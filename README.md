@@ -25,33 +25,44 @@ Each pattern includes:
 
 - **Pros**: simplest shipping; no inter-container ROS overhead; low intra-process latency.
 - **Cons**: large image footprint; coarse-grained updates; limited fault isolation.
-- **Instructions**: 
-  1. adsda
-  2. asdas
+- **Instructions**: A single container image includes the full ROS 2 application stack, namely the camera driver, the YOLO inference node, and the detection output pipeline.
+This pattern is appropriate when operational simplicity is the main priority and the full application is updated as a unit.
+Deployment is performed through one Kubernetes Deployment and one runtime image, which minimizes orchestration complexity and simplifies debugging.
+However, any application change requires rebuilding and redeploying the whole image, even if only one internal component is modified.
+In this work, the monolithic pattern is used as the baseline reference against which the remaining patterns are compared.
+
 
 2. Microservices
 
 - **Pros**: per-service scaling; independent updates; stronger isolation/least-privilege.
 - **Cons**: more moving parts; network overhead between nodes; requires DevOps discipline.
-- **Instructions**: 
-  1. adsda
-  2. asdas
+- **Instructions**: Application functionality is split into independent services, typically separating the camera producer and the YOLO inference component into different containers and Kubernetes workloads.
+Each service can be deployed, monitored, restarted, and updated independently, which improves modularity and operational flexibility.
+This pattern is particularly suitable when compute-intensive inference should be scheduled on different hardware than sensing components, for example separating edge acquisition from cloud-side processing.
+The main trade-off is the additional communication overhead introduced by inter-service ROS 2 traffic, together with increased deployment and observability complexity.
+In this study, the microservices pattern represents the most decoupled and orchestrated form of deployment.
+
 
 3. Dynamic Module Loading (ROS 2 Composition)
 
 - **Pros**: runtime reconfiguration; fast iteration; shared process memory (reduced IPC).
 - **Cons**: weaker isolation across dynamically loaded components; secure loading policy required.
-- **Instructions**: 
-  1. adsda
-  2. asdas
+- **Instructions**: The system starts from a host runtime that can load or unload functional modules dynamically during execution without rebuilding the complete application image.
+In the evaluated setup, the inference component is managed dynamically while the camera pipeline remains continuously active.
+This approach is useful for rapid experimentation, adaptive functionality, and runtime feature management, since modules can be activated or replaced with minimal service interruption.
+Its main limitation is reduced isolation, because dynamically loaded components share a common execution environment and therefore require stricter control over module trust, lifecycle, and error handling.
+In this work, the dynamic loading pattern is used to evaluate the trade-off between deployment agility and runtime robustness.
+
 
 4. Overlay Workspaces
 
 - **Pros**: small incremental updates; keep base immutable; fast rollouts of models/features.
 - **Cons**: dependency boundaries must be curated; overlay depth should stay shallow.
-- **Instructions**: 
-  1. adsda
-  2. asdas
+- **Instructions**: A stable base workspace contains the common ROS 2 dependencies and foundational packages, while an overlay workspace contains the components that evolve more frequently, such as inference nodes or model-related logic.
+This organization allows small incremental updates to be delivered without rebuilding the entire software stack, reducing rollout time and image churn.
+The pattern is especially useful when the lower layers of the application remain stable but upper-layer functionality changes often during experimentation or iterative development.
+Its effectiveness depends on maintaining clear dependency boundaries between base and overlay layers; otherwise, the workspace structure becomes difficult to maintain and reproduce.
+In this study, overlay workspaces are used to assess the benefits of incremental delivery and controlled software evolution in Kubernetes-based ROS 2 systems.
 
 
 ## Benchmarking metrics

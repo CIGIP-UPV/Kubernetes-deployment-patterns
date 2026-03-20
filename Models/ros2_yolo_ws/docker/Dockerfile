@@ -1,5 +1,7 @@
 # ROS 2 Humble (Ubuntu 22.04)
 ARG ROS_DISTRO=humble
+ARG TARGETARCH
+ARG TORCH_VARIANT=auto
 FROM ros:${ROS_DISTRO}-ros-base
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -15,14 +17,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ros-${ROS_DISTRO}-cv-bridge \
       ros-${ROS_DISTRO}-vision-msgs \
       ros-${ROS_DISTRO}-image-transport \
+      ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
     && rm -rf /var/lib/apt/lists/*
 
-# PyTorch + CUDA 12.1 + Ultralytics
+# Use CPU wheels on arm64/local validation, and allow explicit CUDA on amd64.
 RUN python3 -m pip install --no-cache-dir --upgrade pip && \
+    if [ "${TORCH_VARIANT}" = "cuda121" ]; then \
+      python3 -m pip install --no-cache-dir \
+        torch==2.4.1+cu121 torchvision==0.19.1+cu121 \
+        --index-url https://download.pytorch.org/whl/cu121 ; \
+    else \
+      python3 -m pip install --no-cache-dir torch==2.4.1 torchvision==0.19.1 ; \
+    fi && \
     python3 -m pip install --no-cache-dir \
-      torch==2.4.1+cu121 torchvision==0.19.1+cu121 \
-      --index-url https://download.pytorch.org/whl/cu121 && \
-    python3 -m pip install --no-cache-dir ultralytics==8.3.2 numpy
+      ultralytics==8.3.2 \
+      numpy \
+      fastapi==0.115.6 \
+      uvicorn==0.32.1 \
+      python-multipart==0.0.17
 
 # Workspace
 WORKDIR /opt/ros_ws
@@ -37,8 +49,9 @@ SHELL ["/bin/bash", "-lc"]
 RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
     colcon build --symlink-install --packages-select yolo_detector_pkg
 
-# Pre-descarga del modelo
-RUN python3 - <<'PY'\nfrom ultralytics import YOLO\nYOLO('yolov8n.pt')\nPY
+# Pre-download the model during build so runtime validation does not depend on network access.
+RUN mkdir -p /opt/models && \
+    python3 -c "from ultralytics import YOLO; YOLO('/opt/models/yolov8n.pt')"
 
 # Entrypoint
 COPY docker/entrypoint.sh /entrypoint.sh

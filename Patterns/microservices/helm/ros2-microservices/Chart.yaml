@@ -1,8 +1,8 @@
 apiVersion: v2
 name: ros2-microservices
-description: A Helm chart implementing a microservices pattern for ROS 2 (listener, talker & load generator)
+description: Microservices ROS 2 pattern with decoupled camera and YOLO services
 type: application
-version: 1.0.5
+version: 2.0.0
 appVersion: humble
 keywords:
   - ros2

@@ -1,91 +1,59 @@
-image:
-  repository: osrf/ros
-  tag: humble-desktop
-  pullPolicy: IfNotPresent
-imagePullSecrets: []   # p.ej.: [{name: myregistry}]
+images:
+  camera:
+    repository: ros2-camera
+    tag: latest
+    pullPolicy: IfNotPresent
+  yolo:
+    repository: ros2-yolo
+    tag: latest
+    pullPolicy: IfNotPresent
+imagePullSecrets: []
 
-resources:
-  talker:
-    requests: { cpu: 100m, memory: 128Mi }
-    limits:   { cpu: 300m, memory: 256Mi }
-  listener:
-    requests: { cpu: 100m, memory: 128Mi }
-    limits:   { cpu: 300m, memory: 256Mi }
-  loadGenerator:
-    requests: { cpu: 50m, memory: 64Mi }
-    limits:   { cpu: 200m, memory: 128Mi }
+ros:
+  domainId: "42"
+  rmwImplementation: rmw_cyclonedds_cpp
+  localhostOnly: "0"
 
-commonEnv:
-  ROS_DOMAIN_ID: "42"
-  RMW_IMPLEMENTATION: "rmw_fastrtps_cpp"
-  ROS_LOCALHOST_ONLY: "0"
+network:
+  hostNetwork: true
 
-talker:
+camera:
   enabled: true
-  nodeSelector: { role: edge }   # <-- Raspberry (arm64)
-  affinity: {}
+  # Example edge placement: { role: edge }
+  nodeSelector: {}
   tolerations: []
-  extraEnv: []
-  # Opcionalmente puedes exponer Service del talker; por defecto, off:
-  service:
-    enabled: false
-    type: ClusterIP
-    ports: []   # añade si lo necesitas
+  affinity: {}
+  device: /dev/video0
+  width: 1280
+  height: 720
+  fps: 30
+  frameId: camera
+  syntheticMode: false
+  mountVideoDevice: true
+  resources:
+    requests: { cpu: 300m, memory: 512Mi }
+    limits: { cpu: 1000m, memory: 1Gi }
 
-listener:
+yolo:
   enabled: true
-  nodeSelector: { role: cloud }  # <-- kb2 (amd64)
-  affinity: {}
+  # Example cloud placement: { role: cloud }
+  nodeSelector: {}
   tolerations: []
-  extraEnv: []
-  readinessProbe:
-    enabled: false    # Actívala cuando tengas un healthcheck real
-  livenessProbe:
-    enabled: true     # Liveness exec básica para ROS2
-  service:
-    enabled: true
-    type: ClusterIP
-    ports:
-      - name: dds-discovery
-        port: 7400
-        targetPort: 7400
-        protocol: UDP
-      - name: dds-user
-        port: 7401
-        targetPort: 7401
-        protocol: UDP
-  loadGenerator:
-    enabled: true
-    messageRate: 10
-    topicName: "load_topic"
+  affinity: {}
+  modelPath: /opt/models/yolov8n.pt
+  conf: 0.25
+  publishDebugImage: "false"
+  publishMetrics: "true"
+  resources:
+    requests: { cpu: 1000m, memory: 2Gi }
+    limits: { cpu: 4000m, memory: 8Gi }
 
-config:
-  loadSimScript: |
-    #!/usr/bin/env python3
-    import os, time, rclpy
-    from rclpy.node import Node
-    from std_msgs.msg import String
+topics:
+  image: /camera/image_raw
+  detections: /detections
+  debugImage: /detections/image
+  latency: /benchmark/latency_ms
+  inference: /benchmark/inference_ms
 
-    class LoadPublisher(Node):
-        def __init__(self):
-            super().__init__('load_publisher')
-            topic = os.environ.get('TOPIC_NAME','load_topic')
-            hz = float(os.environ.get('MESSAGE_RATE','10'))
-            self.pub = self.create_publisher(String, topic, 10)
-            self.timer = self.create_timer(1.0/max(hz,0.1), self.tick)
-            self.i = 0
-
-        def tick(self):
-            msg = String()
-            msg.data = f"load msg {self.i}"
-            self.pub.publish(msg)
-            self.i += 1
-
-    rclpy.init()
-    node = LoadPublisher()
-    try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
-    node.destroy_node()
-    rclpy.shutdown()
+nameOverride: ""
+fullnameOverride: ""

@@ -1,8 +1,8 @@
 apiVersion: v2
 name: ros2-monolithic
-description: A Helm chart for a monolithic ROS 2 demo (talker+listener & load simulator)
+description: Monolithic ROS 2 pattern with camera + YOLO + detections in a single runtime container
 type: application
-version: 1.0.1
+version: 2.0.0
 appVersion: humble
 keywords:
   - ros2

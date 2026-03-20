@@ -11,6 +11,7 @@ spec:
     matchLabels:
       app: {{ include "dynamic-loader.name" . }}
       pattern: dynamic-loader
+      app.kubernetes.io/instance: {{ .Release.Name }}
   template:
     metadata:
       labels:
@@ -18,120 +19,126 @@ spec:
         pattern: dynamic-loader
         {{- include "dynamic-loader.labels" . | nindent 8 }}
     spec:
+      {{- if .Values.network.hostNetwork }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      {{- end }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- if .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml .Values.nodeSelector | nindent 8 }}
       {{- end }}
-      initContainers:
-        # Init container para instalar dependencias Python
-        - name: install-deps
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command:
-            - /bin/bash
-            - -c
-            - |
-              echo "Installing Python dependencies..."
-              apt-get update -qq
-              apt-get install -y -qq python3-pip
-              python3 -m pip install --no-cache-dir \
-                fastapi==0.104.1 \
-                uvicorn[standard]==0.24.0 \
-                python-multipart==0.0.6
-              echo "Dependencies installed successfully"
-          volumeMounts:
-            - name: pip-cache
-              mountPath: /root/.cache/pip
+      {{- if .Values.affinity }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+      {{- end }}
       containers:
-        - name: dynamic-host
-          {{- if .Values.baseImageCustom.enabled }}
-          image: "{{ .Values.baseImageCustom.repository }}:{{ .Values.baseImageCustom.tag }}"
-          {{- else }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        - name: camera
+          image: "{{ .Values.images.camera.repository }}:{{ .Values.images.camera.tag }}"
+          imagePullPolicy: {{ .Values.images.camera.pullPolicy }}
+          env:
+            - name: ROS_DOMAIN_ID
+              value: {{ .Values.ros.domainId | quote }}
+            - name: RMW_IMPLEMENTATION
+              value: {{ .Values.ros.rmwImplementation | quote }}
+            - name: ROS_LOCALHOST_ONLY
+              value: {{ .Values.ros.localhostOnly | quote }}
+          command: ["/bin/bash", "-lc"]
+          args:
+            - |
+              set -e
+              source /opt/ros/humble/setup.bash
+              if [ -f /opt/ros2_cam_ws/install/setup.bash ]; then
+                source /opt/ros2_cam_ws/install/setup.bash
+              fi
+              ros2 run camera_driver_pkg camera_driver --ros-args \
+                -p device:={{ .Values.camera.device | quote }} \
+                -p width:={{ .Values.camera.width }} \
+                -p height:={{ .Values.camera.height }} \
+                -p fps:={{ .Values.camera.fps }} \
+                -p frame_id:={{ .Values.camera.frameId | quote }} \
+                -p synthetic_mode:={{ .Values.camera.syntheticMode | quote }} \
+                -p image_topic:={{ .Values.topics.image | quote }}
+          resources:
+            {{- toYaml .Values.resources.camera | nindent 12 }}
+          {{- if and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode) }}
+          volumeMounts:
+            - name: video-device
+              mountPath: /dev/video0
           {{- end }}
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+        - name: dynamic-host
+          image: "{{ .Values.images.dynamicHost.repository }}:{{ .Values.images.dynamicHost.tag }}"
+          imagePullPolicy: {{ .Values.images.dynamicHost.pullPolicy }}
           workingDir: /app
           env:
             - name: ROS_DOMAIN_ID
-              value: "{{ .Values.ros.domainId }}"
+              value: {{ .Values.ros.domainId | quote }}
             - name: RMW_IMPLEMENTATION
-              value: "{{ .Values.ros.rmwImplementation }}"
+              value: {{ .Values.ros.rmwImplementation | quote }}
             - name: ROS_LOCALHOST_ONLY
-              value: "1"
+              value: {{ .Values.ros.localhostOnly | quote }}
             - name: PORT
-              value: "{{ .Values.api.port }}"
-            - name: PYTHONUNBUFFERED
-              value: "1"
-            {{- if .Values.security.validateModules }}
-            - name: VALIDATE_MODULES
-              value: "true"
+              value: {{ .Values.dynamic.apiPort | quote }}
+            - name: AUTO_LOAD_YOLO
+              value: {{ .Values.dynamic.autoLoadYolo | quote }}
             - name: ALLOWED_MODULES
-              value: {{ .Values.security.allowedModuleNames | join "," | quote }}
-            {{- end }}
-          command:
-            - /bin/bash
-            - -c
+              value: {{ .Values.dynamic.allowedModules | join "," | quote }}
+            - name: YOLO_MODEL_PATH
+              value: {{ .Values.dynamic.modelPath | quote }}
+            - name: YOLO_CONF
+              value: {{ .Values.dynamic.conf | quote }}
+            - name: YOLO_PUBLISH_DEBUG
+              value: {{ .Values.dynamic.publishDebugImage | quote }}
+            - name: YOLO_PUBLISH_METRICS
+              value: {{ .Values.dynamic.publishMetrics | quote }}
+            - name: IMAGE_TOPIC
+              value: {{ .Values.topics.image | quote }}
+            - name: DETECTIONS_TOPIC
+              value: {{ .Values.topics.detections | quote }}
+            - name: DEBUG_IMAGE_TOPIC
+              value: {{ .Values.topics.debugImage | quote }}
+            - name: LATENCY_TOPIC
+              value: {{ .Values.topics.latency | quote }}
+            - name: INFERENCE_TOPIC
+              value: {{ .Values.topics.inference | quote }}
+          command: ["/bin/bash", "-lc"]
+          args:
             - |
-              source /opt/ros/{{ .Chart.AppVersion }}/setup.bash
-              
-              # Reinstalar dependencias (workaround si initContainer no comparte filesystem)
-              if ! python3 -c "import fastapi" 2>/dev/null; then
-                echo "Installing FastAPI dependencies..."
-                apt-get update -qq && apt-get install -y -qq python3-pip
-                python3 -m pip install --no-cache-dir fastapi uvicorn python-multipart
+              set -e
+              source /opt/ros/humble/setup.bash
+              if [ -f /opt/ros_ws/install/setup.bash ]; then
+                source /opt/ros_ws/install/setup.bash
               fi
-              
-              echo "==================================="
-              echo "Dynamic Module Loader API Starting"
-              echo "Port: $PORT"
-              echo "Modules directory: /modules"
-              echo "==================================="
-              
-              # Iniciar servidor FastAPI
-              cd /app
-              python3 -m uvicorn server:app --host 0.0.0.0 --port $PORT --log-level info
+              python3 -m uvicorn server:app --host 0.0.0.0 --port ${PORT}
           ports:
             - name: http-api
-              containerPort: {{ .Values.api.port }}
+              containerPort: {{ .Values.dynamic.apiPort }}
               protocol: TCP
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            {{- toYaml .Values.resources.dynamicHost | nindent 12 }}
           volumeMounts:
             - name: app-code
               mountPath: /app
-            {{- if .Values.persistence.enabled }}
-            - name: modules-storage
-              mountPath: {{ .Values.persistence.mountPath }}
-            {{- else }}
-            - name: modules
-              mountPath: /modules
-            {{- end }}
           livenessProbe:
             httpGet:
-              path: /
+              path: /health
               port: http-api
-            initialDelaySeconds: 30
+            initialDelaySeconds: 20
             periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 3
-          readinessProbe:
-            httpGet:
-              path: /
-              port: http-api
-            initialDelaySeconds: 10
-            periodSeconds: 5
       volumes:
         - name: app-code
           configMap:
             name: {{ include "dynamic-loader.fullname" . }}-code
-        - name: pip-cache
-          emptyDir: {}
-        {{- if .Values.persistence.enabled }}
-        - name: modules-storage
-          persistentVolumeClaim:
-            claimName: {{ include "dynamic-loader.fullname" . }}-modules
-        {{- else }}
-        - name: modules
-          emptyDir: {}
+        {{- if and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode) }}
+        - name: video-device
+          hostPath:
+            path: /dev/video0
+            type: CharDevice
         {{- end }}
-      restartPolicy: Always

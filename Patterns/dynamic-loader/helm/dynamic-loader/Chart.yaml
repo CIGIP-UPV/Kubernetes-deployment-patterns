@@ -1,8 +1,8 @@
 apiVersion: v2
 name: dynamic-loader
-description: Helm chart for ROS 2 dynamic composition with FastAPI-based HTTP API
+description: Dynamic loading ROS 2 pattern with camera service and runtime-loadable YOLO module via FastAPI
 type: application
-version: 1.0.1
+version: 2.0.0
 appVersion: humble
 keywords:
   - ros2
@@ -11,4 +11,3 @@ keywords:
 maintainers:
   - name: Miguel-Angel-Mateo-Casali
     email: mmateo@cigip.upv.es
-

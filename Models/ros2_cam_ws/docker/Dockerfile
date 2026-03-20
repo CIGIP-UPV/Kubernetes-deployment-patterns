@@ -8,6 +8,7 @@ LABEL authors="miguelangel"
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip python3-colcon-common-extensions \
     ros-${ROS_DISTRO}-cv-bridge ros-${ROS_DISTRO}-image-transport \
+    ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
     python3-opencv v4l-utils libgl1 \
  && rm -rf /var/lib/apt/lists/*
 
@@ -24,7 +25,7 @@ RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
     colcon build --symlink-install
 
 # Entrypoint que hace source de ROS y del workspace
-COPY entrypoint.sh /entrypoint.sh
+COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Por defecto lanzamos el nodo (puedes cambiar a ros2 run si prefieres)

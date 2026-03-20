@@ -1,13 +1,21 @@
-# Monolithic ROS 2 Deployment
+# Monolithic ROS 2 Deployment (Camera + YOLO)
 
-This pattern packages multiple ROS 2 nodes in a single container launched from a single file.
+Single container image running both ROS 2 nodes in one runtime unit:
 
-## Usage
+- `camera_driver_pkg` publishes `/camera/image_raw`
+- `yolo_detector_pkg` subscribes and publishes `/detections`
+
+## Deploy
+
+```bash
+helm upgrade --install mono ./helm \
+  --set image.repository=<registry>/ros2-monolithic \
+  --set image.tag=<tag>
 ```
-kubectl apply -f deployment.yaml
-```
 
-Adjust the message rate via the `MESSAGE_RATE` environment variable in the deployment.
-The `load-simulator` container publishes messages to topic `load_chatter` to emulate workload.
+## Notes
 
-Metrics can be scraped via Prometheus using the Python client if integrated in the `load_sim.py` script.
+- By default it mounts `/dev/video0` from the host.
+- It publishes latency/inference metrics to:
+  - `/benchmark/latency_ms`
+  - `/benchmark/inference_ms`

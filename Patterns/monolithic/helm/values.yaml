@@ -1,60 +1,62 @@
-# values.yaml para Monolithic Pattern
-# Todos los componentes ROS 2 en un solo contenedor
-
 replicaCount: 1
 
 image:
-  repository: osrf/ros
-  tag: humble-desktop
+  repository: ros2-monolithic
+  tag: latest
   pullPolicy: IfNotPresent
+imagePullSecrets: []
 
-# Configuración ROS 2
 ros:
-  domainId: 42
-  rmwImplementation: rmw_fastrtps_cpp
+  domainId: "42"
+  rmwImplementation: rmw_cyclonedds_cpp
+  localhostOnly: "0"
 
-# Selector de nodo (puedes desplegarlo en cloud o edge)
-nodeSelector:
-  # Opción 1: Desplegar en cloud
-  kubernetes.io/hostname: kb2.cigip.upv.es
-  # Opción 2: Desplegar en edge (comentar línea anterior y descomentar esta)
-  # kubernetes.io/hostname: kb-edge01.cigip.upv.es
+network:
+  hostNetwork: true
 
-# Load Simulator integrado
-loadSimulator:
-  enabled: true
-  messageRate: 10
-  scriptPath: load_sim.py
-  topic: load_chatter
+camera:
+  device: /dev/video0
+  width: 1280
+  height: 720
+  fps: 30
+  frameId: camera
+  syntheticMode: false
+  mountVideoDevice: true
 
-# Recursos del contenedor monolítico
+yolo:
+  modelPath: /opt/models/yolov8n.pt
+  conf: 0.25
+  publishDebugImage: "false"
+  publishMetrics: "true"
+  startDelaySeconds: 2
+
+topics:
+  image: /camera/image_raw
+  detections: /detections
+  debugImage: /detections/image
+  latency: /benchmark/latency_ms
+  inference: /benchmark/inference_ms
+
 resources:
   requests:
-    cpu: 300m
-    memory: 512Mi
-  limits:
     cpu: 1000m
-    memory: 1Gi
+    memory: 2Gi
+  limits:
+    cpu: 4000m
+    memory: 8Gi
 
-# Servicio Kubernetes
+securityContext:
+  runAsNonRoot: false
+  allowPrivilegeEscalation: false
+
+nodeSelector: {}
+affinity: {}
+tolerations: []
+
 service:
-  type: ClusterIP
-  port: 11311
-  targetPort: 11311
-
-# Configuración de la aplicación ROS 2
-application:
-  # Launch file que ejecuta múltiples nodos
-  launchPackage: demo_nodes_cpp
-  launchFile: talker_listener.launch.py
-  # Para tu aplicación real:
-  # launchPackage: your_package
-  # launchFile: your_launch.py
-
-# Monitoring (opcional)
-monitoring:
   enabled: false
-  port: 9090
+  type: ClusterIP
+  port: 8080
 
 nameOverride: ""
 fullnameOverride: ""

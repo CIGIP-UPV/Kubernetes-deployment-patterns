@@ -11,6 +11,7 @@ spec:
     matchLabels:
       app: {{ include "ros2-monolithic.name" . }}
       pattern: monolithic
+      app.kubernetes.io/instance: {{ .Release.Name }}
   template:
     metadata:
       labels:
@@ -18,104 +19,129 @@ spec:
         pattern: monolithic
         {{- include "ros2-monolithic.labels" . | nindent 8 }}
     spec:
+      {{- if .Values.network.hostNetwork }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      {{- end }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- if .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml .Values.nodeSelector | nindent 8 }}
       {{- end }}
+      {{- if .Values.affinity }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+      {{- end }}
       containers:
-        # Contenedor principal: Aplicación ROS 2 monolítica
-        - name: ros-monolithic-app
+        - name: monolithic-runtime
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: {{ .Values.securityContext.allowPrivilegeEscalation }}
+            {{- if .Values.securityContext.runAsNonRoot }}
+            runAsNonRoot: true
+            {{- end }}
           env:
             - name: ROS_DOMAIN_ID
-              value: "{{ .Values.ros.domainId }}"
+              value: {{ .Values.ros.domainId | quote }}
             - name: RMW_IMPLEMENTATION
-              value: "{{ .Values.ros.rmwImplementation }}"
+              value: {{ .Values.ros.rmwImplementation | quote }}
             - name: ROS_LOCALHOST_ONLY
-              value: "1"  # En monolítico, todos los nodos están en el mismo proceso
-            - name: NODE_NAME
-              value: "monolithic_app"
-          command:
-            - /bin/bash
-            - -c
+              value: {{ .Values.ros.localhostOnly | quote }}
+            - name: CAMERA_DEVICE
+              value: {{ .Values.camera.device | quote }}
+            - name: CAMERA_WIDTH
+              value: {{ .Values.camera.width | quote }}
+            - name: CAMERA_HEIGHT
+              value: {{ .Values.camera.height | quote }}
+            - name: CAMERA_FPS
+              value: {{ .Values.camera.fps | quote }}
+            - name: CAMERA_FRAME_ID
+              value: {{ .Values.camera.frameId | quote }}
+            - name: CAMERA_SYNTHETIC_MODE
+              value: {{ .Values.camera.syntheticMode | quote }}
+            - name: IMAGE_TOPIC
+              value: {{ .Values.topics.image | quote }}
+            - name: DETECTIONS_TOPIC
+              value: {{ .Values.topics.detections | quote }}
+            - name: DEBUG_IMAGE_TOPIC
+              value: {{ .Values.topics.debugImage | quote }}
+            - name: LATENCY_TOPIC
+              value: {{ .Values.topics.latency | quote }}
+            - name: INFERENCE_TOPIC
+              value: {{ .Values.topics.inference | quote }}
+            - name: YOLO_MODEL_PATH
+              value: {{ .Values.yolo.modelPath | quote }}
+            - name: YOLO_CONF
+              value: {{ .Values.yolo.conf | quote }}
+            - name: YOLO_PUBLISH_DEBUG
+              value: {{ .Values.yolo.publishDebugImage | quote }}
+            - name: YOLO_PUBLISH_METRICS
+              value: {{ .Values.yolo.publishMetrics | quote }}
+            - name: YOLO_START_DELAY
+              value: {{ .Values.yolo.startDelaySeconds | quote }}
+          command: ["/bin/bash", "-lc"]
+          args:
             - |
-              source /opt/ros/{{ .Chart.AppVersion }}/setup.bash
-              echo "==================================="
-              echo "Starting Monolithic ROS 2 Application"
-              echo "Launch: {{ .Values.application.launchPackage }}/{{ .Values.application.launchFile }}"
-              echo "==================================="
-              
-              # Ejecutar el launch file que inicia múltiples nodos
-              ros2 launch {{ .Values.application.launchPackage }} {{ .Values.application.launchFile }}
-          ports:
-            - name: ros-dds
-              containerPort: 7400
-              protocol: UDP
+              set -e
+              source /opt/ros/humble/setup.bash
+              if [ -f /opt/ros2_monolithic_ws/install/setup.bash ]; then
+                source /opt/ros2_monolithic_ws/install/setup.bash
+              fi
+              echo "[monolithic] Starting camera node..."
+              ros2 run camera_driver_pkg camera_driver --ros-args \
+                -p device:=${CAMERA_DEVICE} \
+                -p width:=${CAMERA_WIDTH} \
+                -p height:=${CAMERA_HEIGHT} \
+                -p fps:=${CAMERA_FPS} \
+                -p frame_id:=${CAMERA_FRAME_ID} \
+                -p synthetic_mode:=${CAMERA_SYNTHETIC_MODE} \
+                -p image_topic:=${IMAGE_TOPIC} &
+              CAMERA_PID=$!
+
+              sleep ${YOLO_START_DELAY}
+              echo "[monolithic] Starting yolo node..."
+              ros2 run yolo_detector_pkg yolo_detector --ros-args \
+                -p model_path:=${YOLO_MODEL_PATH} \
+                -p conf:=${YOLO_CONF} \
+                -p image_topic:=${IMAGE_TOPIC} \
+                -p detections_topic:=${DETECTIONS_TOPIC} \
+                -p debug_image_topic:=${DEBUG_IMAGE_TOPIC} \
+                -p publish_debug_image:=${YOLO_PUBLISH_DEBUG} \
+                -p publish_metrics:=${YOLO_PUBLISH_METRICS} \
+                -p latency_topic:=${LATENCY_TOPIC} \
+                -p inference_topic:=${INFERENCE_TOPIC} &
+              YOLO_PID=$!
+
+              wait -n ${CAMERA_PID} ${YOLO_PID}
+              exit 1
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          {{- if and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode) }}
+          volumeMounts:
+            - name: video-device
+              mountPath: /dev/video0
+          {{- end }}
           livenessProbe:
             exec:
               command:
                 - /bin/bash
-                - -c
-                - "ros2 node list | wc -l | grep -qE '^[1-9]' || exit 1"
-            initialDelaySeconds: 30
+                - -lc
+                - |
+                  ros2 node list | grep -q "/camera_driver" && ros2 node list | grep -q "/yolo_detector"
+            initialDelaySeconds: 40
             periodSeconds: 15
-            timeoutSeconds: 5
-            failureThreshold: 3
-          readinessProbe:
-            exec:
-              command:
-                - /bin/bash
-                - -c
-                - "ros2 node list | wc -l | grep -qE '^[1-9]' || exit 1"
-            initialDelaySeconds: 20
-            periodSeconds: 10
-
-        {{- if .Values.loadSimulator.enabled }}
-        # Contenedor sidecar: Load Simulator
-        - name: load-simulator
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          env:
-            - name: ROS_DOMAIN_ID
-              value: "{{ .Values.ros.domainId }}"
-            - name: RMW_IMPLEMENTATION
-              value: "{{ .Values.ros.rmwImplementation }}"
-            - name: ROS_LOCALHOST_ONLY
-              value: "1"
-            - name: MESSAGE_RATE
-              value: "{{ .Values.loadSimulator.messageRate }}"
-            - name: TOPIC_NAME
-              value: "{{ .Values.loadSimulator.topic }}"
-          command:
-            - /bin/bash
-            - -c
-            - |
-              source /opt/ros/{{ .Chart.AppVersion }}/setup.bash
-              # Esperar a que el nodo principal esté listo
-              echo "Waiting for main ROS 2 nodes to start..."
-              sleep 10
-              echo "Starting Load Simulator..."
-              python3 /scripts/{{ .Values.loadSimulator.scriptPath }}
-          volumeMounts:
-            - name: load-sim
-              mountPath: /scripts
-          resources:
-            requests:
-              cpu: 50m
-              memory: 64Mi
-            limits:
-              cpu: 200m
-              memory: 128Mi
-        {{- end }}
-
+      {{- if and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode) }}
       volumes:
-        {{- if .Values.loadSimulator.enabled }}
-        - name: load-sim
-          configMap:
-            name: {{ include "ros2-monolithic.fullname" . }}-load-sim
-            defaultMode: 0755
-        {{- end }}
-      restartPolicy: Always
+        - name: video-device
+          hostPath:
+            path: /dev/video0
+            type: CharDevice
+      {{- end }}

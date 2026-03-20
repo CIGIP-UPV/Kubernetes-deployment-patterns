@@ -8,6 +8,9 @@ spec:
   type: {{ .Values.service.type }}
   selector:
     app: {{ include "dynamic-loader.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
   ports:
-    - port: {{ .Values.service.port }}
+    - name: http
+      protocol: TCP
+      port: {{ .Values.service.port }}
       targetPort: {{ .Values.service.targetPort }}

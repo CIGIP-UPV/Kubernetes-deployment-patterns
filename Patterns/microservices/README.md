@@ -1,10 +1,21 @@
-# ROS 2 Microservices Deployment
+# ROS 2 Microservices Deployment (Camera + YOLO)
 
-This Helm chart deploys ROS 2 nodes as independent microservices communicating via DDS.
+Two microservices are deployed independently:
 
-## Usage
+- `camera` service (edge): publishes `/camera/image_raw`
+- `yolo` service (cloud/edge): subscribes and publishes `/detections`
+
+## Deploy
+
+```bash
+helm upgrade --install micro ./helm/ros2-microservices \
+  --set images.camera.repository=<registry>/ros2-camera \
+  --set images.camera.tag=<tag> \
+  --set images.yolo.repository=<registry>/ros2-yolo \
+  --set images.yolo.tag=<tag>
 ```
-helm install ros2-micro ./helm/ros2-microservices
-```
 
-The `values.yaml` allows adjusting the message rate for the load generator.
+## Notes
+
+- Node placement is configurable via `camera.nodeSelector` and `yolo.nodeSelector`.
+- Metrics are published to `/benchmark/latency_ms` and `/benchmark/inference_ms`.

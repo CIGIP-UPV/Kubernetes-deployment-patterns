@@ -1,71 +1,66 @@
-# values.yaml para Dynamic Module Loading Pattern
-# Sistema ROS 2 con capacidad de cargar módulos dinámicamente vía API
-
 replicaCount: 1
 
-image:
-  repository: osrf/ros
-  tag: humble-desktop
-  pullPolicy: IfNotPresent
+images:
+  camera:
+    repository: ros2-camera
+    tag: latest
+    pullPolicy: IfNotPresent
+  dynamicHost:
+    repository: ros2-yolo
+    tag: latest
+    pullPolicy: IfNotPresent
+imagePullSecrets: []
 
-# Configuración ROS 2
 ros:
-  domainId: 42
-  rmwImplementation: rmw_fastrtps_cpp
+  domainId: "42"
+  rmwImplementation: rmw_cyclonedds_cpp
+  localhostOnly: "0"
 
-# Selector de nodo
-nodeSelector:
-  # Desplegar donde necesites
-  kubernetes.io/hostname: kb2.cigip.upv.es
-  # O en edge:
-  # kubernetes.io/hostname: kb-edge01.cigip.upv.es
+network:
+  hostNetwork: true
 
-# API HTTP para carga dinámica
-api:
-  port: 5000
-  enabled: true
+camera:
+  device: /dev/video0
+  width: 1280
+  height: 720
+  fps: 30
+  frameId: camera
+  syntheticMode: false
+  mountVideoDevice: true
 
-# Base image con dependencias preinstaladas
-# IMPORTANTE: En producción, crear una imagen custom con FastAPI ya instalado
-baseImageCustom:
-  enabled: false
-  # Si enabled: true, usar:
-  # repository: your-registry/ros2-dynamic-loader
-  # tag: latest
+dynamic:
+  apiPort: 5000
+  autoLoadYolo: true
+  modelPath: /opt/models/yolov8n.pt
+  conf: 0.25
+  publishDebugImage: "false"
+  publishMetrics: "true"
+  allowedModules:
+    - yolo_detector
 
-# Recursos
+topics:
+  image: /camera/image_raw
+  detections: /detections
+  debugImage: /detections/image
+  latency: /benchmark/latency_ms
+  inference: /benchmark/inference_ms
+
 resources:
-  requests:
-    cpu: 200m
-    memory: 256Mi
-  limits:
-    cpu: 1000m
-    memory: 1Gi
+  camera:
+    requests: { cpu: 300m, memory: 512Mi }
+    limits: { cpu: 1000m, memory: 1Gi }
+  dynamicHost:
+    requests: { cpu: 1000m, memory: 2Gi }
+    limits: { cpu: 4000m, memory: 8Gi }
 
-# Servicio
 service:
   type: ClusterIP
   port: 5000
   targetPort: 5000
-  # Para exponer externamente:
-  # type: NodePort
-  # nodePort: 30500
 
-# Persistencia (opcional, para mantener módulos entre reinicios)
-persistence:
-  enabled: false
-  storageClass: ""
-  size: 1Gi
-  mountPath: /modules
-
-# Seguridad
-security:
-  # En producción, habilitar validación de módulos
-  validateModules: false
-  allowedModuleNames: []
-  # allowedModuleNames:
-  #   - perception_module
-  #   - navigation_module
+nodeSelector: {}
+affinity: {}
+tolerations: []
 
 nameOverride: ""
 fullnameOverride: ""
