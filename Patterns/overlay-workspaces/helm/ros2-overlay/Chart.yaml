@@ -1,0 +1,13 @@
+apiVersion: v2
+name: ros2-overlay
+description: Helm chart for ROS2 overlay-workspaces pattern (base ws + overlay ws)
+type: application
+version: 1.0.0
+appVersion: humble
+keywords:
+  - ros2
+  - overlay
+  - cloud-edge
+maintainers:
+  - name: Miguel-Angel-Mateo-Casali
+    email: mmateo@cigip.upv.es

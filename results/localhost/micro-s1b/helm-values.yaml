@@ -1,0 +1,17 @@
+USER-SUPPLIED VALUES:
+camera:
+  fps: 10
+  mountVideoDevice: false
+  syntheticMode: true
+images:
+  camera:
+    repository: local/ros2-camera
+    tag: ddktop
+  yolo:
+    repository: local/ros2-yolo
+    tag: ddktop
+ros:
+  domainId: 210
+  rmwImplementation: rmw_cyclonedds_cpp
+yolo:
+  conf: "0.25"

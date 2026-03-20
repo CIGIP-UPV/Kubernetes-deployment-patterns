@@ -1,0 +1,17 @@
+USER-SUPPLIED VALUES:
+camera:
+  fps: 10
+  mountVideoDevice: false
+  syntheticMode: true
+dynamic:
+  conf: "0.25"
+images:
+  camera:
+    repository: local/ros2-camera
+    tag: ddktop
+  dynamicHost:
+    repository: local/ros2-yolo
+    tag: ddktop
+ros:
+  domainId: 32
+  rmwImplementation: rmw_cyclonedds_cpp

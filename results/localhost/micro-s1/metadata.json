@@ -1,0 +1,11 @@
+{
+  "pattern": "microservices",
+  "scenario": "S1",
+  "release": "micro-s1",
+  "namespace": "ros2exp",
+  "duration_seconds": 25,
+  "image_registry_prefix": "local",
+  "image_tag": "ddktop",
+  "install_seconds": 1,
+  "ready_seconds": "9.44077754020691"
+}

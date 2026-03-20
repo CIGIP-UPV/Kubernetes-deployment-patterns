@@ -1,0 +1,69 @@
+imagePullSecrets:
+  - name: regcred
+
+images:
+  camera:
+    repository: registry.example.com/tesis/ros2-camera
+    tag: stable
+    pullPolicy: IfNotPresent
+  dynamicHost:
+    repository: registry.example.com/tesis/ros2-yolo
+    tag: stable
+    pullPolicy: IfNotPresent
+
+network:
+  hostNetwork: true
+
+ros:
+  domainId: "42"
+  rmwImplementation: rmw_cyclonedds_cpp
+  localhostOnly: "0"
+
+camera:
+  device: /dev/video0
+  width: 1280
+  height: 720
+  fps: 10
+  frameId: camera
+  syntheticMode: false
+  mountVideoDevice: true
+
+dynamic:
+  apiPort: 5000
+  autoLoadYolo: true
+  modelPath: /opt/models/yolov8n.pt
+  conf: 0.25
+  publishDebugImage: "false"
+  publishMetrics: "true"
+  allowedModules:
+    - yolo_detector
+
+resources:
+  camera:
+    requests:
+      cpu: 300m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  dynamicHost:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+
+service:
+  type: ClusterIP
+  port: 5000
+  targetPort: 5000
+
+nodeSelector: {}
+affinity: {}
+tolerations: []
+
+# This pattern runs camera and loader in the same Pod, so both land on the same node.
+# Example edge placement:
+# nodeSelector:
+#   kubernetes.io/hostname: edge-node-1

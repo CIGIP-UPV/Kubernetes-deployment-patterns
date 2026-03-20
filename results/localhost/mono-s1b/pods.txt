@@ -1,0 +1,3 @@
+NAME                                        READY   STATUS    RESTARTS   AGE   IP             NODE             NOMINATED NODE   READINESS GATES
+mono-s1b-probe                              1/1     Running   0          34s   192.168.65.3   docker-desktop   <none>           <none>
+mono-s1b-ros2-monolithic-6569778f57-gftn8   1/1     Running   0          36s   192.168.65.3   docker-desktop   <none>           <none>

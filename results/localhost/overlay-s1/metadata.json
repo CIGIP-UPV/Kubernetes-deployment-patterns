@@ -1,0 +1,12 @@
+{
+  "pattern": "overlay-workspaces",
+  "scenario": "S1",
+  "release": "overlay-s1",
+  "namespace": "ros2exp",
+  "ros_domain_id": 90,
+  "duration_seconds": 25,
+  "image_registry_prefix": "local",
+  "image_tag": "ddktop",
+  "install_seconds": 0,
+  "ready_seconds": "14.629469394683838"
+}

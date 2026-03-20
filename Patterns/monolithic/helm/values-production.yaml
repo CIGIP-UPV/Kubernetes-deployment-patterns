@@ -1,0 +1,47 @@
+imagePullSecrets:
+  - name: regcred
+
+image:
+  repository: registry.example.com/tesis/ros2-monolithic
+  tag: stable
+  pullPolicy: IfNotPresent
+
+network:
+  hostNetwork: true
+
+ros:
+  domainId: "42"
+  rmwImplementation: rmw_cyclonedds_cpp
+  localhostOnly: "0"
+
+camera:
+  device: /dev/video0
+  width: 1280
+  height: 720
+  fps: 10
+  frameId: camera
+  syntheticMode: false
+  mountVideoDevice: true
+
+yolo:
+  modelPath: /opt/models/yolov8n.pt
+  conf: 0.25
+  publishDebugImage: "false"
+  publishMetrics: "true"
+  startDelaySeconds: 2
+
+resources:
+  requests:
+    cpu: 1000m
+    memory: 2Gi
+  limits:
+    cpu: 4000m
+    memory: 8Gi
+
+nodeSelector: {}
+affinity: {}
+tolerations: []
+
+# Example edge pinning:
+# nodeSelector:
+#   kubernetes.io/hostname: edge-node-1

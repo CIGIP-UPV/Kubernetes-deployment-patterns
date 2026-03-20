@@ -1,0 +1,11 @@
+{
+  "pattern": "monolithic",
+  "scenario": "S1",
+  "release": "mono-s1b",
+  "namespace": "ros2exp",
+  "duration_seconds": 30,
+  "image_registry_prefix": "local",
+  "image_tag": "ddktop",
+  "install_seconds": 1,
+  "ready_seconds": "5.774688482284546"
+}

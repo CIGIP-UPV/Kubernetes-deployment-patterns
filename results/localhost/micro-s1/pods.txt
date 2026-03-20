@@ -1,0 +1,4 @@
+NAME                                                  READY   STATUS    RESTARTS   AGE   IP             NODE             NOMINATED NODE   READINESS GATES
+micro-s1-probe                                        1/1     Running   0          31s   192.168.65.3   docker-desktop   <none>           <none>
+micro-s1-ros2-microservices-camera-7cf55978d5-z65zk   1/1     Running   0          35s   192.168.65.3   docker-desktop   <none>           <none>
+micro-s1-ros2-microservices-yolo-84d6f89556-qt9tf     1/1     Running   0          35s   192.168.65.3   docker-desktop   <none>           <none>

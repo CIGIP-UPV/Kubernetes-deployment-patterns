@@ -1,0 +1,83 @@
+{{- if .Values.yolo.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ros2-microservices.fullname" . }}-yolo
+  labels:
+    {{- include "ros2-microservices.labels" . | nindent 4 }}
+    pattern: microservices
+    component: yolo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: yolo
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        {{- include "ros2-microservices.labels" . | nindent 8 }}
+        app: yolo
+        component: yolo
+        pattern: microservices
+    spec:
+      {{- if .Values.network.hostNetwork }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      {{- end }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.yolo.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.yolo.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if .Values.yolo.affinity }}
+      affinity:
+        {{- toYaml .Values.yolo.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.yolo.tolerations }}
+      tolerations:
+        {{- toYaml .Values.yolo.tolerations | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: yolo
+          image: "{{ .Values.images.yolo.repository }}:{{ .Values.images.yolo.tag }}"
+          imagePullPolicy: {{ .Values.images.yolo.pullPolicy }}
+          env:
+            - name: ROS_DOMAIN_ID
+              value: {{ .Values.ros.domainId | quote }}
+            - name: RMW_IMPLEMENTATION
+              value: {{ .Values.ros.rmwImplementation | quote }}
+            - name: ROS_LOCALHOST_ONLY
+              value: {{ .Values.ros.localhostOnly | quote }}
+          command: ["/bin/bash", "-lc"]
+          args:
+            - |
+              set -e
+              source /opt/ros/humble/setup.bash
+              if [ -f /opt/ros_ws/install/setup.bash ]; then
+                source /opt/ros_ws/install/setup.bash
+              fi
+              ros2 run yolo_detector_pkg yolo_detector --ros-args \
+                -p model_path:={{ .Values.yolo.modelPath | quote }} \
+                -p conf:={{ .Values.yolo.conf }} \
+                -p image_topic:={{ .Values.topics.image | quote }} \
+                -p detections_topic:={{ .Values.topics.detections | quote }} \
+                -p debug_image_topic:={{ .Values.topics.debugImage | quote }} \
+                -p publish_debug_image:={{ .Values.yolo.publishDebugImage | quote }} \
+                -p publish_metrics:={{ .Values.yolo.publishMetrics | quote }} \
+                -p latency_topic:={{ .Values.topics.latency | quote }} \
+                -p inference_topic:={{ .Values.topics.inference | quote }}
+          resources:
+            {{- toYaml .Values.yolo.resources | nindent 12 }}
+          livenessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -lc
+                - ros2 node list | grep -q "/yolo_detector"
+            initialDelaySeconds: 40
+            periodSeconds: 15
+{{- end }}

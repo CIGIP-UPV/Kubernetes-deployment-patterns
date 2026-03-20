@@ -1,0 +1,53 @@
+replicaCount: 1
+
+image:
+  repository: ros2-overlay
+  tag: latest
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+ros:
+  domainId: "42"
+  rmwImplementation: rmw_cyclonedds_cpp
+  localhostOnly: "0"
+
+network:
+  hostNetwork: true
+
+camera:
+  device: /dev/video0
+  width: 1280
+  height: 720
+  fps: 30
+  frameId: camera
+  syntheticMode: false
+  mountVideoDevice: true
+
+yolo:
+  modelPath: /opt/models/yolov8n.pt
+  conf: 0.25
+  publishDebugImage: "false"
+  publishMetrics: "true"
+  startDelaySeconds: 2
+
+topics:
+  image: /camera/image_raw
+  detections: /detections
+  debugImage: /detections/image
+  latency: /benchmark/latency_ms
+  inference: /benchmark/inference_ms
+
+resources:
+  requests:
+    cpu: 1000m
+    memory: 2Gi
+  limits:
+    cpu: 4000m
+    memory: 8Gi
+
+nodeSelector: {}
+affinity: {}
+tolerations: []
+
+nameOverride: ""
+fullnameOverride: ""

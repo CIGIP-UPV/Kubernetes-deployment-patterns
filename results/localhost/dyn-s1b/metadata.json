@@ -1,0 +1,12 @@
+{
+  "pattern": "dynamic-loader",
+  "scenario": "S1",
+  "release": "dyn-s1b",
+  "namespace": "ros2exp",
+  "ros_domain_id": 32,
+  "duration_seconds": 25,
+  "image_registry_prefix": "local",
+  "image_tag": "ddktop",
+  "install_seconds": 0,
+  "ready_seconds": "20.080596923828125"
+}

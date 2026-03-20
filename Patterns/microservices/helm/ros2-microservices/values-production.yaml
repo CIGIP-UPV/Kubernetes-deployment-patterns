@@ -1,0 +1,65 @@
+imagePullSecrets:
+  - name: regcred
+
+images:
+  camera:
+    repository: registry.example.com/tesis/ros2-camera
+    tag: stable
+    pullPolicy: IfNotPresent
+  yolo:
+    repository: registry.example.com/tesis/ros2-yolo
+    tag: stable
+    pullPolicy: IfNotPresent
+
+network:
+  hostNetwork: true
+
+ros:
+  domainId: "42"
+  rmwImplementation: rmw_cyclonedds_cpp
+  localhostOnly: "0"
+
+camera:
+  enabled: true
+  device: /dev/video0
+  width: 1280
+  height: 720
+  fps: 10
+  frameId: camera
+  syntheticMode: false
+  mountVideoDevice: true
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  resources:
+    requests:
+      cpu: 300m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+yolo:
+  enabled: true
+  modelPath: /opt/models/yolov8n.pt
+  conf: 0.25
+  publishDebugImage: "false"
+  publishMetrics: "true"
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+
+# Example split placement:
+# camera:
+#   nodeSelector:
+#     kubernetes.io/hostname: edge-node-1
+# yolo:
+#   nodeSelector:
+#     kubernetes.io/hostname: cloud-node-1

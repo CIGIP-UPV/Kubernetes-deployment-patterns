@@ -1,0 +1,85 @@
+{{- if .Values.camera.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ros2-microservices.fullname" . }}-camera
+  labels:
+    {{- include "ros2-microservices.labels" . | nindent 4 }}
+    pattern: microservices
+    component: camera
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: camera
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        {{- include "ros2-microservices.labels" . | nindent 8 }}
+        app: camera
+        component: camera
+        pattern: microservices
+    spec:
+      {{- if .Values.network.hostNetwork }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      {{- end }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.camera.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.camera.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if .Values.camera.affinity }}
+      affinity:
+        {{- toYaml .Values.camera.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.camera.tolerations }}
+      tolerations:
+        {{- toYaml .Values.camera.tolerations | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: camera
+          image: "{{ .Values.images.camera.repository }}:{{ .Values.images.camera.tag }}"
+          imagePullPolicy: {{ .Values.images.camera.pullPolicy }}
+          env:
+            - name: ROS_DOMAIN_ID
+              value: {{ .Values.ros.domainId | quote }}
+            - name: RMW_IMPLEMENTATION
+              value: {{ .Values.ros.rmwImplementation | quote }}
+            - name: ROS_LOCALHOST_ONLY
+              value: {{ .Values.ros.localhostOnly | quote }}
+          command: ["/bin/bash", "-lc"]
+          args:
+            - |
+              set -e
+              source /opt/ros/humble/setup.bash
+              if [ -f /opt/ros2_cam_ws/install/setup.bash ]; then
+                source /opt/ros2_cam_ws/install/setup.bash
+              fi
+              ros2 run camera_driver_pkg camera_driver --ros-args \
+                -p device:={{ .Values.camera.device | quote }} \
+                -p width:={{ .Values.camera.width }} \
+                -p height:={{ .Values.camera.height }} \
+                -p fps:={{ .Values.camera.fps }} \
+                -p frame_id:={{ .Values.camera.frameId | quote }} \
+                -p synthetic_mode:={{ .Values.camera.syntheticMode | quote }} \
+                -p image_topic:={{ .Values.topics.image | quote }}
+          resources:
+            {{- toYaml .Values.camera.resources | nindent 12 }}
+          {{- if and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode) }}
+          volumeMounts:
+            - name: video-device
+              mountPath: /dev/video0
+          {{- end }}
+      {{- if and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode) }}
+      volumes:
+        - name: video-device
+          hostPath:
+            path: /dev/video0
+            type: CharDevice
+      {{- end }}
+{{- end }}
