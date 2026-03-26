@@ -3,10 +3,10 @@ entries:
   dynamic-loader:
   - apiVersion: v2
     appVersion: humble
-    created: "2026-03-20T13:09:57.263703+01:00"
+    created: "2026-03-26T14:25:43.771695+01:00"
     description: Dynamic loading ROS 2 pattern with camera service and runtime-loadable
       YOLO module via FastAPI
-    digest: 40b42572220be175154678db6eca53884a4c1a03b9026b6143705926011c0ce2
+    digest: 4fd76146eca11b52601c6265c17f237eaa32134dfdae8163bc97e0bdc179eeda
     keywords:
     - ros2
     - fastapi
@@ -17,14 +17,14 @@ entries:
     name: dynamic-loader
     type: application
     urls:
-    - https://cigip-upv.github.io/Kubernetes-deployment-patterns/charts/dynamic-loader-2.0.0.tgz
-    version: 2.0.0
+    - https://cigip-upv.github.io/Kubernetes-deployment-patterns/charts/dynamic-loader-2.0.1.tgz
+    version: 2.0.1
   ros2-microservices:
   - apiVersion: v2
     appVersion: humble
-    created: "2026-03-20T13:09:57.26402+01:00"
+    created: "2026-03-26T14:25:43.771951+01:00"
     description: Microservices ROS 2 pattern with decoupled camera and YOLO services
-    digest: cd48e333d571b1f68fd15c530b53a29f49ead94b3ca53f723ce775cff80da0ef
+    digest: b720a1fc076a119e39a81c15a17d1ca4de4594052323ba2aee66b59b0f7cb35e
     keywords:
     - ros2
     - microservices
@@ -35,15 +35,15 @@ entries:
     name: ros2-microservices
     type: application
     urls:
-    - https://cigip-upv.github.io/Kubernetes-deployment-patterns/charts/ros2-microservices-2.0.0.tgz
-    version: 2.0.0
+    - https://cigip-upv.github.io/Kubernetes-deployment-patterns/charts/ros2-microservices-2.0.1.tgz
+    version: 2.0.1
   ros2-monolithic:
   - apiVersion: v2
     appVersion: humble
-    created: "2026-03-20T13:09:57.264332+01:00"
+    created: "2026-03-26T14:25:43.772387+01:00"
     description: Monolithic ROS 2 pattern with camera + YOLO + detections in a single
       runtime container
-    digest: fa06e4ee5e5f20a43d79f17293095bdc09d79dbd67dcbbc5ff68f0b0d86018fa
+    digest: c48c06ae290bf87ab7b473c4c497666a4375ac8036b25f0713768a24ed733d4f
     keywords:
     - ros2
     - monolithic
@@ -54,15 +54,15 @@ entries:
     name: ros2-monolithic
     type: application
     urls:
-    - https://cigip-upv.github.io/Kubernetes-deployment-patterns/charts/ros2-monolithic-2.0.0.tgz
-    version: 2.0.0
+    - https://cigip-upv.github.io/Kubernetes-deployment-patterns/charts/ros2-monolithic-2.0.1.tgz
+    version: 2.0.1
   ros2-overlay:
   - apiVersion: v2
     appVersion: humble
-    created: "2026-03-20T13:09:57.264578+01:00"
+    created: "2026-03-26T14:25:43.772589+01:00"
     description: Helm chart for ROS2 overlay-workspaces pattern (base ws + overlay
       ws)
-    digest: 90e0ad8a61c5f9bf42d105c7f8873418b61364e9ed9f28a7bf51458b5365543d
+    digest: ad35a34594b2dd31a9926b7bcd7dfed141086f93dc4c63f3507c6b17412b2585
     keywords:
     - ros2
     - overlay
@@ -73,6 +73,6 @@ entries:
     name: ros2-overlay
     type: application
     urls:
-    - https://cigip-upv.github.io/Kubernetes-deployment-patterns/charts/ros2-overlay-1.0.0.tgz
-    version: 1.0.0
-generated: "2026-03-20T13:09:57.262765+01:00"
+    - https://cigip-upv.github.io/Kubernetes-deployment-patterns/charts/ros2-overlay-1.0.1.tgz
+    version: 1.0.1
+generated: "2026-03-26T14:25:43.769691+01:00"
