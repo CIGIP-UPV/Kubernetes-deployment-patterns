@@ -1,14 +1,13 @@
-imagePullSecrets:
-  - name: regcred
+imagePullSecrets: []
 
 images:
   camera:
-    repository: registry.example.com/tesis/ros2-camera
-    tag: stable
+    repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-camera
+    tag: v1
     pullPolicy: IfNotPresent
   yolo:
-    repository: registry.example.com/tesis/ros2-yolo
-    tag: stable
+    repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-yolo
+    tag: v1
     pullPolicy: IfNotPresent
 
 network:
@@ -26,8 +25,8 @@ camera:
   height: 720
   fps: 10
   frameId: camera
-  syntheticMode: false
-  mountVideoDevice: true
+  syntheticMode: true
+  mountVideoDevice: false
   nodeSelector: {}
   tolerations: []
   affinity: {}

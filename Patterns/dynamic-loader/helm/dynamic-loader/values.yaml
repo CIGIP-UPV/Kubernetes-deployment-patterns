@@ -2,12 +2,12 @@ replicaCount: 1
 
 images:
   camera:
-    repository: ros2-camera
-    tag: latest
+    repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-camera
+    tag: v1
     pullPolicy: IfNotPresent
   dynamicHost:
-    repository: ros2-yolo
-    tag: latest
+    repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-yolo
+    tag: v1
     pullPolicy: IfNotPresent
 imagePullSecrets: []
 
@@ -23,10 +23,10 @@ camera:
   device: /dev/video0
   width: 1280
   height: 720
-  fps: 30
+  fps: 10
   frameId: camera
-  syntheticMode: false
-  mountVideoDevice: true
+  syntheticMode: true
+  mountVideoDevice: false
 
 dynamic:
   apiPort: 5000

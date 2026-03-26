@@ -1,11 +1,11 @@
 images:
   camera:
-    repository: ros2-camera
-    tag: latest
+    repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-camera
+    tag: v1
     pullPolicy: IfNotPresent
   yolo:
-    repository: ros2-yolo
-    tag: latest
+    repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-yolo
+    tag: v1
     pullPolicy: IfNotPresent
 imagePullSecrets: []
 
@@ -26,10 +26,10 @@ camera:
   device: /dev/video0
   width: 1280
   height: 720
-  fps: 30
+  fps: 10
   frameId: camera
-  syntheticMode: false
-  mountVideoDevice: true
+  syntheticMode: true
+  mountVideoDevice: false
   resources:
     requests: { cpu: 300m, memory: 512Mi }
     limits: { cpu: 1000m, memory: 1Gi }

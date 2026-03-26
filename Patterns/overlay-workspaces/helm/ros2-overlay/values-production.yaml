@@ -1,9 +1,8 @@
-imagePullSecrets:
-  - name: regcred
+imagePullSecrets: []
 
 image:
-  repository: registry.example.com/tesis/ros2-overlay
-  tag: stable
+  repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-overlay
+  tag: v1
   pullPolicy: IfNotPresent
 
 network:
@@ -20,8 +19,8 @@ camera:
   height: 720
   fps: 10
   frameId: camera
-  syntheticMode: false
-  mountVideoDevice: true
+  syntheticMode: true
+  mountVideoDevice: false
 
 yolo:
   modelPath: /opt/models/yolov8n.pt
