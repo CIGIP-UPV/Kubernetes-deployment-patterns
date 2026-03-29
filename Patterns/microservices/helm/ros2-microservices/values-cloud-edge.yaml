@@ -1,0 +1,26 @@
+# =============================================================================
+# Cloud-Edge deployment values for the CIGIP cluster (cigip-cluster)
+# =============================================================================
+# Topology:
+#   - Cloud node (kb2):        Control Plane — runs AI inference (YOLO)
+#   - Edge node  (worker1-kb2): Worker       — runs sensor acquisition (camera)
+#
+# Usage:
+#   helm install micro-s1 ./ros2-microservices \
+#     -n ros2exp \
+#     -f values.yaml \
+#     -f values-cloud-edge.yaml
+#
+# Or with run_experiment.sh:
+#   EXTRA_HELM_ARGS="-f values-cloud-edge.yaml" ./run_experiment.sh microservices S1
+# =============================================================================
+
+# --- Camera: deployed on the EDGE node (sensor/robot side) ---
+camera:
+  nodeSelector:
+    kubernetes.io/hostname: worker1-kb2
+
+# --- YOLO: deployed on the CLOUD node (AI inference, more resources) ---
+yolo:
+  nodeSelector:
+    kubernetes.io/hostname: kb2
