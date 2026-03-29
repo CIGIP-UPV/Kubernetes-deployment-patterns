@@ -20,6 +20,7 @@ on:
       - 'Models/**'
       - 'Patterns/**'
       - 'scripts/**'
+      - '.github/workflows/**'
   workflow_dispatch:
     inputs:
       image_tag:
