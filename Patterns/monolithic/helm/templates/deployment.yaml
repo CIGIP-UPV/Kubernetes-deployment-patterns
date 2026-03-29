@@ -136,9 +136,9 @@ spec:
             exec:
               command:
                 - /bin/bash
-                - -lc
+                - -c
                 - |
-                  ros2 node list | grep -q "/camera_driver" && ros2 node list | grep -q "/yolo_detector"
+                  source /opt/ros/humble/setup.bash && ros2 node list | grep -q "/camera_driver" && ros2 node list | grep -q "/yolo_detector"
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 10
@@ -147,9 +147,9 @@ spec:
             exec:
               command:
                 - /bin/bash
-                - -lc
+                - -c
                 - |
-                  ros2 node list | grep -q "/camera_driver" && ros2 node list | grep -q "/yolo_detector"
+                  source /opt/ros/humble/setup.bash && ros2 node list | grep -q "/camera_driver" && ros2 node list | grep -q "/yolo_detector"
             periodSeconds: 20
             timeoutSeconds: 10
             failureThreshold: 3
