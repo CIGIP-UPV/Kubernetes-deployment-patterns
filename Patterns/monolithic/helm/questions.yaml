@@ -1,0 +1,85 @@
+questions:
+  # ── Docker Registry ──────────────────────────────────────────────
+  - variable: imagePullSecretName
+    label: "Image Pull Secret"
+    description: "Name of the Kubernetes secret for pulling images from GHCR"
+    type: string
+    default: "regcred"
+    required: false
+    group: "Container Images"
+
+  - variable: image.tag
+    label: "Image Tag"
+    description: "Docker image tag for the monolithic container"
+    type: string
+    default: "v1"
+    required: true
+    group: "Container Images"
+
+  # ── Node Placement ──────────────────────────────────────────────
+  - variable: nodeHostname
+    label: "Deploy on Node"
+    description: "Hostname of the node where the monolithic pod runs"
+    type: enum
+    default: ""
+    required: false
+    options:
+      - ""
+      - "kb2"
+      - "worker1-kb2"
+    group: "Node Placement"
+
+  # ── Experiment Scenario ──────────────────────────────────────────
+  - variable: camera.fps
+    label: "Camera FPS (Scenario)"
+    description: "Frame rate: S1=10 Hz, S2=20 Hz, S3=30 Hz"
+    type: enum
+    default: 10
+    required: true
+    options:
+      - 10
+      - 20
+      - 30
+    group: "Experiment"
+
+  - variable: ros.domainId
+    label: "ROS Domain ID"
+    description: "Isolates ROS 2 communication between experiments"
+    type: enum
+    default: "42"
+    required: true
+    options:
+      - "42"
+      - "1"
+      - "2"
+      - "3"
+    group: "Experiment"
+
+  - variable: camera.syntheticMode
+    label: "Synthetic Camera"
+    description: "Use synthetic test frames instead of a real camera"
+    type: boolean
+    default: true
+    group: "Experiment"
+
+  - variable: yolo.publishMetrics
+    label: "Publish Benchmark Metrics"
+    description: "Enable latency and inference time metrics on ROS topics"
+    type: enum
+    default: "true"
+    options:
+      - "true"
+      - "false"
+    group: "Experiment"
+
+  - variable: yolo.conf
+    label: "YOLO Confidence Threshold"
+    description: "Minimum confidence for object detection"
+    type: enum
+    default: 0.25
+    options:
+      - 0.10
+      - 0.25
+      - 0.50
+      - 0.75
+    group: "Experiment"

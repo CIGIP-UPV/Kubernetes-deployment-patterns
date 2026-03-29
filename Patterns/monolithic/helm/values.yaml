@@ -4,8 +4,8 @@ image:
   repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-monolithic
   tag: v1
   pullPolicy: IfNotPresent
-imagePullSecrets:
-  - name: regcred
+
+imagePullSecretName: regcred
 
 ros:
   domainId: "42"
@@ -14,6 +14,11 @@ ros:
 
 network:
   hostNetwork: true
+
+nodeHostname: ""
+nodeSelector: {}
+affinity: {}
+tolerations: []
 
 camera:
   device: /dev/video0
@@ -43,10 +48,6 @@ resources: {}
 securityContext:
   runAsNonRoot: false
   allowPrivilegeEscalation: false
-
-nodeSelector: {}
-affinity: {}
-tolerations: []
 
 service:
   enabled: false

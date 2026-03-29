@@ -25,11 +25,14 @@ spec:
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       {{- end }}
-      {{- with .Values.imagePullSecrets }}
+      {{- if .Values.imagePullSecretName }}
       imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
+        - name: {{ .Values.imagePullSecretName }}
       {{- end }}
-      {{- if .Values.camera.nodeSelector }}
+      {{- if .Values.camera.nodeHostname }}
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.camera.nodeHostname }}
+      {{- else if .Values.camera.nodeSelector }}
       nodeSelector:
         {{- toYaml .Values.camera.nodeSelector | nindent 8 }}
       {{- end }}

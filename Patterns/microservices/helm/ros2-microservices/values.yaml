@@ -7,8 +7,8 @@ images:
     repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-yolo
     tag: v1
     pullPolicy: IfNotPresent
-imagePullSecrets:
-  - name: regcred
+
+imagePullSecretName: regcred
 
 ros:
   domainId: "42"
@@ -20,8 +20,7 @@ network:
 
 camera:
   enabled: true
-  # Edge placement: camera runs on the edge node (robot/sensor side)
-  # Override with --set camera.nodeSelector.kubernetes\\.io/hostname=<edge-node>
+  nodeHostname: ""
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -36,8 +35,7 @@ camera:
 
 yolo:
   enabled: true
-  # Cloud placement: AI inference runs on the cloud node (more resources)
-  # Override with --set yolo.nodeSelector.kubernetes\\.io/hostname=<cloud-node>
+  nodeHostname: ""
   nodeSelector: {}
   tolerations: []
   affinity: {}
