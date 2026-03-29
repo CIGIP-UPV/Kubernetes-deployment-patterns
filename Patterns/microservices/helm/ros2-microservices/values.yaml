@@ -52,5 +52,11 @@ topics:
   latency: /benchmark/latency_ms
   inference: /benchmark/inference_ms
 
+benchmark:
+  enabled: false
+  durationSeconds: 120
+  initialWaitSeconds: 60
+  ttlSecondsAfterFinished: 3600
+
 nameOverride: ""
 fullnameOverride: ""

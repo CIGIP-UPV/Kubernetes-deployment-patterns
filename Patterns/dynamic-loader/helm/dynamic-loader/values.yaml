@@ -60,5 +60,11 @@ service:
   port: 5000
   targetPort: 5000
 
+benchmark:
+  enabled: false
+  durationSeconds: 120
+  initialWaitSeconds: 60
+  ttlSecondsAfterFinished: 3600
+
 nameOverride: ""
 fullnameOverride: ""

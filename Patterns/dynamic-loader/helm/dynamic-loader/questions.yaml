@@ -95,6 +95,40 @@ questions:
       - "false"
     group: "Experiment"
 
+  # ── Benchmark Probe ──────────────────────────────────────────────
+  - variable: benchmark.enabled
+    label: "Run Benchmark Probe"
+    description: "Launch a Job that collects latency, inference time and FPS metrics after deployment"
+    type: boolean
+    default: false
+    group: "Benchmark"
+
+  - variable: benchmark.durationSeconds
+    label: "Probe Duration (seconds)"
+    description: "How long the benchmark probe listens for ROS 2 metrics"
+    type: enum
+    default: 120
+    show_if: "benchmark.enabled=true"
+    options:
+      - 60
+      - 120
+      - 180
+      - 300
+    group: "Benchmark"
+
+  - variable: benchmark.initialWaitSeconds
+    label: "Initial Wait (seconds)"
+    description: "Seconds to wait for the main app to start before probing"
+    type: enum
+    default: 60
+    show_if: "benchmark.enabled=true"
+    options:
+      - 30
+      - 60
+      - 90
+      - 120
+    group: "Benchmark"
+
   - variable: dynamic.conf
     label: "YOLO Confidence Threshold"
     description: "Minimum confidence for object detection"
