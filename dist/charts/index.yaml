@@ -1,0 +1,78 @@
+apiVersion: v1
+entries:
+  dynamic-loader:
+  - apiVersion: v2
+    appVersion: humble
+    created: "2026-03-29T11:24:06.005753+02:00"
+    description: Dynamic loading ROS 2 pattern with camera service and runtime-loadable
+      YOLO module via FastAPI
+    digest: b96848d9b2962e64789e68de93012019a764e0269b04bd5555b787abfc5ff56a
+    keywords:
+    - ros2
+    - fastapi
+    - dynamic loading
+    maintainers:
+    - email: mmateo@cigip.upv.es
+      name: Miguel-Angel-Mateo-Casali
+    name: dynamic-loader
+    type: application
+    urls:
+    - https://cigip-upv.github.io/Kubernetes-deployment-patterns/charts/dynamic-loader-2.0.1.tgz
+    version: 2.0.1
+  ros2-microservices:
+  - apiVersion: v2
+    appVersion: humble
+    created: "2026-03-29T11:24:06.005959+02:00"
+    description: Microservices ROS 2 pattern with decoupled camera and YOLO services
+    digest: 7d3ad28275d28f3e78b59666c815bc3717b12b0e5aa34567bb41763c223ac479
+    keywords:
+    - ros2
+    - microservices
+    - robotics
+    maintainers:
+    - email: mmateo@cigip.upv.es
+      name: Miguel-Angel-Mateo-Casali
+    name: ros2-microservices
+    type: application
+    urls:
+    - https://cigip-upv.github.io/Kubernetes-deployment-patterns/charts/ros2-microservices-2.1.0.tgz
+    version: 2.1.0
+  ros2-monolithic:
+  - apiVersion: v2
+    appVersion: humble
+    created: "2026-03-29T11:24:06.006118+02:00"
+    description: Monolithic ROS 2 pattern with camera + YOLO + detections in a single
+      runtime container
+    digest: 568ef76b26c7e7e9776a80bb565ae3af5c7cdd5a4f16bea36db8e496fbf6da56
+    keywords:
+    - ros2
+    - monolithic
+    - robotics
+    maintainers:
+    - email: mmateo@cigip.upv.es
+      name: Miguel-Angel-Mateo-Casali
+    name: ros2-monolithic
+    type: application
+    urls:
+    - https://cigip-upv.github.io/Kubernetes-deployment-patterns/charts/ros2-monolithic-2.1.0.tgz
+    version: 2.1.0
+  ros2-overlay:
+  - apiVersion: v2
+    appVersion: humble
+    created: "2026-03-29T11:24:06.006248+02:00"
+    description: Helm chart for ROS2 overlay-workspaces pattern (base ws + overlay
+      ws)
+    digest: 87c5dec60a3a959037d02a5f76a1ee19aacdc9b9ddeda3dda112835e9e7c2824
+    keywords:
+    - ros2
+    - overlay
+    - cloud-edge
+    maintainers:
+    - email: mmateo@cigip.upv.es
+      name: Miguel-Angel-Mateo-Casali
+    name: ros2-overlay
+    type: application
+    urls:
+    - https://cigip-upv.github.io/Kubernetes-deployment-patterns/charts/ros2-overlay-1.1.0.tgz
+    version: 1.1.0
+generated: "2026-03-29T11:24:06.004962+02:00"

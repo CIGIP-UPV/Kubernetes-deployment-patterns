@@ -1,0 +1,227 @@
+# =============================================================================
+# CI/CD Pipeline: Build Docker images + Publish Helm charts
+# =============================================================================
+# Triggers:
+#   - Push to main (auto-publish)
+#   - Manual dispatch (workflow_dispatch) with custom tag
+#
+# What it does:
+#   1. Builds 4 Docker images (camera, yolo, monolithic, overlay)
+#   2. Pushes them to ghcr.io/cigip-upv/kubernetes-deployment-patterns/
+#   3. Packages Helm charts and publishes to gh-pages
+# =============================================================================
+
+name: Build Images & Publish Charts
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Models/**'
+      - 'Patterns/**'
+      - 'scripts/**'
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Docker image tag (e.g., v2, 2026-03-29)'
+        required: false
+        default: ''
+      publish_charts:
+        description: 'Also publish Helm charts to gh-pages'
+        required: false
+        type: boolean
+        default: true
+      publish_images:
+        description: 'Build and push Docker images'
+        required: false
+        type: boolean
+        default: true
+
+env:
+  REGISTRY: ghcr.io
+  REGISTRY_PREFIX: ghcr.io/cigip-upv/kubernetes-deployment-patterns
+  TORCH_VARIANT: cpu
+  BUILD_PLATFORM: linux/amd64
+
+jobs:
+  # =========================================================================
+  # Job 1: Build and push Docker images to GHCR
+  # =========================================================================
+  build-images:
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_images == 'true')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: tag
+        run: |
+          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            echo "tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
+          else
+            # Auto-generate tag from short SHA + date
+            echo "tag=sha-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push ros2-camera
+        uses: docker/build-push-action@v6
+        with:
+          context: Models/ros2_cam_ws
+          file: Models/ros2_cam_ws/docker/Dockerfile
+          platforms: ${{ env.BUILD_PLATFORM }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY_PREFIX }}/ros2-camera:${{ steps.tag.outputs.tag }}
+            ${{ env.REGISTRY_PREFIX }}/ros2-camera:latest
+          build-args: |
+            TORCH_VARIANT=${{ env.TORCH_VARIANT }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push ros2-yolo
+        uses: docker/build-push-action@v6
+        with:
+          context: Models/ros2_yolo_ws
+          file: Models/ros2_yolo_ws/docker/Dockerfile
+          platforms: ${{ env.BUILD_PLATFORM }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY_PREFIX }}/ros2-yolo:${{ steps.tag.outputs.tag }}
+            ${{ env.REGISTRY_PREFIX }}/ros2-yolo:latest
+          build-args: |
+            TORCH_VARIANT=${{ env.TORCH_VARIANT }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push ros2-monolithic
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Models/ros2_monolithic_ws/docker/Dockerfile
+          platforms: ${{ env.BUILD_PLATFORM }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY_PREFIX }}/ros2-monolithic:${{ steps.tag.outputs.tag }}
+            ${{ env.REGISTRY_PREFIX }}/ros2-monolithic:latest
+          build-args: |
+            TORCH_VARIANT=${{ env.TORCH_VARIANT }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push ros2-overlay
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Models/ros2_overlay_ws/docker/Dockerfile
+          platforms: ${{ env.BUILD_PLATFORM }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY_PREFIX }}/ros2-overlay:${{ steps.tag.outputs.tag }}
+            ${{ env.REGISTRY_PREFIX }}/ros2-overlay:latest
+          build-args: |
+            TORCH_VARIANT=${{ env.TORCH_VARIANT }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summary
+        run: |
+          echo "### Docker Images Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Image | Tag |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-----|" >> $GITHUB_STEP_SUMMARY
+          echo "| ros2-camera | \`${{ steps.tag.outputs.tag }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| ros2-yolo | \`${{ steps.tag.outputs.tag }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| ros2-monolithic | \`${{ steps.tag.outputs.tag }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| ros2-overlay | \`${{ steps.tag.outputs.tag }}\` |" >> $GITHUB_STEP_SUMMARY
+
+  # =========================================================================
+  # Job 2: Publish Helm charts to GitHub Pages (gh-pages branch)
+  # =========================================================================
+  publish-charts:
+    runs-on: ubuntu-latest
+    needs: [build-images]
+    # Run even if build-images was skipped (charts-only publish), but not on failure
+    if: always() && !failure() && !cancelled()
+    permissions:
+      contents: write
+      pages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.16.4'
+
+      - name: Lint charts
+        run: |
+          helm lint Patterns/monolithic/helm
+          helm lint Patterns/microservices/helm/ros2-microservices
+          helm lint Patterns/dynamic-loader/helm/dynamic-loader
+          helm lint Patterns/overlay-workspaces/helm/ros2-overlay
+
+      - name: Package charts
+        run: |
+          mkdir -p dist/charts
+          helm package Patterns/monolithic/helm -d dist/charts
+          helm package Patterns/microservices/helm/ros2-microservices -d dist/charts
+          helm package Patterns/dynamic-loader/helm/dynamic-loader -d dist/charts
+          helm package Patterns/overlay-workspaces/helm/ros2-overlay -d dist/charts
+
+      - name: Checkout gh-pages (merge existing index)
+        run: |
+          # Fetch existing index.yaml to merge versions (keep old + add new)
+          git fetch origin gh-pages:gh-pages || true
+          if git show gh-pages:charts/index.yaml > /tmp/old-index.yaml 2>/dev/null; then
+            echo "Merging with existing index.yaml..."
+            helm repo index dist/charts \
+              --url https://cigip-upv.github.io/Kubernetes-deployment-patterns/charts \
+              --merge /tmp/old-index.yaml
+          else
+            echo "No existing index.yaml, creating fresh..."
+            helm repo index dist/charts \
+              --url https://cigip-upv.github.io/Kubernetes-deployment-patterns/charts
+          fi
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist/charts
+          destination_dir: charts
+          keep_files: false
+          enable_jekyll: false
+
+      - name: Summary
+        run: |
+          echo "### Helm Charts Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Chart | Version |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|---------|" >> $GITHUB_STEP_SUMMARY
+          for tgz in dist/charts/*.tgz; do
+            name=$(basename "$tgz" .tgz)
+            echo "| ${name} | published |" >> $GITHUB_STEP_SUMMARY
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Refresh Rancher repository to see new versions." >> $GITHUB_STEP_SUMMARY

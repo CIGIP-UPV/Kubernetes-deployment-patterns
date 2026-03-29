@@ -7,7 +7,8 @@ images:
     repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-yolo
     tag: v1
     pullPolicy: IfNotPresent
-imagePullSecrets: []
+imagePullSecrets:
+  - name: regcred
 
 ros:
   domainId: "42"
@@ -31,9 +32,7 @@ camera:
   frameId: camera
   syntheticMode: true
   mountVideoDevice: false
-  resources:
-    requests: { cpu: 300m, memory: 512Mi }
-    limits: { cpu: 1000m, memory: 1Gi }
+  resources: {}
 
 yolo:
   enabled: true
@@ -46,9 +45,7 @@ yolo:
   conf: 0.25
   publishDebugImage: "false"
   publishMetrics: "true"
-  resources:
-    requests: { cpu: 1000m, memory: 2Gi }
-    limits: { cpu: 4000m, memory: 8Gi }
+  resources: {}
 
 topics:
   image: /camera/image_raw

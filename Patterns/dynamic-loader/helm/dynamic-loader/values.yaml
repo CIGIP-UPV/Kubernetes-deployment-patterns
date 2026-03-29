@@ -9,7 +9,8 @@ images:
     repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-yolo
     tag: v1
     pullPolicy: IfNotPresent
-imagePullSecrets: []
+imagePullSecrets:
+  - name: regcred
 
 ros:
   domainId: "42"
@@ -46,12 +47,8 @@ topics:
   inference: /benchmark/inference_ms
 
 resources:
-  camera:
-    requests: { cpu: 300m, memory: 512Mi }
-    limits: { cpu: 1000m, memory: 1Gi }
-  dynamicHost:
-    requests: { cpu: 1000m, memory: 2Gi }
-    limits: { cpu: 4000m, memory: 8Gi }
+  camera: {}
+  dynamicHost: {}
 
 service:
   type: ClusterIP

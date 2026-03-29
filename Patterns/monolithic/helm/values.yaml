@@ -4,7 +4,8 @@ image:
   repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-monolithic
   tag: v1
   pullPolicy: IfNotPresent
-imagePullSecrets: []
+imagePullSecrets:
+  - name: regcred
 
 ros:
   domainId: "42"
@@ -37,13 +38,7 @@ topics:
   latency: /benchmark/latency_ms
   inference: /benchmark/inference_ms
 
-resources:
-  requests:
-    cpu: 1000m
-    memory: 2Gi
-  limits:
-    cpu: 4000m
-    memory: 8Gi
+resources: {}
 
 securityContext:
   runAsNonRoot: false
