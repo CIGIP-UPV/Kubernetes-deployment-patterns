@@ -72,12 +72,23 @@ spec:
                 -p inference_topic:={{ .Values.topics.inference | quote }}
           resources:
             {{- toYaml .Values.yolo.resources | nindent 12 }}
+          startupProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -lc
+                - ros2 node list | grep -q "/yolo_detector"
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 18
           livenessProbe:
             exec:
               command:
                 - /bin/bash
                 - -lc
                 - ros2 node list | grep -q "/yolo_detector"
-            initialDelaySeconds: 40
-            periodSeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 3
 {{- end }}

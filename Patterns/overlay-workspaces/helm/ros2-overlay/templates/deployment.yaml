@@ -115,6 +115,27 @@ spec:
 
               wait -n ${CAMERA_PID} ${YOLO_PID}
               exit 1
+          startupProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -lc
+                - |
+                  ros2 node list | grep -q "/camera_driver" && ros2 node list | grep -q "/yolo_detector"
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 18
+          livenessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -lc
+                - |
+                  ros2 node list | grep -q "/camera_driver" && ros2 node list | grep -q "/yolo_detector"
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 3
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           {{- if and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode) }}

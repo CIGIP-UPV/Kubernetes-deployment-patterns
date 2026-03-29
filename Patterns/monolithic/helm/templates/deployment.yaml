@@ -129,6 +129,17 @@ spec:
             - name: video-device
               mountPath: /dev/video0
           {{- end }}
+          startupProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -lc
+                - |
+                  ros2 node list | grep -q "/camera_driver" && ros2 node list | grep -q "/yolo_detector"
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 18
           livenessProbe:
             exec:
               command:
@@ -136,8 +147,9 @@ spec:
                 - -lc
                 - |
                   ros2 node list | grep -q "/camera_driver" && ros2 node list | grep -q "/yolo_detector"
-            initialDelaySeconds: 40
-            periodSeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 3
       {{- if and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode) }}
       volumes:
         - name: video-device

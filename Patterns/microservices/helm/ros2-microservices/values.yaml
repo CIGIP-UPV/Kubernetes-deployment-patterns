@@ -19,7 +19,8 @@ network:
 
 camera:
   enabled: true
-  # Example edge placement: { role: edge }
+  # Edge placement: camera runs on the edge node (robot/sensor side)
+  # Override with --set camera.nodeSelector.kubernetes\\.io/hostname=<edge-node>
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -36,7 +37,8 @@ camera:
 
 yolo:
   enabled: true
-  # Example cloud placement: { role: cloud }
+  # Cloud placement: AI inference runs on the cloud node (more resources)
+  # Override with --set yolo.nodeSelector.kubernetes\\.io/hostname=<cloud-node>
   nodeSelector: {}
   tolerations: []
   affinity: {}
