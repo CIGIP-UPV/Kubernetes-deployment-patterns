@@ -1,14 +1,10 @@
 # =============================================================================
 # CI/CD Pipeline: Build Docker images + Publish Helm charts
 # =============================================================================
-# Triggers:
-#   - Push to main (auto-publish)
-#   - Manual dispatch (workflow_dispatch) with custom tag
-#
-# What it does:
-#   1. Builds 4 Docker images (camera, yolo, monolithic, overlay)
-#   2. Pushes them to ghcr.io/cigip-upv/kubernetes-deployment-patterns/
-#   3. Packages Helm charts and publishes to gh-pages
+# Smart triggers:
+#   - Only builds images if Models/ or Dockerfiles changed
+#   - Only publishes charts if Patterns/ changed
+#   - Manual dispatch always available with full control
 # =============================================================================
 
 name: Build Images & Publish Charts
@@ -28,7 +24,7 @@ on:
         required: false
         default: ''
       publish_charts:
-        description: 'Also publish Helm charts to gh-pages'
+        description: 'Publish Helm charts to gh-pages'
         required: false
         type: boolean
         default: true
@@ -46,13 +42,58 @@ env:
 
 jobs:
   # =========================================================================
+  # Job 0: Detect what changed to decide which jobs to run
+  # =========================================================================
+  detect-changes:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      images_changed: ${{ steps.changes.outputs.images }}
+      charts_changed: ${{ steps.changes.outputs.charts }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed paths
+        id: changes
+        run: |
+          # Compare with previous commit
+          CHANGED=$(git diff --name-only HEAD~1 HEAD)
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          # Check if Docker images need rebuilding (Models/ or Dockerfiles)
+          if echo "$CHANGED" | grep -qE '^Models/'; then
+            echo "images=true" >> $GITHUB_OUTPUT
+            echo ">> Images need rebuilding"
+          else
+            echo "images=false" >> $GITHUB_OUTPUT
+            echo ">> No image changes detected"
+          fi
+
+          # Check if Helm charts need republishing (Patterns/)
+          if echo "$CHANGED" | grep -qE '^Patterns/'; then
+            echo "charts=true" >> $GITHUB_OUTPUT
+            echo ">> Charts need republishing"
+          else
+            echo "charts=false" >> $GITHUB_OUTPUT
+            echo ">> No chart changes detected"
+          fi
+
+  # =========================================================================
   # Job 1: Build and push Docker images to GHCR
   # =========================================================================
   build-images:
-    if: >-
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_images == 'true')
     runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: |
+      always() &&
+      (
+        (github.event_name == 'push' && needs.detect-changes.outputs.images_changed == 'true') ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_images == 'true')
+      )
     permissions:
       contents: read
       packages: write
@@ -67,7 +108,6 @@ jobs:
           if [ -n "${{ github.event.inputs.image_tag }}" ]; then
             echo "tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
           else
-            # Auto-generate tag from short SHA + date
             echo "tag=sha-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
           fi
 
@@ -157,9 +197,13 @@ jobs:
   # =========================================================================
   publish-charts:
     runs-on: ubuntu-latest
-    needs: [build-images]
-    # Run even if build-images was skipped (charts-only publish), but not on failure
-    if: always() && !failure() && !cancelled()
+    needs: [detect-changes, build-images]
+    if: |
+      always() && !failure() && !cancelled() &&
+      (
+        (github.event_name == 'push' && needs.detect-changes.outputs.charts_changed == 'true') ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_charts == 'true')
+      )
     permissions:
       contents: write
       pages: write
@@ -192,7 +236,6 @@ jobs:
 
       - name: Checkout gh-pages (merge existing index)
         run: |
-          # Fetch existing index.yaml to merge versions (keep old + add new)
           git fetch origin gh-pages:gh-pages || true
           if git show gh-pages:charts/index.yaml > /tmp/old-index.yaml 2>/dev/null; then
             echo "Merging with existing index.yaml..."
