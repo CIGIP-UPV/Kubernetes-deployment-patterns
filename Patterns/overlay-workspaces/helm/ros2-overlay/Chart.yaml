@@ -2,7 +2,7 @@ apiVersion: v2
 name: ros2-overlay
 description: Helm chart for ROS2 overlay-workspaces pattern (base ws + overlay ws)
 type: application
-version: 1.3.0
+version: 1.4.0
 appVersion: humble
 keywords:
   - ros2

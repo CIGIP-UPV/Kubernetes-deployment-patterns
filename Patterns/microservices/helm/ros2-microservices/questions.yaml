@@ -76,11 +76,19 @@ questions:
     group: "Experiment"
 
   - variable: camera.syntheticMode
-    label: "Synthetic Camera"
-    description: "Use synthetic test frames instead of a real camera"
+    label: "Camera Source"
+    description: "true = Synthetic test frames (no hardware) | false = Real camera on edge node"
     type: boolean
     default: true
-    group: "Experiment"
+    group: "Camera"
+
+  - variable: camera.mountVideoDevice
+    label: "Mount /dev/video0"
+    description: "Mount the physical camera device into the camera container (required for real camera)"
+    type: boolean
+    default: false
+    show_if: "camera.syntheticMode=false"
+    group: "Camera"
 
   - variable: yolo.publishMetrics
     label: "Publish Benchmark Metrics"

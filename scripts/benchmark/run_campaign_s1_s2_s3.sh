@@ -18,25 +18,34 @@ SYNTHETIC_CAMERA=${BENCHMARK_SYNTHETIC_CAMERA:-false}
 SCENARIOS=(S1 S2 S3)
 PATTERNS=(monolithic microservices dynamic-loader overlay-workspaces)
 
+# Optional: override values per pattern (e.g., values-cloud-edge.yaml)
+# If the file does not exist, only default values.yaml is used.
 pattern_values_file() {
+  local candidate=""
   case "$1" in
     monolithic)
-      echo "${ROOT_DIR}/Patterns/monolithic/helm/values-production.yaml"
+      candidate="${ROOT_DIR}/Patterns/monolithic/helm/values-production.yaml"
       ;;
     microservices)
-      echo "${ROOT_DIR}/Patterns/microservices/helm/ros2-microservices/values-production.yaml"
+      candidate="${ROOT_DIR}/Patterns/microservices/helm/ros2-microservices/values-production.yaml"
       ;;
     dynamic-loader)
-      echo "${ROOT_DIR}/Patterns/dynamic-loader/helm/dynamic-loader/values-production.yaml"
+      candidate="${ROOT_DIR}/Patterns/dynamic-loader/helm/dynamic-loader/values-production.yaml"
       ;;
     overlay-workspaces)
-      echo "${ROOT_DIR}/Patterns/overlay-workspaces/helm/ros2-overlay/values-production.yaml"
+      candidate="${ROOT_DIR}/Patterns/overlay-workspaces/helm/ros2-overlay/values-production.yaml"
       ;;
     *)
       echo "Unsupported pattern: $1" >&2
       exit 1
       ;;
   esac
+  # Return path only if file exists; empty otherwise
+  if [[ -f "${candidate}" ]]; then
+    echo "${candidate}"
+  else
+    echo ""
+  fi
 }
 
 pattern_short_name() {
