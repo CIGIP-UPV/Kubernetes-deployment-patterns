@@ -1,0 +1,74 @@
+{{- if .Values.benchmark.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "ros2-monolithic.fullname" . }}-benchmark-{{ now | date "150405" }}
+  labels:
+    {{- include "ros2-monolithic.labels" . | nindent 4 }}
+    component: benchmark
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: {{ .Values.benchmark.ttlSecondsAfterFinished | default 3600 }}
+  template:
+    metadata:
+      labels:
+        {{- include "ros2-monolithic.labels" . | nindent 8 }}
+        component: benchmark
+    spec:
+      restartPolicy: Never
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      {{- if .Values.imagePullSecretName }}
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecretName }}
+      {{- end }}
+      {{- if .Values.nodeHostname }}
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.nodeHostname }}
+      {{- end }}
+      initContainers:
+        - name: wait-for-app
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              echo "[benchmark] Waiting {{ .Values.benchmark.initialWaitSeconds }}s for app to start..."
+              sleep {{ .Values.benchmark.initialWaitSeconds }}
+              echo "[benchmark] Wait complete, starting probe."
+      containers:
+        - name: probe
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -e
+              source /opt/ros/humble/setup.bash
+              export ROS_DOMAIN_ID={{ .Values.ros.domainId }}
+              export RMW_IMPLEMENTATION={{ .Values.ros.rmwImplementation }}
+              export ROS_LOCALHOST_ONLY=0
+
+              echo "[benchmark] Starting probe for {{ .Values.benchmark.durationSeconds }}s..."
+              echo "[benchmark] Pattern: monolithic"
+              echo "[benchmark] Release: {{ .Release.Name }}"
+              echo "[benchmark] ROS_DOMAIN_ID: ${ROS_DOMAIN_ID}"
+              echo "[benchmark] Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+              python3 /probe/ros_latency_probe.py \
+                --latency-topic {{ .Values.topics.latency }} \
+                --inference-topic {{ .Values.topics.inference }} \
+                --duration {{ .Values.benchmark.durationSeconds }} \
+                --output-dir /tmp \
+                --summary /tmp/summary.json
+
+              echo "[benchmark] Probe finished."
+          volumeMounts:
+            - name: probe-script
+              mountPath: /probe
+              readOnly: true
+      volumes:
+        - name: probe-script
+          configMap:
+            name: {{ include "ros2-monolithic.fullname" . }}-benchmark
+{{- end }}
