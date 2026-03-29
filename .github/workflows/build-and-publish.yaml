@@ -91,7 +91,7 @@ jobs:
     if: |
       always() &&
       (
-        (github.event_name == 'push' && needs.detect-changes.outputs.images_changed == 'true') ||
+        (github.event_name == 'push' && needs.detect-changes.result == 'success' && needs.detect-changes.outputs.images_changed == 'true') ||
         (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_images == 'true')
       )
     permissions:
@@ -197,11 +197,11 @@ jobs:
   # =========================================================================
   publish-charts:
     runs-on: ubuntu-latest
-    needs: [detect-changes, build-images]
+    needs: [build-images]
     if: |
       always() && !failure() && !cancelled() &&
       (
-        (github.event_name == 'push' && needs.detect-changes.outputs.charts_changed == 'true') ||
+        (github.event_name == 'push' && needs.detect-changes.result == 'success' && needs.detect-changes.outputs.charts_changed == 'true') ||
         (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_charts == 'true')
       )
     permissions:
