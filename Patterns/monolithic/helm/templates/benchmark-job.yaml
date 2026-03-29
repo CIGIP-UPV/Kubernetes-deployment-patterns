@@ -62,7 +62,24 @@ spec:
                 --output-dir /tmp \
                 --summary /tmp/summary.json
 
-              echo "[benchmark] Probe finished."
+              echo ""
+              echo "[benchmark] Probe finished. Results saved to /tmp/"
+              echo "[benchmark] Files: summary.json, latency.csv, inference.csv"
+              echo ""
+              echo "============================================================"
+              echo "  To download results, open a Shell on this pod and run:"
+              echo "    cat /tmp/summary.json"
+              echo "    cat /tmp/latency.csv"
+              echo "    cat /tmp/inference.csv"
+              echo ""
+              echo "  Or from kubectl:"
+              echo "    kubectl cp {{ .Release.Namespace }}/$(hostname):/tmp/summary.json ./summary.json"
+              echo "    kubectl cp {{ .Release.Namespace }}/$(hostname):/tmp/latency.csv ./latency.csv"
+              echo "    kubectl cp {{ .Release.Namespace }}/$(hostname):/tmp/inference.csv ./inference.csv"
+              echo "============================================================"
+              echo ""
+              echo "[benchmark] Pod will stay alive for 10 minutes for file retrieval..."
+              sleep 600
           volumeMounts:
             - name: probe-script
               mountPath: /probe
