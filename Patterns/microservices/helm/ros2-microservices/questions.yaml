@@ -134,6 +134,14 @@ questions:
       - 120
     group: "Benchmark"
 
+  - variable: benchmark.httpPort
+    label: "Results HTTP Port"
+    description: "Port for the HTTP file server to download benchmark results (summary.json, latency.csv, inference.csv)"
+    type: int
+    default: 9999
+    show_if: "benchmark.enabled=true"
+    group: "Benchmark"
+
   - variable: yolo.conf
     label: "YOLO Confidence Threshold"
     description: "Minimum confidence for object detection"

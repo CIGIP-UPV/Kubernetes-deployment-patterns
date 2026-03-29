@@ -67,19 +67,21 @@ spec:
               echo "[benchmark] Files: summary.json, latency.csv, inference.csv"
               echo ""
               echo "============================================================"
-              echo "  To download results, open a Shell on this pod and run:"
-              echo "    cat /tmp/summary.json"
-              echo "    cat /tmp/latency.csv"
-              echo "    cat /tmp/inference.csv"
+              echo "  DOWNLOAD RESULTS via HTTP:"
+              echo "    http://$(hostname -I | awk '{print $1}'):{{ .Values.benchmark.httpPort | default 9999 }}/summary.json"
+              echo "    http://$(hostname -I | awk '{print $1}'):{{ .Values.benchmark.httpPort | default 9999 }}/latency.csv"
+              echo "    http://$(hostname -I | awk '{print $1}'):{{ .Values.benchmark.httpPort | default 9999 }}/inference.csv"
               echo ""
-              echo "  Or from kubectl:"
-              echo "    kubectl cp {{ .Release.Namespace }}/$(hostname):/tmp/summary.json ./summary.json"
-              echo "    kubectl cp {{ .Release.Namespace }}/$(hostname):/tmp/latency.csv ./latency.csv"
-              echo "    kubectl cp {{ .Release.Namespace }}/$(hostname):/tmp/inference.csv ./inference.csv"
+              echo "  Or browse all files at:"
+              echo "    http://$(hostname -I | awk '{print $1}'):{{ .Values.benchmark.httpPort | default 9999 }}/"
               echo "============================================================"
               echo ""
-              echo "[benchmark] Pod will stay alive for 10 minutes for file retrieval..."
+              echo "[benchmark] Starting HTTP server on port {{ .Values.benchmark.httpPort | default 9999 }} for file download..."
+              cd /tmp && python3 -m http.server {{ .Values.benchmark.httpPort | default 9999 }} &
+              HTTP_PID=$!
+              echo "[benchmark] HTTP server running (PID $HTTP_PID). Keeping alive for 10 minutes..."
               sleep 600
+              kill $HTTP_PID 2>/dev/null || true
           volumeMounts:
             - name: probe-script
               mountPath: /probe

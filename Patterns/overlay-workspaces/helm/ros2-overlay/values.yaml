@@ -49,6 +49,7 @@ benchmark:
   enabled: false
   durationSeconds: 120
   initialWaitSeconds: 60
+  httpPort: 9999
   ttlSecondsAfterFinished: 3600
 
 nameOverride: ""
