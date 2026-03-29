@@ -8,6 +8,7 @@ metadata:
 data:
   ros_latency_probe.py: |
     #!/usr/bin/env python3
+    """ROS 2 latency & inference probe with startup-time measurement."""
     import argparse, csv, functools, json, math, time
     from statistics import mean
     import rclpy
@@ -15,14 +16,18 @@ data:
     from std_msgs.msg import Float32
 
     class MetricsProbe(Node):
-        def __init__(self, topics):
+        def __init__(self, topics, probe_start):
             super().__init__("metrics_probe")
             self.samples = {name: [] for name in topics}
             self.timestamps = {name: [] for name in topics}
+            self.probe_start = probe_start
+            self.first_sample_time = None
             for name, topic in topics.items():
                 self.create_subscription(Float32, topic, functools.partial(self._cb, name), 100)
         def _cb(self, name, msg):
             now = time.time()
+            if self.first_sample_time is None:
+                self.first_sample_time = now
             self.timestamps[name].append(now)
             self.samples[name].append(float(msg.data))
 
@@ -37,9 +42,15 @@ data:
     def summarize(values, timestamps):
         if not values:
             return {"samples": 0, "avg_ms": None, "p50_ms": None, "p95_ms": None,
+                    "p99_ms": None, "min_ms": None, "max_ms": None, "stddev_ms": None,
                     "jitter_p95_p50_ms": None, "first_sample_unix": None, "last_sample_unix": None}
-        p50, p95 = percentile(values, 0.50), percentile(values, 0.95)
+        from statistics import stdev
+        p50 = percentile(values, 0.50)
+        p95 = percentile(values, 0.95)
+        p99 = percentile(values, 0.99)
+        sd = stdev(values) if len(values) > 1 else 0.0
         return {"samples": len(values), "avg_ms": mean(values), "p50_ms": p50, "p95_ms": p95,
+                "p99_ms": p99, "min_ms": min(values), "max_ms": max(values), "stddev_ms": sd,
                 "jitter_p95_p50_ms": p95 - p50, "first_sample_unix": timestamps[0], "last_sample_unix": timestamps[-1]}
 
     def main():
@@ -51,15 +62,19 @@ data:
         parser.add_argument("--summary", required=True)
         args = parser.parse_args()
         rclpy.init()
-        node = MetricsProbe({"latency": args.latency_topic, "inference": args.inference_topic})
-        start = time.time()
-        end = start + args.duration
+        probe_start = time.time()
+        node = MetricsProbe({"latency": args.latency_topic, "inference": args.inference_topic}, probe_start)
+        end = probe_start + args.duration
         while rclpy.ok() and time.time() < end:
             rclpy.spin_once(node, timeout_sec=0.2)
-        elapsed = max(time.time() - start, 1e-6)
-        summary = {"elapsed_s": elapsed,
-                    "latency": summarize(node.samples["latency"], node.timestamps["latency"]),
-                    "inference": summarize(node.samples["inference"], node.timestamps["inference"])}
+        elapsed = max(time.time() - probe_start, 1e-6)
+        ttfs = (node.first_sample_time - probe_start) if node.first_sample_time else None
+        summary = {
+            "elapsed_s": elapsed,
+            "time_to_first_sample_s": ttfs,
+            "latency": summarize(node.samples["latency"], node.timestamps["latency"]),
+            "inference": summarize(node.samples["inference"], node.timestamps["inference"]),
+        }
         for name in ("latency", "inference"):
             with open(f"{args.output_dir}/{name}.csv", "w", newline="") as fh:
                 w = csv.writer(fh)
@@ -80,6 +95,84 @@ data:
                 print(fh.read())
         node.destroy_node()
         rclpy.shutdown()
+
+    if __name__ == "__main__":
+        main()
+  resource_sampler.py: |
+    #!/usr/bin/env python3
+    """Host-level CPU & memory sampler using /proc. Runs alongside the ROS probe."""
+    import csv, os, signal, sys, time
+
+    running = True
+    def _stop(signum, frame):
+        global running
+        running = False
+    signal.signal(signal.SIGTERM, _stop)
+    signal.signal(signal.SIGINT, _stop)
+
+    def read_cpu():
+        """Return total and idle jiffies from /proc/stat."""
+        with open("/proc/stat") as f:
+            parts = f.readline().split()
+        vals = [int(v) for v in parts[1:]]
+        total = sum(vals)
+        idle = vals[3] + (vals[4] if len(vals) > 4 else 0)
+        return total, idle
+
+    def read_mem():
+        """Return (used_mb, total_mb, available_mb) from /proc/meminfo."""
+        info = {}
+        with open("/proc/meminfo") as f:
+            for line in f:
+                parts = line.split()
+                if parts[0].rstrip(":") in ("MemTotal", "MemAvailable", "MemFree", "Buffers", "Cached"):
+                    info[parts[0].rstrip(":")] = int(parts[1])
+        total = info.get("MemTotal", 0)
+        avail = info.get("MemAvailable", info.get("MemFree", 0))
+        used = total - avail
+        return used / 1024.0, total / 1024.0, avail / 1024.0
+
+    def main():
+        import argparse
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--interval", type=float, default=2.0, help="Sampling interval in seconds")
+        parser.add_argument("--output", required=True, help="Output CSV path")
+        parser.add_argument("--duration", type=int, default=300, help="Max duration in seconds")
+        args = parser.parse_args()
+
+        prev_total, prev_idle = read_cpu()
+        start = time.time()
+        rows = []
+
+        while running and (time.time() - start) < args.duration:
+            time.sleep(args.interval)
+            cur_total, cur_idle = read_cpu()
+            dt = cur_total - prev_total
+            di = cur_idle - prev_idle
+            cpu_pct = ((dt - di) / dt * 100.0) if dt > 0 else 0.0
+            prev_total, prev_idle = cur_total, cur_idle
+            mem_used, mem_total, mem_avail = read_mem()
+            row = {
+                "timestamp": time.time(),
+                "cpu_percent": round(cpu_pct, 2),
+                "mem_used_mb": round(mem_used, 1),
+                "mem_total_mb": round(mem_total, 1),
+                "mem_available_mb": round(mem_avail, 1),
+                "mem_used_percent": round(mem_used / mem_total * 100, 1) if mem_total > 0 else 0,
+            }
+            rows.append(row)
+
+        if rows:
+            with open(args.output, "w", newline="") as fh:
+                w = csv.DictWriter(fh, fieldnames=rows[0].keys())
+                w.writeheader()
+                w.writerows(rows)
+            cpus = [r["cpu_percent"] for r in rows]
+            mems = [r["mem_used_percent"] for r in rows]
+            print(f"\n[resources] Samples: {len(rows)}")
+            print(f"[resources] CPU  — avg: {sum(cpus)/len(cpus):.1f}%, max: {max(cpus):.1f}%, min: {min(cpus):.1f}%")
+            print(f"[resources] MEM  — avg: {sum(mems)/len(mems):.1f}%, max: {max(mems):.1f}%, min: {min(mems):.1f}%")
+            print(f"[resources] Saved to {args.output}")
 
     if __name__ == "__main__":
         main()

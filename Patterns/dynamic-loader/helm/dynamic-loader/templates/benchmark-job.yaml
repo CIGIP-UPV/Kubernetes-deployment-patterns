@@ -55,6 +55,14 @@ spec:
               echo "[benchmark] ROS_DOMAIN_ID: ${ROS_DOMAIN_ID}"
               echo "[benchmark] Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
+              # Start resource sampler in background
+              python3 /probe/resource_sampler.py \
+                --interval 2 \
+                --output /tmp/resources.csv \
+                --duration {{ add (int .Values.benchmark.durationSeconds) 30 }} &
+              RESOURCE_PID=$!
+              echo "[benchmark] Resource sampler started (PID $RESOURCE_PID)"
+
               python3 /probe/ros_latency_probe.py \
                 --latency-topic {{ .Values.topics.latency }} \
                 --inference-topic {{ .Values.topics.inference }} \
@@ -62,22 +70,28 @@ spec:
                 --output-dir /tmp \
                 --summary /tmp/summary.json
 
+              # Stop resource sampler
+              kill $RESOURCE_PID 2>/dev/null && wait $RESOURCE_PID 2>/dev/null || true
+
               echo ""
               echo "[benchmark] Probe finished. Results saved to /tmp/"
-              echo "[benchmark] Files: summary.json, latency.csv, inference.csv"
+              echo "[benchmark] Files: summary.json, latency.csv, inference.csv, resources.csv"
               echo ""
+              NODE_IP=$(hostname -I | awk '{print $1}')
+              PORT={{ .Values.benchmark.httpPort | default 9999 }}
               echo "============================================================"
               echo "  DOWNLOAD RESULTS via HTTP:"
-              echo "    http://$(hostname -I | awk '{print $1}'):{{ .Values.benchmark.httpPort | default 9999 }}/summary.json"
-              echo "    http://$(hostname -I | awk '{print $1}'):{{ .Values.benchmark.httpPort | default 9999 }}/latency.csv"
-              echo "    http://$(hostname -I | awk '{print $1}'):{{ .Values.benchmark.httpPort | default 9999 }}/inference.csv"
+              echo "    http://${NODE_IP}:${PORT}/summary.json"
+              echo "    http://${NODE_IP}:${PORT}/latency.csv"
+              echo "    http://${NODE_IP}:${PORT}/inference.csv"
+              echo "    http://${NODE_IP}:${PORT}/resources.csv"
               echo ""
               echo "  Or browse all files at:"
-              echo "    http://$(hostname -I | awk '{print $1}'):{{ .Values.benchmark.httpPort | default 9999 }}/"
+              echo "    http://${NODE_IP}:${PORT}/"
               echo "============================================================"
               echo ""
-              echo "[benchmark] Starting HTTP server on port {{ .Values.benchmark.httpPort | default 9999 }} for file download..."
-              cd /tmp && python3 -m http.server {{ .Values.benchmark.httpPort | default 9999 }} &
+              echo "[benchmark] Starting HTTP server on port ${PORT} for file download..."
+              cd /tmp && python3 -m http.server ${PORT} &
               HTTP_PID=$!
               echo "[benchmark] HTTP server running (PID $HTTP_PID). Keeping alive for 10 minutes..."
               sleep 600
