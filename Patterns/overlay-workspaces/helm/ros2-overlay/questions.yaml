@@ -27,6 +27,7 @@ questions:
       - ""
       - "kb2"
       - "worker1-kb2"
+      - "edgenode01"
     group: "Node Placement"
 
   # ── Experiment Scenario ──────────────────────────────────────────
