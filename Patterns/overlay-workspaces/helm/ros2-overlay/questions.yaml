@@ -81,6 +81,71 @@ questions:
       - "false"
     group: "Experiment"
 
+  - variable: yolo.filterClasses
+    label: "Filter Detection Classes"
+    description: "COCO class IDs to detect (empty = all 80 classes). Examples: '0' = person only, '0,16,17' = person+dog+cat"
+    type: string
+    default: ""
+    group: "Experiment"
+
+  # ── CycloneDDS (Cloud-Edge Communication) ────────────────────────
+  - variable: cyclonedds.enabled
+    label: "Enable CycloneDDS Unicast"
+    description: "Use CycloneDDS unicast peers for cross-node DDS communication (required for cloud-edge)"
+    type: boolean
+    default: true
+    group: "DDS Network"
+
+  - variable: cyclonedds.allowMulticast
+    label: "Allow Multicast"
+    description: "false = unicast peers only (recommended for cloud-edge), true = use multicast"
+    type: enum
+    default: "false"
+    options:
+      - "false"
+      - "true"
+    show_if: "cyclonedds.enabled=true"
+    group: "DDS Network"
+
+  # ── Dashboard (Cloud Observability) ─────────────────────────────
+  - variable: dashboard.enabled
+    label: "Enable Dashboard"
+    description: "Deploy a web dashboard to visualize YOLO detections and metrics from the cloud"
+    type: boolean
+    default: true
+    group: "Dashboard"
+
+  - variable: dashboard.nodeHostname
+    label: "Dashboard Node"
+    description: "Cloud node where the dashboard runs (leave empty for any node)"
+    type: enum
+    default: ""
+    options:
+      - ""
+      - "kb2"
+      - "worker1-kb2"
+    show_if: "dashboard.enabled=true"
+    group: "Dashboard"
+
+  - variable: dashboard.image.tag
+    label: "Dashboard Image Tag"
+    description: "Docker image tag for the dashboard container"
+    type: string
+    default: "v1"
+    show_if: "dashboard.enabled=true"
+    group: "Dashboard"
+
+  - variable: dashboard.service.type
+    label: "Dashboard Service Type"
+    description: "NodePort to access from outside the cluster, ClusterIP for internal only"
+    type: enum
+    default: "NodePort"
+    options:
+      - "NodePort"
+      - "ClusterIP"
+    show_if: "dashboard.enabled=true"
+    group: "Dashboard"
+
   # ── Benchmark Probe ──────────────────────────────────────────────
   - variable: benchmark.enabled
     label: "Run Benchmark Probe"

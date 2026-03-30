@@ -15,7 +15,27 @@ class YoloDetector(Node):
     Suscribe a /camera/image_raw, ejecuta YOLO y publica:
       - /detections (vision_msgs/Detection2DArray)
       - /detections/image (sensor_msgs/Image) [opcional, imagen anotada]
+
+    Parámetro filter_classes:
+      - "" (vacío)  → publica TODAS las clases (80 COCO)
+      - "0"         → solo personas
+      - "0,16,17"   → personas + perros + gatos
+      Los IDs corresponden al dataset COCO de YOLOv8.
     """
+    # Colores distintos para las 10 primeras clases (BGR)
+    PALETTE = [
+        (0, 255, 0),    # green  - person
+        (255, 128, 0),  # blue-ish - bicycle
+        (0, 128, 255),  # orange - car
+        (255, 0, 255),  # magenta - motorcycle
+        (255, 255, 0),  # cyan - airplane
+        (0, 255, 255),  # yellow - bus
+        (128, 0, 255),  # purple - train
+        (255, 0, 128),  # pink - truck
+        (0, 200, 128),  # teal - boat
+        (128, 255, 0),  # lime - traffic light
+    ]
+
     def __init__(self):
         super().__init__('yolo_detector')
 
@@ -29,10 +49,27 @@ class YoloDetector(Node):
             ('publish_metrics', True),
             ('latency_topic', '/benchmark/latency_ms'),
             ('inference_topic', '/benchmark/inference_ms'),
+            ('filter_classes', ''),
         ])
 
         self.model = YOLO(self.get_parameter('model_path').value)
         self.model.fuse()  # ligera optimización
+
+        # Parse filter_classes: "" → None (all), "0" → {0}, "0,16" → {0,16}
+        raw = str(self.get_parameter('filter_classes').value).strip()
+        if raw:
+            self.filter_classes = set(int(c.strip()) for c in raw.split(',') if c.strip())
+        else:
+            self.filter_classes = None
+
+        # COCO class names from the model
+        self.class_names = self.model.names  # dict {0: 'person', 1: 'bicycle', ...}
+
+        if self.filter_classes:
+            names = [self.class_names.get(c, str(c)) for c in sorted(self.filter_classes)]
+            self.get_logger().info(f'Filtrando clases: {names} (IDs: {sorted(self.filter_classes)})')
+        else:
+            self.get_logger().info('Detectando TODAS las clases COCO (80 clases)')
 
         self.bridge = CvBridge()
 
@@ -96,6 +133,10 @@ class YoloDetector(Node):
             cls = int(b.cls[0]) if b.cls is not None else -1
             sc  = float(b.conf[0]) if b.conf is not None else 0.0
 
+            # Filtrar por clases si está configurado
+            if self.filter_classes is not None and cls not in self.filter_classes:
+                continue
+
             det = Detection2D()
             # bbox como centro + tamaño (formato vision_msgs)
             det.bbox.center.x = (x1 + x2) / 2.0
@@ -111,10 +152,15 @@ class YoloDetector(Node):
             out.detections.append(det)
 
             if self.publish_debug:
-                cv2.rectangle(dbg, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
-                label = f'{cls}:{sc:.2f}'
-                cv2.putText(dbg, label, (int(x1), int(max(0, y1-5))),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 1, cv2.LINE_AA)
+                color = self.PALETTE[cls % len(self.PALETTE)]
+                class_name = self.class_names.get(cls, str(cls))
+                cv2.rectangle(dbg, (int(x1), int(y1)), (int(x2), int(y2)), color, 2)
+                label = f'{class_name} {sc:.0%}'
+                # Fondo para el texto (mejor legibilidad)
+                (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                cv2.rectangle(dbg, (int(x1), int(y1)-th-6), (int(x1)+tw, int(y1)), color, -1)
+                cv2.putText(dbg, label, (int(x1), int(max(0, y1-4))),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,255), 2, cv2.LINE_AA)
 
         # Publicaciones
         self.pub_det.publish(out)

@@ -1,0 +1,21 @@
+# Headless service for StatefulSet DNS (DDS peers)
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "dynamic-loader.fullname" . }}-peers
+  labels:
+    {{- include "dynamic-loader.labels" . | nindent 4 }}
+    pattern: dynamic-loader
+spec:
+  clusterIP: None
+  selector:
+    app: {{ include "dynamic-loader.name" . }}
+    pattern: dynamic-loader
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: dds
+      port: 7400
+      protocol: UDP
+    - name: http-api
+      port: {{ .Values.dynamic.apiPort }}
+      protocol: TCP

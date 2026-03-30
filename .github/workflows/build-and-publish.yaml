@@ -184,6 +184,19 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Build and push ros2-dashboard
+        uses: docker/build-push-action@v6
+        with:
+          context: Models/ros2_dashboard/docker
+          file: Models/ros2_dashboard/docker/Dockerfile
+          platforms: ${{ env.BUILD_PLATFORM }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY_PREFIX }}/ros2-dashboard:${{ steps.tag.outputs.tag }}
+            ${{ env.REGISTRY_PREFIX }}/ros2-dashboard:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
       - name: Summary
         run: |
           echo "### Docker Images Published" >> $GITHUB_STEP_SUMMARY
@@ -194,6 +207,7 @@ jobs:
           echo "| ros2-yolo | \`${{ steps.tag.outputs.tag }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| ros2-monolithic | \`${{ steps.tag.outputs.tag }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| ros2-overlay | \`${{ steps.tag.outputs.tag }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| ros2-dashboard | \`${{ steps.tag.outputs.tag }}\` |" >> $GITHUB_STEP_SUMMARY
 
   # =========================================================================
   # Job 2: Publish Helm charts to GitHub Pages (gh-pages branch)

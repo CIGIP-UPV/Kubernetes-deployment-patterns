@@ -96,6 +96,13 @@ questions:
       - "false"
     group: "Experiment"
 
+  - variable: dynamic.filterClasses
+    label: "Filter Detection Classes"
+    description: "COCO class IDs to detect (empty = all 80 classes). Examples: '0' = person only, '0,16,17' = person+dog+cat"
+    type: string
+    default: ""
+    group: "Experiment"
+
   # ── Benchmark Probe ──────────────────────────────────────────────
   - variable: benchmark.enabled
     label: "Run Benchmark Probe"
@@ -149,3 +156,70 @@ questions:
       - 0.50
       - 0.75
     group: "Experiment"
+
+  # ── CycloneDDS Configuration ────────────────────────────
+  - variable: cyclonedds.enabled
+    label: "Enable CycloneDDS"
+    description: "Enable unicast communication between edge and cloud nodes"
+    type: boolean
+    default: true
+    group: "CycloneDDS"
+
+  - variable: cyclonedds.allowMulticast
+    label: "Allow Multicast"
+    description: "Enable multicast discovery (set to 'false' for pure unicast)"
+    type: enum
+    default: "false"
+    options:
+      - "true"
+      - "false"
+    show_if: "cyclonedds.enabled=true"
+    group: "CycloneDDS"
+
+  # ── Dashboard Configuration ──────────────────────────────
+  - variable: dashboard.enabled
+    label: "Enable Dashboard"
+    description: "Deploy a cloud-side ROS 2 observability dashboard"
+    type: boolean
+    default: true
+    group: "Dashboard"
+
+  - variable: dashboard.image.tag
+    label: "Dashboard Image Tag"
+    description: "Docker image tag for the ROS 2 dashboard"
+    type: string
+    default: "v1"
+    required: true
+    show_if: "dashboard.enabled=true"
+    group: "Dashboard"
+
+  - variable: dashboard.nodeHostname
+    label: "Dashboard Node Placement"
+    description: "Hostname of the node where the dashboard runs (cloud side)"
+    type: enum
+    default: ""
+    required: false
+    options:
+      - ""
+      - "kb2"
+      - "worker1-kb2"
+    show_if: "dashboard.enabled=true"
+    group: "Dashboard"
+
+  - variable: dashboard.service.httpNodePort
+    label: "Dashboard HTTP NodePort"
+    description: "NodePort for web access (empty = auto-assign)"
+    type: int
+    default: ""
+    required: false
+    show_if: "dashboard.enabled=true"
+    group: "Dashboard"
+
+  - variable: dashboard.service.wsNodePort
+    label: "Dashboard WebSocket NodePort"
+    description: "NodePort for WebSocket (empty = auto-assign)"
+    type: int
+    default: ""
+    required: false
+    show_if: "dashboard.enabled=true"
+    group: "Dashboard"

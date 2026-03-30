@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ros2-monolithic.fullname" . }}-peers
+  labels:
+    {{- include "ros2-monolithic.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  selector:
+    app: {{ include "ros2-monolithic.name" . }}
+    pattern: monolithic
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: dds
+      port: 7400
+      protocol: UDP

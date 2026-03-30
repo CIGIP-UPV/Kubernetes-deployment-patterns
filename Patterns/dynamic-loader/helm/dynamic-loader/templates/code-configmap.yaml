@@ -28,6 +28,7 @@ data:
     DEBUG_IMAGE_TOPIC = os.getenv("DEBUG_IMAGE_TOPIC", "/detections/image")
     PUBLISH_DEBUG = os.getenv("YOLO_PUBLISH_DEBUG", "false")
     PUBLISH_METRICS = os.getenv("YOLO_PUBLISH_METRICS", "true")
+    FILTER_CLASSES = os.getenv("YOLO_FILTER_CLASSES", "")
     LATENCY_TOPIC = os.getenv("LATENCY_TOPIC", "/benchmark/latency_ms")
     INFERENCE_TOPIC = os.getenv("INFERENCE_TOPIC", "/benchmark/inference_ms")
 
@@ -59,7 +60,8 @@ data:
                     f"-p publish_debug_image:={PUBLISH_DEBUG} "
                     f"-p publish_metrics:={PUBLISH_METRICS} "
                     f"-p latency_topic:={LATENCY_TOPIC} "
-                    f"-p inference_topic:={INFERENCE_TOPIC}"
+                    f"-p inference_topic:={INFERENCE_TOPIC} "
+                    f"-p filter_classes:={FILTER_CLASSES}"
                 ),
             ]
             _process = subprocess.Popen(cmd)

@@ -1,0 +1,12 @@
+{{- if .Values.dashboard.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ros2-overlay.fullname" . }}-dashboard-html
+  labels:
+    {{- include "ros2-overlay.labels" . | nindent 4 }}
+    component: dashboard
+data:
+  dashboard.html: |
+{{ .Files.Get "files/dashboard.html" | indent 4 }}
+{{- end }}

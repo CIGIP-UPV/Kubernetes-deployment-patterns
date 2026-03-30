@@ -1,0 +1,17 @@
+# Headless service for StatefulSet DNS (DDS peers)
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ros2-overlay.fullname" . }}-peers
+  labels:
+    {{- include "ros2-overlay.labels" . | nindent 4 }}
+    pattern: overlay-workspaces
+spec:
+  clusterIP: None
+  selector:
+    app: {{ include "ros2-overlay.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: dds
+      port: 7400
+      protocol: UDP

@@ -1,0 +1,33 @@
+{{- if .Values.cyclonedds.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ros2-monolithic.fullname" . }}-cyclonedds
+  labels:
+    {{- include "ros2-monolithic.labels" . | nindent 4 }}
+data:
+  cyclonedds.xml: |
+    <CycloneDDS>
+      <Domain Id="{{ .Values.ros.domainId }}">
+        <General>
+          <AllowMulticast>{{ .Values.cyclonedds.allowMulticast | default "false" }}</AllowMulticast>
+          <Interfaces>
+            <NetworkInterface autodetermine="true"/>
+          </Interfaces>
+          <Transport>udp</Transport>
+        </General>
+        <Discovery>
+          <ParticipantIndex>auto</ParticipantIndex>
+          <Peers>
+            <Peer Address="{{ include "ros2-monolithic.fullname" . }}-0.{{ include "ros2-monolithic.fullname" . }}-peers.{{ .Release.Namespace }}.svc.cluster.local"/>
+            {{- if .Values.dashboard.enabled }}
+            <Peer Address="{{ include "ros2-monolithic.fullname" . }}-dashboard-0.{{ include "ros2-monolithic.fullname" . }}-dashboard-peers.{{ .Release.Namespace }}.svc.cluster.local"/>
+            {{- end }}
+            {{- range .Values.cyclonedds.extraPeers }}
+            <Peer Address="{{ . }}"/>
+            {{- end }}
+          </Peers>
+        </Discovery>
+      </Domain>
+    </CycloneDDS>
+{{- end }}

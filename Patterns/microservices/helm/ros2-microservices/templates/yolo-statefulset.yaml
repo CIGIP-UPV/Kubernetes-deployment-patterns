@@ -1,6 +1,6 @@
 {{- if .Values.yolo.enabled }}
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: {{ include "ros2-microservices.fullname" . }}-yolo
   labels:
@@ -8,6 +8,7 @@ metadata:
     pattern: microservices
     component: yolo
 spec:
+  serviceName: {{ include "ros2-microservices.fullname" . }}-yolo-peers
   replicas: 1
   selector:
     matchLabels:
@@ -21,10 +22,6 @@ spec:
         component: yolo
         pattern: microservices
     spec:
-      {{- if .Values.network.hostNetwork }}
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
-      {{- end }}
       {{- if .Values.imagePullSecretName }}
       imagePullSecrets:
         - name: {{ .Values.imagePullSecretName }}
@@ -55,6 +52,10 @@ spec:
               value: {{ .Values.ros.rmwImplementation | quote }}
             - name: ROS_LOCALHOST_ONLY
               value: {{ .Values.ros.localhostOnly | quote }}
+            {{- if .Values.cyclonedds.enabled }}
+            - name: CYCLONEDDS_URI
+              value: "file:///etc/cyclonedds/cyclonedds.xml"
+            {{- end }}
           command: ["/bin/bash", "-lc"]
           args:
             - |
@@ -72,9 +73,16 @@ spec:
                 -p publish_debug_image:={{ .Values.yolo.publishDebugImage | quote }} \
                 -p publish_metrics:={{ .Values.yolo.publishMetrics | quote }} \
                 -p latency_topic:={{ .Values.topics.latency | quote }} \
-                -p inference_topic:={{ .Values.topics.inference | quote }}
+                -p inference_topic:={{ .Values.topics.inference | quote }} \
+                -p filter_classes:={{ .Values.yolo.filterClasses | quote }}
           resources:
             {{- toYaml .Values.yolo.resources | nindent 12 }}
+          {{- if .Values.cyclonedds.enabled }}
+          volumeMounts:
+            - name: cyclonedds
+              mountPath: /etc/cyclonedds
+              readOnly: true
+          {{- end }}
           startupProbe:
             exec:
               command:
@@ -96,4 +104,13 @@ spec:
             periodSeconds: 20
             timeoutSeconds: 10
             failureThreshold: 3
+      {{- if .Values.cyclonedds.enabled }}
+      volumes:
+        - name: cyclonedds
+          configMap:
+            name: {{ include "ros2-microservices.fullname" . }}-cyclonedds
+            items:
+              - key: cyclonedds.xml
+                path: cyclonedds.xml
+      {{- end }}
 {{- end }}

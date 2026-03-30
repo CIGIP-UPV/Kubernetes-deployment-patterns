@@ -102,6 +102,13 @@ questions:
       - "false"
     group: "Experiment"
 
+  - variable: yolo.filterClasses
+    label: "Filter Detection Classes"
+    description: "COCO class IDs to detect (empty = all 80 classes). Examples: '0' = person only, '0,16,17' = person+dog+cat"
+    type: string
+    default: ""
+    group: "Experiment"
+
   # ── Benchmark Probe ──────────────────────────────────────────────
   - variable: benchmark.enabled
     label: "Run Benchmark Probe"
@@ -155,3 +162,82 @@ questions:
       - 0.50
       - 0.75
     group: "Experiment"
+
+  # ── CycloneDDS ──────────────────────────────────────────
+  - variable: cyclonedds.enabled
+    label: "Enable CycloneDDS Unicast"
+    description: "Enable CycloneDDS for ROS 2 communication between microservices"
+    type: boolean
+    default: true
+    group: "CycloneDDS"
+
+  - variable: cyclonedds.allowMulticast
+    label: "Allow Multicast"
+    description: "Enable multicast for DDS discovery (false = unicast only)"
+    type: enum
+    default: "false"
+    options:
+      - "true"
+      - "false"
+    show_if: "cyclonedds.enabled=true"
+    group: "CycloneDDS"
+
+  # ── Dashboard ────────────────────────────────────────────
+  - variable: dashboard.enabled
+    label: "Enable Dashboard"
+    description: "Deploy the ROS 2 dashboard for visualization and monitoring"
+    type: boolean
+    default: true
+    group: "Dashboard"
+
+  - variable: dashboard.image.tag
+    label: "Dashboard Image Tag"
+    description: "Docker image tag for the dashboard"
+    type: string
+    default: "v1"
+    show_if: "dashboard.enabled=true"
+    required: true
+    group: "Dashboard"
+
+  - variable: dashboard.nodeHostname
+    label: "Dashboard Node (Cloud)"
+    description: "Hostname of the cloud node where the dashboard runs"
+    type: enum
+    default: ""
+    show_if: "dashboard.enabled=true"
+    required: false
+    options:
+      - ""
+      - "kb2"
+      - "worker1-kb2"
+      - "edgenode01"
+    group: "Dashboard"
+
+  - variable: dashboard.service.type
+    label: "Dashboard Service Type"
+    description: "Kubernetes service type for dashboard access"
+    type: enum
+    default: "NodePort"
+    show_if: "dashboard.enabled=true"
+    options:
+      - "NodePort"
+      - "ClusterIP"
+    group: "Dashboard"
+
+  - variable: dashboard.service.httpNodePort
+    label: "Dashboard HTTP NodePort (optional)"
+    description: "Specific NodePort for HTTP (leave empty for auto-assignment)"
+    type: int
+    default: ""
+    show_if: "dashboard.enabled=true AND dashboard.service.type=NodePort"
+    required: false
+    group: "Dashboard"
+
+  - variable: dashboard.service.wsNodePort
+    label: "Dashboard WebSocket NodePort (optional)"
+    description: "Specific NodePort for WebSocket (leave empty for auto-assignment)"
+    type: int
+    default: ""
+    show_if: "dashboard.enabled=true AND dashboard.service.type=NodePort"
+    required: false
+    group: "Dashboard"

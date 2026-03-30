@@ -17,9 +17,6 @@ ros:
   rmwImplementation: rmw_cyclonedds_cpp
   localhostOnly: "0"
 
-network:
-  hostNetwork: true
-
 nodeHostname: ""
 nodeSelector: {}
 affinity: {}
@@ -41,6 +38,7 @@ dynamic:
   conf: 0.25
   publishDebugImage: "false"
   publishMetrics: "true"
+  filterClasses: ""  # "" = all 80 COCO classes, "0" = person only, "0,16,17" = person+dog+cat
   allowedModules:
     - yolo_detector
 
@@ -59,6 +57,26 @@ service:
   type: ClusterIP
   port: 5000
   targetPort: 5000
+
+# ── CycloneDDS Unicast (cloud-edge communication) ──
+cyclonedds:
+  enabled: true
+  allowMulticast: "false"
+  extraPeers: []  # Additional peer addresses (e.g., other charts' StatefulSets)
+
+# ── Dashboard (cloud-side observability) ──
+dashboard:
+  enabled: true
+  image:
+    repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-dashboard
+    tag: v1
+    pullPolicy: IfNotPresent
+  nodeHostname: ""  # Pin to cloud node (e.g., worker1-kb2)
+  resources: {}
+  service:
+    type: NodePort
+    httpNodePort: ""
+    wsNodePort: ""
 
 benchmark:
   enabled: false
