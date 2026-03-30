@@ -43,6 +43,10 @@ spec:
         - name: camera
           image: "{{ .Values.images.camera.repository }}:{{ .Values.images.camera.tag }}"
           imagePullPolicy: {{ .Values.images.camera.pullPolicy }}
+          {{- if and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode) }}
+          securityContext:
+            privileged: true
+          {{- end }}
           env:
             - name: ROS_DOMAIN_ID
               value: {{ .Values.ros.domainId | quote }}
@@ -114,7 +118,7 @@ spec:
             - name: YOLO_PUBLISH_METRICS
               value: {{ .Values.dynamic.publishMetrics | quote }}
             - name: YOLO_FILTER_CLASSES
-              value: {{ .Values.dynamic.filterClasses | quote }}
+              value: {{ .Values.dynamic.filterClasses | toString | quote }}
             - name: IMAGE_TOPIC
               value: {{ .Values.topics.image | quote }}
             - name: DETECTIONS_TOPIC

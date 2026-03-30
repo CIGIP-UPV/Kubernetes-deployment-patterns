@@ -6,6 +6,7 @@ FROM ros:humble-ros-base
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ros-humble-rosbridge-suite \
+        ros-humble-rmw-cyclonedds-cpp \
         python3 \
     && rm -rf /var/lib/apt/lists/*
 

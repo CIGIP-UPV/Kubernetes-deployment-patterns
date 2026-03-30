@@ -43,6 +43,10 @@ spec:
         - name: overlay-runtime
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode) }}
+          securityContext:
+            privileged: true
+          {{- end }}
           env:
             - name: ROS_DOMAIN_ID
               value: {{ .Values.ros.domainId | quote }}
@@ -81,7 +85,7 @@ spec:
             - name: YOLO_PUBLISH_METRICS
               value: {{ .Values.yolo.publishMetrics | quote }}
             - name: YOLO_FILTER_CLASSES
-              value: {{ .Values.yolo.filterClasses | quote }}
+              value: {{ .Values.yolo.filterClasses | toString | quote }}
             - name: YOLO_START_DELAY
               value: {{ .Values.yolo.startDelaySeconds | quote }}
             {{- if .Values.cyclonedds.enabled }}

@@ -45,6 +45,10 @@ spec:
         - name: camera
           image: "{{ .Values.images.camera.repository }}:{{ .Values.images.camera.tag }}"
           imagePullPolicy: {{ .Values.images.camera.pullPolicy }}
+          {{- if and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode) }}
+          securityContext:
+            privileged: true
+          {{- end }}
           env:
             - name: ROS_DOMAIN_ID
               value: {{ .Values.ros.domainId | quote }}
