@@ -6,7 +6,8 @@
 <title>CIGIP — ROS 2 Detection Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/roslibjs/1.4.0/roslib.min.js"></script>
+<!-- roslib served locally from Docker image (no CDN dependency) -->
+<script src="lib/roslib.min.js"></script>
 <style>
   :root {
     --cigip-red: #9B1B30;
@@ -558,7 +559,15 @@ const imageTopicName    = params.get('image_topic')     || '/detections/image';
 const latencyTopicName  = params.get('latency_topic')   || '/benchmark/latency_ms';
 const inferenceTopicName= params.get('inference_topic')  || '/benchmark/inference_ms';
 const detectionTopicName= params.get('detection_topic')  || '/detections';
-const rosbridgePort     = params.get('rosbridge_port')   || '9090';
+// Auto-detect rosbridge WebSocket port:
+// 1. Explicit URL param ?rosbridge_port=XXXXX (always wins)
+// 2. If accessed via NodePort (port != 8080), try HTTP port + 1
+//    (K8s assigns sequential NodePorts for the same service)
+// 3. Fall back to 9090 (direct pod access / port-forward)
+const rosbridgePort = params.get('rosbridge_port') ||
+  (window.location.port && window.location.port !== '8080'
+    ? String(parseInt(window.location.port) + 1)
+    : '9090');
 const cfgPattern        = params.get('pattern')          || 'monolithic';
 const cfgNamespace      = params.get('namespace')        || 'ros2exp';
 const cfgNodeName       = params.get('node')             || 'edgenode01';

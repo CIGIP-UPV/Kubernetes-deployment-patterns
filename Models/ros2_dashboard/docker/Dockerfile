@@ -10,8 +10,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         python3 \
     && rm -rf /var/lib/apt/lists/*
 
-# Dashboard HTML is mounted via ConfigMap at /dashboard
-RUN mkdir -p /dashboard
+# Pre-bundle roslib.js in /opt/dashboard-lib (outside ConfigMap mount point)
+# The entrypoint copies these into /dashboard/lib/ at startup
+RUN mkdir -p /opt/dashboard-lib /dashboard && \
+    apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && \
+    curl -fsSL -o /opt/dashboard-lib/roslib.min.js \
+      https://cdnjs.cloudflare.com/ajax/libs/roslibjs/1.4.0/roslib.min.js && \
+    apt-get purge -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 8080 9090
 

@@ -53,7 +53,7 @@ spec:
               protocol: TCP
           volumeMounts:
             - name: dashboard-html
-              mountPath: /dashboard
+              mountPath: /dashboard-cm
               readOnly: true
             {{- if .Values.cyclonedds.enabled }}
             - name: cyclonedds
