@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-overlay
-  tag: v1
+  tag: latest
   pullPolicy: IfNotPresent
 
 imagePullSecretName: regcred
