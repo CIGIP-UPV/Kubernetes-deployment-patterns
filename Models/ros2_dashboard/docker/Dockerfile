@@ -4,16 +4,27 @@
 # ─────────────────────────────────────────────────────────
 FROM ros:humble-ros-base
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Retry logic: QEMU arm64 emulation may segfault on libc-bin post-install
+RUN for attempt in 1 2 3; do \
+      echo "[apt] Attempt $attempt..." && \
+      apt-get update && \
+      apt-get install -y --no-install-recommends \
         ros-humble-rosbridge-suite \
         ros-humble-rmw-cyclonedds-cpp \
         python3 \
-    && rm -rf /var/lib/apt/lists/*
+      && break \
+      || { echo "[apt] Attempt $attempt failed (QEMU?), retrying..."; \
+           apt-get install -f -y || true; sleep 2; }; \
+    done && rm -rf /var/lib/apt/lists/*
 
 # Pre-bundle roslib.js in /opt/dashboard-lib (outside ConfigMap mount point)
 # The entrypoint copies these into /dashboard/lib/ at startup
 RUN mkdir -p /opt/dashboard-lib /dashboard && \
-    apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && \
+    for attempt in 1 2 3; do \
+      apt-get update && \
+      apt-get install -y --no-install-recommends curl ca-certificates && break \
+      || { apt-get install -f -y || true; sleep 2; }; \
+    done && \
     curl -fsSL -o /opt/dashboard-lib/roslib.min.js \
       https://cdnjs.cloudflare.com/ajax/libs/roslibjs/1.4.0/roslib.min.js && \
     apt-get purge -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*

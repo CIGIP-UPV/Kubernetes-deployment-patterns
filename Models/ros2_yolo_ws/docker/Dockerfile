@@ -10,15 +10,21 @@ ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 ENV ROS_DOMAIN_ID=42
 ENV YOLO_VERBOSE=False
 
-# Dependencias del sistema y ROS
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      python3-pip python3-colcon-common-extensions \
-      python3-opencv libgl1 libglib2.0-0 \
-      ros-${ROS_DISTRO}-cv-bridge \
-      ros-${ROS_DISTRO}-vision-msgs \
-      ros-${ROS_DISTRO}-image-transport \
-      ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
-    && rm -rf /var/lib/apt/lists/*
+# Retry logic: QEMU arm64 emulation may segfault on libc-bin post-install
+RUN for attempt in 1 2 3; do \
+      echo "[apt] Attempt $attempt..." && \
+      apt-get update && \
+      apt-get install -y --no-install-recommends \
+        python3-pip python3-colcon-common-extensions \
+        python3-opencv libgl1 libglib2.0-0 \
+        ros-${ROS_DISTRO}-cv-bridge \
+        ros-${ROS_DISTRO}-vision-msgs \
+        ros-${ROS_DISTRO}-image-transport \
+        ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
+      && break \
+      || { echo "[apt] Attempt $attempt failed (QEMU?), retrying..."; \
+           apt-get install -f -y || true; sleep 2; }; \
+    done && rm -rf /var/lib/apt/lists/*
 
 # Use CPU wheels on arm64/local validation, and allow explicit CUDA on amd64.
 RUN python3 -m pip install --no-cache-dir --upgrade pip && \

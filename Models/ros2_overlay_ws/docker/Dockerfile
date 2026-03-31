@@ -8,15 +8,22 @@ ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 ENV ROS_DOMAIN_ID=42
 ENV YOLO_VERBOSE=False
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      python3-pip python3-colcon-common-extensions \
-      python3-opencv libgl1 libglib2.0-0 \
-      ros-${ROS_DISTRO}-cv-bridge \
-      ros-${ROS_DISTRO}-vision-msgs \
-      ros-${ROS_DISTRO}-image-transport \
-      ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
-      v4l-utils \
-    && rm -rf /var/lib/apt/lists/*
+# Retry logic: QEMU arm64 emulation may segfault on libc-bin post-install
+RUN for attempt in 1 2 3; do \
+      echo "[apt] Attempt $attempt..." && \
+      apt-get update && \
+      apt-get install -y --no-install-recommends \
+        python3-pip python3-colcon-common-extensions \
+        python3-opencv libgl1 libglib2.0-0 \
+        ros-${ROS_DISTRO}-cv-bridge \
+        ros-${ROS_DISTRO}-vision-msgs \
+        ros-${ROS_DISTRO}-image-transport \
+        ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
+        v4l-utils \
+      && break \
+      || { echo "[apt] Attempt $attempt failed (QEMU?), retrying..."; \
+           apt-get install -f -y || true; sleep 2; }; \
+    done && rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m pip install --no-cache-dir --upgrade pip && \
     if [ "${TORCH_VARIANT}" = "cuda121" ]; then \
