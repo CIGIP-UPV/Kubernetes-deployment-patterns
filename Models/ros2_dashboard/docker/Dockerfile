@@ -11,6 +11,7 @@ RUN for attempt in 1 2 3; do \
       apt-get install -y --no-install-recommends \
         ros-humble-rosbridge-suite \
         ros-humble-rmw-cyclonedds-cpp \
+        ros-humble-vision-msgs \
         python3 \
       && break \
       || { echo "[apt] Attempt $attempt failed (QEMU?), retrying..."; \
