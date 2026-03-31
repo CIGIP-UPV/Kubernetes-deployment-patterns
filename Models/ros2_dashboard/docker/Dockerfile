@@ -26,7 +26,7 @@ RUN mkdir -p /opt/dashboard-lib /dashboard && \
       || { apt-get install -f -y || true; sleep 2; }; \
     done && \
     curl -fsSL -o /opt/dashboard-lib/roslib.min.js \
-      https://cdnjs.cloudflare.com/ajax/libs/roslibjs/1.4.0/roslib.min.js && \
+      https://cdnjs.cloudflare.com/ajax/libs/roslibjs/1.1.0/roslib.min.js && \
     apt-get purge -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 8080 9090
