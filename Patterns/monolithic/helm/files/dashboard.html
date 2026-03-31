@@ -749,11 +749,13 @@ function scheduleReconnect() {
 }
 
 function subscribeToTopics() {
-  // Image
+  // Image — use PNG compression so rosbridge converts raw BGR8 to PNG
+  // on the server side. This reduces bandwidth ~90% and simplifies rendering.
   const imageTopic = new ROSLIB.Topic({
     ros, name: imageTopicName,
     messageType: 'sensor_msgs/msg/Image',
-    throttle_rate: 100
+    throttle_rate: 200,
+    compression: 'png'
   });
   imageTopic.subscribe(function(msg) {
     if (!isConnected) return;
@@ -825,18 +827,38 @@ function subscribeToTopics() {
 }
 
 function drawLiveImage(msg) {
-  const w = msg.width;
-  const h = msg.height;
-  const encoding = msg.encoding || 'bgr8';
+  // With compression: 'png', rosbridge sends {data: '<base64 PNG>'}.
+  // With raw Image msgs, fields include width/height/encoding/data.
+  // We handle both formats for robustness.
 
-  document.getElementById('resDisplay').textContent =
-    `${w} × ${h} — ${imageTopicName}`;
+  if (msg.width && msg.height) {
+    document.getElementById('resDisplay').textContent =
+      `${msg.width} × ${msg.height} — ${imageTopicName}`;
+  }
 
   try {
-    const raw = atob(msg.data);
-    const imgData = ctx.createImageData(w, h);
-
-    if (encoding === 'bgr8' || encoding === 'rgb8') {
+    const img = new Image();
+    img.onload = function() {
+      if (!msg.width) {
+        document.getElementById('resDisplay').textContent =
+          `${img.naturalWidth} × ${img.naturalHeight} — ${imageTopicName}`;
+      }
+      resize();
+      ctx.drawImage(img, 0, 0, W, H);
+    };
+    // PNG compression: data is base64 PNG directly
+    // Raw Image: data is base64 raw pixels (fallback)
+    if (msg.format === 'png' || !msg.encoding) {
+      img.src = 'data:image/png;base64,' + msg.data;
+    } else {
+      // Fallback: raw image data — decode pixel by pixel
+      const w = msg.width, h = msg.height;
+      const encoding = msg.encoding || 'bgr8';
+      const raw = atob(msg.data);
+      const tmpCanvas = document.createElement('canvas');
+      tmpCanvas.width = w; tmpCanvas.height = h;
+      const tmpCtx = tmpCanvas.getContext('2d');
+      const imgData = tmpCtx.createImageData(w, h);
       for (let i = 0; i < w * h; i++) {
         if (encoding === 'bgr8') {
           imgData.data[i*4]   = raw.charCodeAt(i*3+2);
@@ -849,15 +871,10 @@ function drawLiveImage(msg) {
         }
         imgData.data[i*4+3] = 255;
       }
+      tmpCtx.putImageData(imgData, 0, 0);
+      resize();
+      ctx.drawImage(tmpCanvas, 0, 0, W, H);
     }
-
-    const tmpCanvas = document.createElement('canvas');
-    tmpCanvas.width = w;
-    tmpCanvas.height = h;
-    tmpCanvas.getContext('2d').putImageData(imgData, 0, 0);
-
-    resize();
-    ctx.drawImage(tmpCanvas, 0, 0, W, H);
   } catch (e) {
     console.error('[dashboard] Error decoding image:', e);
   }
