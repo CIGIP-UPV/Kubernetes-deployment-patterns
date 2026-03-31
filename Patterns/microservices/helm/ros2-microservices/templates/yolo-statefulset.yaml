@@ -74,7 +74,12 @@ spec:
                 -p publish_metrics:={{ .Values.yolo.publishMetrics | quote }} \
                 -p latency_topic:={{ .Values.topics.latency | quote }} \
                 -p inference_topic:={{ .Values.topics.inference | quote }} \
-                -p filter_classes:="{{ .Values.yolo.filterClasses | toString }}"
+                -p filter_classes:="{{ .Values.yolo.filterClasses | toString }}" &
+              YOLO_PID=$!
+              python3 /opt/scripts/resource_monitor.py &
+              MONITOR_PID=$!
+              wait -n ${YOLO_PID} ${MONITOR_PID}
+              exit 1
           resources:
             {{- toYaml .Values.yolo.resources | nindent 12 }}
           {{- if .Values.cyclonedds.enabled }}

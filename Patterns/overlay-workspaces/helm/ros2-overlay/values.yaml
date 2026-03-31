@@ -28,7 +28,7 @@ camera:
 yolo:
   modelPath: /opt/models/yolov8n.pt
   conf: 0.25
-  publishDebugImage: "false"
+  publishDebugImage: "true"
   publishMetrics: "true"
   startDelaySeconds: 2
   filterClasses: ""  # "" = all 80 COCO classes, "0" = person only, "0,16,17" = person+dog+cat

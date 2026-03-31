@@ -131,7 +131,11 @@ spec:
                 -p filter_classes:="\"${YOLO_FILTER_CLASSES}\"" &
               YOLO_PID=$!
 
-              wait -n ${CAMERA_PID} ${YOLO_PID}
+              echo "[monolithic] Starting resource monitor..."
+              python3 /opt/scripts/resource_monitor.py &
+              RESMON_PID=$!
+
+              wait -n ${CAMERA_PID} ${YOLO_PID} ${RESMON_PID}
               exit 1
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

@@ -86,6 +86,16 @@ questions:
     default: true
     group: "Dynamic Loading"
 
+  - variable: dynamic.publishDebugImage
+    label: "Publish Debug Image"
+    description: "Publish annotated YOLO detection image (required for dashboard video feed)"
+    type: enum
+    default: "true"
+    options:
+      - "true"
+      - "false"
+    group: "Experiment"
+
   - variable: dynamic.publishMetrics
     label: "Publish Benchmark Metrics"
     description: "Enable latency and inference time metrics on ROS topics"

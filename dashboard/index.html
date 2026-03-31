@@ -823,6 +823,28 @@ function subscribeToTopics() {
       `).join('');
     }
   });
+
+  // CPU usage
+  new ROSLIB.Topic({
+    ros, name: '/node/cpu_percent',
+    messageType: 'std_msgs/msg/Float32'
+  }).subscribe(function(msg) {
+    if (!isConnected) return;
+    const pct = Math.min(100, Math.max(0, msg.data));
+    document.getElementById('cpuVal').textContent = pct.toFixed(1) + ' %';
+    document.getElementById('cpuBar').style.width = pct.toFixed(1) + '%';
+  });
+
+  // Memory usage
+  new ROSLIB.Topic({
+    ros, name: '/node/memory_percent',
+    messageType: 'std_msgs/msg/Float32'
+  }).subscribe(function(msg) {
+    if (!isConnected) return;
+    const pct = Math.min(100, Math.max(0, msg.data));
+    document.getElementById('memVal').textContent = pct.toFixed(1) + ' %';
+    document.getElementById('memBar').style.width = pct.toFixed(1) + '%';
+  });
 }
 
 function drawLiveImage(msg) {

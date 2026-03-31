@@ -59,6 +59,9 @@ RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
 RUN mkdir -p /opt/models && \
     python3 -c "from ultralytics import YOLO; YOLO('/opt/models/yolov8n.pt')"
 
+# Standalone resource monitor (no colcon build needed — uses rclpy directly)
+COPY scripts/resource_monitor.py /opt/scripts/resource_monitor.py
+
 # Entrypoint
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

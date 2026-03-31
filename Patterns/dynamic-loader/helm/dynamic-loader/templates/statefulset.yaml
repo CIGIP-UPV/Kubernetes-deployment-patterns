@@ -137,7 +137,12 @@ spec:
               if [ -f /opt/ros_ws/install/setup.bash ]; then
                 source /opt/ros_ws/install/setup.bash
               fi
-              python3 -m uvicorn server:app --host 0.0.0.0 --port ${PORT}
+              python3 /opt/scripts/resource_monitor.py &
+              MONITOR_PID=$!
+              python3 -m uvicorn server:app --host 0.0.0.0 --port ${PORT} &
+              API_PID=$!
+              wait -n ${MONITOR_PID} ${API_PID}
+              exit 1
           ports:
             - name: http-api
               containerPort: {{ .Values.dynamic.apiPort }}

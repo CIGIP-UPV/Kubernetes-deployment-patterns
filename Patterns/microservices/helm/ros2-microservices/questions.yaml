@@ -92,6 +92,16 @@ questions:
     show_if: "camera.syntheticMode=false"
     group: "Camera"
 
+  - variable: yolo.publishDebugImage
+    label: "Publish Debug Image"
+    description: "Publish annotated YOLO detection image (required for dashboard video feed)"
+    type: enum
+    default: "true"
+    options:
+      - "true"
+      - "false"
+    group: "Experiment"
+
   - variable: yolo.publishMetrics
     label: "Publish Benchmark Metrics"
     description: "Enable latency and inference time metrics on ROS topics"
