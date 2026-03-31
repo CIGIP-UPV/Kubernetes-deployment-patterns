@@ -210,7 +210,7 @@ questions:
     label: "Dashboard HTTP NodePort"
     description: "NodePort for web access (empty = auto-assign)"
     type: int
-    default: ""
+    default: 31406
     required: false
     show_if: "dashboard.enabled=true"
     group: "Dashboard"
@@ -219,7 +219,7 @@ questions:
     label: "Dashboard WebSocket NodePort"
     description: "NodePort for WebSocket (empty = auto-assign)"
     type: int
-    default: ""
+    default: 31407
     required: false
     show_if: "dashboard.enabled=true"
     group: "Dashboard"

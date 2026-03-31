@@ -150,7 +150,7 @@ questions:
     label: "Dashboard HTTP NodePort"
     description: "Fixed NodePort for web UI (30000-32767). Leave empty for auto-assign."
     type: int
-    default: ""
+    default: 31406
     required: false
     show_if: "dashboard.enabled=true&&dashboard.service.type=NodePort"
     group: "Dashboard"
@@ -159,7 +159,7 @@ questions:
     label: "Dashboard WebSocket NodePort"
     description: "Fixed NodePort for rosbridge WebSocket (30000-32767). Leave empty for auto-assign."
     type: int
-    default: ""
+    default: 31407
     required: false
     show_if: "dashboard.enabled=true&&dashboard.service.type=NodePort"
     group: "Dashboard"

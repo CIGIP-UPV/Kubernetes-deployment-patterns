@@ -29,6 +29,22 @@ spec:
       nodeSelector:
         kubernetes.io/hostname: {{ .Values.dashboard.nodeHostname }}
       {{- end }}
+      # Wait for DDS peer DNS to be resolvable before starting rosbridge.
+      # CycloneDDS only resolves peer addresses once at startup.
+      initContainers:
+        - name: wait-for-peers
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              PEER="{{ include "dynamic-loader.fullname" . }}-0.{{ include "dynamic-loader.fullname" . }}-peers.{{ .Release.Namespace }}.svc.cluster.local"
+              echo "[init] Waiting for DDS peer DNS: $PEER"
+              until nslookup "$PEER" >/dev/null 2>&1; do
+                echo "[init] $PEER not resolvable yet, retrying in 3s..."
+                sleep 3
+              done
+              echo "[init] Peer resolved — ready to start rosbridge"
       containers:
         - name: dashboard
           image: "{{ .Values.dashboard.image.repository }}:{{ .Values.dashboard.image.tag }}"

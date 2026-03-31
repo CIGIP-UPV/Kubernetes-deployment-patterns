@@ -228,7 +228,7 @@ questions:
     label: "Dashboard HTTP NodePort (optional)"
     description: "Specific NodePort for HTTP (leave empty for auto-assignment)"
     type: int
-    default: ""
+    default: 31406
     show_if: "dashboard.enabled=true AND dashboard.service.type=NodePort"
     required: false
     group: "Dashboard"
@@ -237,7 +237,7 @@ questions:
     label: "Dashboard WebSocket NodePort (optional)"
     description: "Specific NodePort for WebSocket (leave empty for auto-assignment)"
     type: int
-    default: ""
+    default: 31407
     show_if: "dashboard.enabled=true AND dashboard.service.type=NodePort"
     required: false
     group: "Dashboard"

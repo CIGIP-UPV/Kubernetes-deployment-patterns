@@ -59,8 +59,8 @@ dashboard:
   resources: {}
   service:
     type: NodePort
-    httpNodePort: ""
-    wsNodePort: ""
+    httpNodePort: 31406
+    wsNodePort: 31407
 
 benchmark:
   enabled: false
