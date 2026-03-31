@@ -139,8 +139,8 @@ class YoloDetector(Node):
 
             det = Detection2D()
             # bbox como centro + tamaño (formato vision_msgs)
-            det.bbox.center.x = (x1 + x2) / 2.0
-            det.bbox.center.y = (y1 + y2) / 2.0
+            det.bbox.center.position.x = (x1 + x2) / 2.0
+            det.bbox.center.position.y = (y1 + y2) / 2.0
             det.bbox.center.theta = 0.0
             det.bbox.size_x = (x2 - x1)
             det.bbox.size_y = (y2 - y1)

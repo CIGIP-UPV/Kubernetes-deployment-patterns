@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CIGIP — ROS 2 YOLO Detection Dashboard</title>
+<title>CIGIP — ROS 2 Detection Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/roslibjs/1.4.0/roslib.min.js"></script>
@@ -25,6 +25,8 @@
     --success-bg: rgba(27,135,63,0.08);
     --warn: #C67F17;
     --warn-bg: rgba(198,127,23,0.08);
+    --error: #DC2626;
+    --error-bg: rgba(220,38,38,0.06);
   }
 
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -53,7 +55,6 @@
     align-items: center;
     gap: 14px;
   }
-  /* SVG CIGIP-style mark */
   header .logo-mark {
     width: 32px; height: 32px;
     background: rgba(255,255,255,0.18);
@@ -109,8 +110,8 @@
     display: inline-block;
   }
   .dot.live { background: #4ADE80; box-shadow: 0 0 8px rgba(74,222,128,0.5); animation: pulse 1.8s infinite; }
-  .dot.sim  { background: #FCD34D; box-shadow: 0 0 6px rgba(252,211,77,0.4); animation: pulse 1.8s infinite; }
-  .dot.off  { background: #F87171; }
+  .dot.connecting { background: #FCD34D; box-shadow: 0 0 6px rgba(252,211,77,0.4); animation: pulse 1.8s infinite; }
+  .dot.off { background: #F87171; }
   @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.4; }
@@ -158,6 +159,70 @@
   .video-overlay .fps-label { color: rgba(255,255,255,0.6); }
   .video-overlay .res { font-size: 10px; color: rgba(255,255,255,0.45); margin-top: 2px; }
 
+  /* ── Waiting state overlay ── */
+  .waiting-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #1A1A2E;
+    z-index: 5;
+    transition: opacity 0.5s;
+  }
+  .waiting-overlay.hidden { opacity: 0; pointer-events: none; }
+  .waiting-icon {
+    width: 64px; height: 64px;
+    border: 3px solid rgba(155,27,48,0.3);
+    border-top-color: var(--cigip-red);
+    border-radius: 50%;
+    animation: spin 1.2s linear infinite;
+    margin-bottom: 20px;
+  }
+  .waiting-overlay.disconnected .waiting-icon {
+    border-top-color: #F87171;
+    animation: none;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  .waiting-text {
+    color: rgba(255,255,255,0.7);
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .waiting-sub {
+    color: rgba(255,255,255,0.35);
+    font-size: 11px;
+    margin-top: 8px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .footer-strip {
+    position: absolute;
+    bottom: 14px; right: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(26,26,46,0.75);
+    backdrop-filter: blur(8px);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 10px;
+    color: rgba(255,255,255,0.5);
+    z-index: 6;
+  }
+  .footer-strip .upv-badge {
+    background: var(--cigip-red);
+    color: #fff;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 700;
+    font-size: 9px;
+    letter-spacing: 0.5px;
+  }
+
   /* ── Sidebar ── */
   .sidebar {
     display: flex;
@@ -181,6 +246,37 @@
     color: var(--muted);
     margin-bottom: 12px;
     font-weight: 600;
+  }
+
+  /* ── Connection Status ── */
+  .conn-status {
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .conn-status.connected {
+    background: var(--success-bg);
+    border: 1px solid rgba(27,135,63,0.2);
+    color: var(--success);
+  }
+  .conn-status.connecting {
+    background: var(--warn-bg);
+    border: 1px solid rgba(198,127,23,0.2);
+    color: var(--warn);
+  }
+  .conn-status.disconnected {
+    background: var(--error-bg);
+    border: 1px solid rgba(220,38,38,0.15);
+    color: var(--error);
+  }
+  .conn-status .conn-detail {
+    font-size: 10px;
+    opacity: 0.8;
+    font-family: 'JetBrains Mono', monospace;
   }
 
   /* ── Metrics Grid ── */
@@ -212,10 +308,7 @@
   }
 
   /* ── Detection List ── */
-  .det-list {
-    max-height: 180px;
-    overflow-y: auto;
-  }
+  .det-list { max-height: 180px; overflow-y: auto; }
   .det-item {
     display: flex;
     align-items: center;
@@ -225,11 +318,7 @@
     font-size: 13px;
   }
   .det-item:last-child { border-bottom: none; }
-  .det-color {
-    width: 10px; height: 10px;
-    border-radius: 3px;
-    flex-shrink: 0;
-  }
+  .det-color { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
   .det-class { flex: 1; font-weight: 600; color: var(--text); }
   .det-conf {
     color: var(--cigip-red);
@@ -237,16 +326,16 @@
     font-family: 'JetBrains Mono', monospace;
     font-size: 12px;
   }
+  .det-empty {
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+    padding: 12px 0;
+  }
 
   /* ── Chart ── */
-  .chart-container {
-    height: 90px;
-    position: relative;
-  }
-  .chart-container canvas {
-    width: 100% !important;
-    height: 100% !important;
-  }
+  .chart-container { height: 90px; position: relative; }
+  .chart-container canvas { width: 100% !important; height: 100% !important; }
 
   /* ── Resource Bars ── */
   .resource-bar { margin-bottom: 10px; }
@@ -295,57 +384,13 @@
     font-size: 11px;
   }
 
-  /* ── Mode banner ── */
-  .sim-banner {
-    background: var(--warn-bg);
-    border: 1px solid rgba(198,127,23,0.2);
-    color: var(--warn);
-    padding: 10px 16px;
-    border-radius: 8px;
-    font-size: 12px;
-    text-align: center;
-    font-weight: 500;
-  }
-
-  .sim-banner.live {
-    background: var(--success-bg);
-    border-color: rgba(27,135,63,0.2);
-    color: var(--success);
-  }
-
-  .connection-info {
-    font-size: 11px;
-    margin-top: 6px;
-    padding-top: 6px;
-    border-top: 1px solid rgba(198,127,23,0.15);
-  }
-
-  .connection-info.live {
-    border-top-color: rgba(27,135,63,0.15);
-  }
-
-  /* ── UPV footer strip ── */
-  .footer-strip {
-    position: absolute;
-    bottom: 14px; right: 14px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: rgba(26,26,46,0.75);
-    backdrop-filter: blur(8px);
-    padding: 6px 12px;
-    border-radius: 6px;
+  /* ── Uptime ── */
+  .uptime {
     font-size: 10px;
-    color: rgba(255,255,255,0.5);
-  }
-  .footer-strip .upv-badge {
-    background: var(--cigip-red);
-    color: #fff;
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-weight: 700;
-    font-size: 9px;
-    letter-spacing: 0.5px;
+    color: var(--muted);
+    text-align: center;
+    padding-top: 4px;
+    font-family: 'JetBrains Mono', monospace;
   }
 
   /* ── Scrollbar ── */
@@ -368,8 +413,8 @@
   <div class="separator"></div>
   <div class="nav-label">Kubernetes Deployment Patterns</div>
   <div class="status">
-    <span class="dot sim" id="statusDot"></span>
-    <span id="statusText">SIMULATION</span>
+    <span class="dot connecting" id="statusDot"></span>
+    <span id="statusText">CONECTANDO</span>
   </div>
 </header>
 
@@ -377,9 +422,14 @@
   <!-- Video Panel -->
   <div class="video-panel">
     <canvas id="videoCanvas"></canvas>
-    <div class="video-overlay">
-      <div><span class="fps" id="fpsDisplay">10.0</span> <span class="fps-label">FPS</span></div>
-      <div class="res" id="resDisplay">1280 &times; 720 &mdash; /detections/image</div>
+    <div class="waiting-overlay" id="waitingOverlay">
+      <div class="waiting-icon"></div>
+      <div class="waiting-text" id="waitingText">Conectando con rosbridge...</div>
+      <div class="waiting-sub" id="waitingSub"></div>
+    </div>
+    <div class="video-overlay" id="videoOverlay" style="display:none">
+      <div><span class="fps" id="fpsDisplay">0.0</span> <span class="fps-label">FPS</span></div>
+      <div class="res" id="resDisplay">-- &times; --</div>
     </div>
     <div class="footer-strip">
       <span class="upv-badge">UPV</span>
@@ -389,9 +439,12 @@
 
   <!-- Sidebar -->
   <div class="sidebar">
-    <div class="sim-banner" id="simBanner">
-      <div id="bannerMain">Datos simulados &mdash; conectar a ROS 2 bridge para feed en vivo</div>
-      <div class="connection-info" id="connectionInfo"></div>
+    <!-- Connection Status -->
+    <div class="conn-status connecting" id="connStatus">
+      <div>
+        <div id="connText">Conectando con ROS 2 bridge...</div>
+        <div class="conn-detail" id="connDetail"></div>
+      </div>
     </div>
 
     <!-- Metrics -->
@@ -428,7 +481,9 @@
     <!-- Active Detections -->
     <div class="card">
       <h3>Detecciones Activas</h3>
-      <div class="det-list" id="detList"></div>
+      <div class="det-list" id="detList">
+        <div class="det-empty">Esperando datos de detección...</div>
+      </div>
     </div>
 
     <!-- Resources -->
@@ -437,297 +492,97 @@
       <div class="resource-bar">
         <div class="bar-header">
           <span>CPU</span>
-          <span id="cpuVal">0%</span>
+          <span id="cpuVal">--</span>
         </div>
         <div class="bar-track"><div class="bar-fill cpu" id="cpuBar" style="width:0%"></div></div>
       </div>
       <div class="resource-bar">
         <div class="bar-header">
           <span>Memoria</span>
-          <span id="memVal">0 / 0 GB</span>
+          <span id="memVal">--</span>
         </div>
         <div class="bar-track"><div class="bar-fill mem" id="memBar" style="width:0%"></div></div>
       </div>
     </div>
 
-    <!-- Config -->
+    <!-- Config — populated from URL params / env -->
     <div class="card">
       <h3>Configuración</h3>
-      <div class="config-row"><span class="key">Modelo</span><span class="val">yolov8n.pt</span></div>
-      <div class="config-row"><span class="key">Confianza</span><span class="val">0.25</span></div>
-      <div class="config-row"><span class="key">Filtro</span><span class="val" id="cfgFilter">person (clase 0)</span></div>
-      <div class="config-row"><span class="key">Patrón</span><span class="val" id="cfgPattern">monolithic</span></div>
-      <div class="config-row"><span class="key">Nodo</span><span class="val" id="cfgNode">worker1-kb2</span></div>
+      <div class="config-row"><span class="key">Patrón</span><span class="val" id="cfgPattern">--</span></div>
+      <div class="config-row"><span class="key">Namespace</span><span class="val" id="cfgNamespace">--</span></div>
+      <div class="config-row"><span class="key">Nodo edge</span><span class="val" id="cfgNode">--</span></div>
       <div class="config-row"><span class="key">RMW</span><span class="val">CycloneDDS</span></div>
-      <div class="config-row"><span class="key">ROS Domain</span><span class="val">42</span></div>
+      <div class="config-row"><span class="key">ROS Domain</span><span class="val" id="cfgDomain">--</span></div>
+      <div class="config-row"><span class="key">Modelo</span><span class="val" id="cfgModel">--</span></div>
+      <div class="config-row"><span class="key">Confianza</span><span class="val" id="cfgConf">--</span></div>
+      <div class="config-row"><span class="key">Filtro</span><span class="val" id="cfgFilter">--</span></div>
+      <div class="config-row"><span class="key">Rosbridge</span><span class="val" id="cfgRosbridge">--</span></div>
     </div>
+
+    <!-- Uptime -->
+    <div class="uptime" id="uptimeDisplay">Dashboard iniciado: --</div>
   </div>
 </div>
 
 <script>
 // ═══════════════════════════════════════════════════════════════════
-//  CONNECTION MANAGER & ROSBRIDGE INTEGRATION
-// ═══════════════════════════════════════════════════════════════════
-
-// Parse URL parameters for topic configuration
-const params = new URLSearchParams(window.location.search);
-const imageTopicName = params.get('image_topic') || '/detections/image';
-const latencyTopicName = params.get('latency_topic') || '/benchmark/latency_ms';
-const inferenceTopicName = params.get('inference_topic') || '/benchmark/inference_ms';
-const detectionTopicName = params.get('detection_topic') || '/detections';
-const rosbridgePort = params.get('rosbridge_port') || '9090';
-
-let liveMode = false;
-let ros = null;
-let reconnectTimer = null;
-
-// Initialize ROS connection
-function initRosConnection() {
-  const rosbridgeUrl = `ws://${window.location.hostname}:${rosbridgePort}`;
-
-  ros = new ROSLIB.Ros({
-    url: rosbridgeUrl
-  });
-
-  ros.on('connection', () => {
-    console.log('ROS connected');
-    switchToLiveMode();
-    subscribeToTopics();
-  });
-
-  ros.on('error', (error) => {
-    console.log('ROS connection error:', error);
-    switchToSimulationMode();
-    scheduleReconnect();
-  });
-
-  ros.on('close', () => {
-    console.log('ROS connection closed');
-    switchToSimulationMode();
-    scheduleReconnect();
-  });
-}
-
-function switchToLiveMode() {
-  liveMode = true;
-  const dot = document.getElementById('statusDot');
-  const statusText = document.getElementById('statusText');
-  const banner = document.getElementById('simBanner');
-  const connectionInfo = document.getElementById('connectionInfo');
-
-  dot.className = 'dot live';
-  statusText.textContent = 'LIVE';
-  banner.classList.add('live');
-  banner.style.display = 'block';
-
-  const rosbridgeUrl = `ws://${window.location.hostname}:${rosbridgePort}`;
-  connectionInfo.classList.add('live');
-  connectionInfo.innerHTML = `Conectado a ${rosbridgeUrl}`;
-
-  document.getElementById('bannerMain').style.display = 'none';
-}
-
-function switchToSimulationMode() {
-  liveMode = false;
-  const dot = document.getElementById('statusDot');
-  const statusText = document.getElementById('statusText');
-  const banner = document.getElementById('simBanner');
-  const connectionInfo = document.getElementById('connectionInfo');
-
-  dot.className = 'dot sim';
-  statusText.textContent = 'SIMULATION';
-  banner.classList.remove('live');
-
-  document.getElementById('bannerMain').style.display = 'block';
-  connectionInfo.classList.remove('live');
-  connectionInfo.innerHTML = `Intentando conectar a rosbridge...`;
-}
-
-function scheduleReconnect() {
-  if (reconnectTimer) clearTimeout(reconnectTimer);
-  reconnectTimer = setTimeout(() => {
-    console.log('Attempting to reconnect to ROS');
-    initRosConnection();
-  }, 5000);
-}
-
-function subscribeToTopics() {
-  // Subscribe to image topic
-  const imageTopic = new ROSLIB.Topic({
-    ros: ros,
-    name: imageTopicName,
-    messageType: 'sensor_msgs/msg/Image',
-    throttle_rate: 100
-  });
-
-  imageTopic.subscribe(function(msg) {
-    if (!liveMode) return;
-    drawLiveImage(msg);
-  });
-
-  // Subscribe to latency topic
-  const latencyTopic = new ROSLIB.Topic({
-    ros: ros,
-    name: latencyTopicName,
-    messageType: 'std_msgs/msg/Float32'
-  });
-
-  latencyTopic.subscribe(function(msg) {
-    if (!liveMode) return;
-    document.getElementById('metLatency').textContent = msg.data.toFixed(1);
-    latencyHistory[historyIdx % latencyHistory.length] = msg.data;
-    historyIdx++;
-  });
-
-  // Subscribe to inference topic
-  const inferenceTopic = new ROSLIB.Topic({
-    ros: ros,
-    name: inferenceTopicName,
-    messageType: 'std_msgs/msg/Float32'
-  });
-
-  inferenceTopic.subscribe(function(msg) {
-    if (!liveMode) return;
-    document.getElementById('metInference').textContent = msg.data.toFixed(1);
-  });
-
-  // Subscribe to detections topic
-  const detectionsTopic = new ROSLIB.Topic({
-    ros: ros,
-    name: detectionTopicName,
-    messageType: 'vision_msgs/msg/Detection2DArray'
-  });
-
-  detectionsTopic.subscribe(function(msg) {
-    if (!liveMode) return;
-    const dets = msg.detections;
-    let personCount = 0;
-    const detItems = [];
-
-    for (const d of dets) {
-      if (d.results && d.results.length > 0) {
-        const hyp = d.results[0].hypothesis;
-        const cls = parseInt(hyp.class_id) || 0;
-        const conf = hyp.score || 0;
-        const name = COCO_NAMES[cls] || `class_${cls}`;
-        if (cls === 0) personCount++;
-        detItems.push({ name, conf, cls });
-      }
-    }
-
-    document.getElementById('metDetections').textContent = detItems.length;
-    document.getElementById('metPersons').textContent = personCount;
-    updateDetectionList(detItems);
-  });
-}
-
-function drawLiveImage(msg) {
-  const w = msg.width;
-  const h = msg.height;
-  const encoding = msg.encoding || 'bgr8';
-
-  try {
-    // Decode base64 image data
-    const raw = atob(msg.data);
-    const imgData = ctx.createImageData(w, h);
-
-    // Handle BGR8 encoding (swap to RGB for canvas)
-    if (encoding === 'bgr8' || encoding === 'rgb8') {
-      for (let i = 0; i < w * h; i++) {
-        if (encoding === 'bgr8') {
-          imgData.data[i*4]   = raw.charCodeAt(i*3+2);
-          imgData.data[i*4+1] = raw.charCodeAt(i*3+1);
-          imgData.data[i*4+2] = raw.charCodeAt(i*3);
-        } else {
-          imgData.data[i*4]   = raw.charCodeAt(i*3);
-          imgData.data[i*4+1] = raw.charCodeAt(i*3+1);
-          imgData.data[i*4+2] = raw.charCodeAt(i*3+2);
-        }
-        imgData.data[i*4+3] = 255;
-      }
-    }
-
-    // Draw to temporary canvas and scale to main canvas
-    const tmpCanvas = document.createElement('canvas');
-    tmpCanvas.width = w;
-    tmpCanvas.height = h;
-    const tmpCtx = tmpCanvas.getContext('2d');
-    tmpCtx.putImageData(imgData, 0, 0);
-    ctx.drawImage(tmpCanvas, 0, 0, W, H);
-  } catch (e) {
-    console.error('Error decoding image:', e);
-  }
-}
-
-function updateDetectionList(detItems) {
-  const list = document.getElementById('detList');
-  list.innerHTML = detItems.map(d => `
-    <div class="det-item">
-      <div class="det-color" style="background:${PALETTE[d.cls % PALETTE.length]}"></div>
-      <span class="det-class">${d.name}</span>
-      <span class="det-conf">${(d.conf*100).toFixed(0)}%</span>
-    </div>
-  `).join('');
-}
-
-// ═══════════════════════════════════════════════════════════════════
-//  SIMULATION ENGINE — CIGIP-UPV
-//  (fallback when rosbridge unavailable)
+//  CIGIP-UPV — ROS 2 Detection Dashboard (Production)
+//  No simulation — real data only via rosbridge WebSocket
 // ═══════════════════════════════════════════════════════════════════
 
 const COCO_NAMES = {
-  0:'person', 1:'bicycle', 2:'car', 3:'motorcycle', 5:'bus',
-  15:'cat', 16:'dog', 39:'bottle', 56:'chair', 62:'tv', 67:'cell phone'
+  0:'person',1:'bicycle',2:'car',3:'motorcycle',4:'airplane',5:'bus',6:'train',
+  7:'truck',8:'boat',9:'traffic light',10:'fire hydrant',11:'stop sign',
+  12:'parking meter',13:'bench',14:'bird',15:'cat',16:'dog',17:'horse',
+  18:'sheep',19:'cow',20:'elephant',21:'bear',22:'zebra',23:'giraffe',
+  24:'backpack',25:'umbrella',26:'handbag',27:'tie',28:'suitcase',29:'frisbee',
+  30:'skis',31:'snowboard',32:'sports ball',33:'kite',34:'baseball bat',
+  35:'baseball glove',36:'skateboard',37:'surfboard',38:'tennis racket',
+  39:'bottle',40:'wine glass',41:'cup',42:'fork',43:'knife',44:'spoon',
+  45:'bowl',46:'banana',47:'apple',48:'sandwich',49:'orange',50:'broccoli',
+  51:'carrot',52:'hot dog',53:'pizza',54:'donut',55:'cake',56:'chair',
+  57:'couch',58:'potted plant',59:'bed',60:'dining table',61:'toilet',
+  62:'tv',63:'laptop',64:'mouse',65:'remote',66:'keyboard',67:'cell phone',
+  68:'microwave',69:'oven',70:'toaster',71:'sink',72:'refrigerator',73:'book',
+  74:'clock',75:'vase',76:'scissors',77:'teddy bear',78:'hair drier',79:'toothbrush'
 };
 
-// CIGIP-aligned detection palette
 const PALETTE = [
-  '#C62040', // person  — cigip red
-  '#2563EB', // bicycle — blue
-  '#D97706', // car     — amber
-  '#7C3AED', // motorcycle — violet
-  '#0891B2', // bus     — cyan
-  '#059669', // cat     — emerald
-  '#EA580C', // dog     — orange
-  '#6D28D9', // bottle  — purple
-  '#B45309', // chair   — brown
-  '#0D9488', // tv      — teal
+  '#C62040','#2563EB','#D97706','#7C3AED','#0891B2',
+  '#059669','#EA580C','#6D28D9','#B45309','#0D9488',
 ];
 
-class SimPerson {
-  constructor(canvasW, canvasH) {
-    this.cw = canvasW;
-    this.ch = canvasH;
-    this.reset();
-  }
-  reset() {
-    this.x = Math.random() * this.cw * 0.6 + this.cw * 0.1;
-    this.y = this.ch * (0.2 + Math.random() * 0.45);
-    this.w = 50 + Math.random() * 40;
-    this.h = this.w * (2.2 + Math.random() * 0.6);
-    this.vx = (Math.random() - 0.5) * 2.5;
-    this.vy = (Math.random() - 0.5) * 0.3;
-    this.conf = 0.65 + Math.random() * 0.3;
-    this.cls = 0;
-    if (Math.random() < 0.15) {
-      const others = [2, 16, 56, 67];
-      this.cls = others[Math.floor(Math.random() * others.length)];
-      this.w = 40 + Math.random() * 60;
-      this.h = this.w * (0.6 + Math.random() * 1.0);
-      this.vx *= 0.3;
-    }
-  }
-  update() {
-    this.x += this.vx;
-    this.y += this.vy;
-    this.conf = Math.max(0.3, Math.min(0.99, this.conf + (Math.random()-0.5)*0.03));
-    if (this.x < -this.w || this.x > this.cw + this.w ||
-        this.y < -this.h || this.y > this.ch) {
-      this.reset();
-      this.x = Math.random() < 0.5 ? -this.w : this.cw + this.w;
-    }
-  }
-}
+// ── URL Parameters ──
+const params = new URLSearchParams(window.location.search);
+const imageTopicName    = params.get('image_topic')     || '/detections/image';
+const latencyTopicName  = params.get('latency_topic')   || '/benchmark/latency_ms';
+const inferenceTopicName= params.get('inference_topic')  || '/benchmark/inference_ms';
+const detectionTopicName= params.get('detection_topic')  || '/detections';
+const rosbridgePort     = params.get('rosbridge_port')   || '9090';
+const cfgPattern        = params.get('pattern')          || 'monolithic';
+const cfgNamespace      = params.get('namespace')        || 'ros2exp';
+const cfgNodeName       = params.get('node')             || 'edgenode01';
+const cfgDomainId       = params.get('domain_id')        || '42';
+const cfgModelName      = params.get('model')            || 'yolov8n.pt';
+const cfgConfThreshold  = params.get('conf')             || '0.25';
+const cfgFilterClasses  = params.get('filter')           || 'person (clase 0)';
+
+// ── Populate config panel ──
+document.getElementById('cfgPattern').textContent   = cfgPattern;
+document.getElementById('cfgNamespace').textContent  = cfgNamespace;
+document.getElementById('cfgNode').textContent       = cfgNodeName;
+document.getElementById('cfgDomain').textContent     = cfgDomainId;
+document.getElementById('cfgModel').textContent      = cfgModelName;
+document.getElementById('cfgConf').textContent       = cfgConfThreshold;
+document.getElementById('cfgFilter').textContent     = cfgFilterClasses;
+
+const rosbridgeUrl = `ws://${window.location.hostname}:${rosbridgePort}`;
+document.getElementById('cfgRosbridge').textContent = rosbridgeUrl;
+document.getElementById('waitingSub').textContent   = rosbridgeUrl;
+
+// ── Dashboard start time ──
+const startTime = new Date();
+document.getElementById('uptimeDisplay').textContent = `Dashboard iniciado: ${startTime.toLocaleTimeString('es-ES')}`;
 
 // ── Canvas Setup ──
 const canvas = document.getElementById('videoCanvas');
@@ -741,9 +596,6 @@ function resize() {
 }
 window.addEventListener('resize', resize);
 resize();
-
-const persons = [];
-for (let i = 0; i < 4; i++) persons.push(new SimPerson(W, H));
 
 // ── Latency History ──
 const latencyHistory = new Array(60).fill(0);
@@ -768,10 +620,7 @@ function drawChart() {
   chartCtx.lineWidth = 1;
   for (let i = 0; i < 4; i++) {
     const y = (i / 3) * h;
-    chartCtx.beginPath();
-    chartCtx.moveTo(0, y);
-    chartCtx.lineTo(w, y);
-    chartCtx.stroke();
+    chartCtx.beginPath(); chartCtx.moveTo(0, y); chartCtx.lineTo(w, y); chartCtx.stroke();
   }
 
   // Line
@@ -781,8 +630,7 @@ function drawChart() {
   for (let i = 0; i < latencyHistory.length; i++) {
     const x = i * step;
     const y = h - (latencyHistory[(historyIdx + i) % latencyHistory.length] / max) * (h - 10);
-    if (i === 0) chartCtx.moveTo(x, y);
-    else chartCtx.lineTo(x, y);
+    if (i === 0) chartCtx.moveTo(x, y); else chartCtx.lineTo(x, y);
   }
   chartCtx.stroke();
 
@@ -800,167 +648,242 @@ function drawChart() {
   chartCtx.fillText('0ms', 4, h - 2);
 }
 
-// ── Background ──
-function drawBackground() {
-  // Indoor corridor scene — warm tones matching CIGIP building
-  const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
-  bgGrad.addColorStop(0, '#2B2B3D');
-  bgGrad.addColorStop(0.4, '#1E1E2F');
-  bgGrad.addColorStop(1, '#28283C');
-  ctx.fillStyle = bgGrad;
-  ctx.fillRect(0, 0, W, H);
+// ═══════════════════════════════════════════════════════════════════
+//  ROSBRIDGE CONNECTION
+// ═══════════════════════════════════════════════════════════════════
 
-  // Floor
-  const floorGrad = ctx.createLinearGradient(0, H * 0.55, 0, H);
-  floorGrad.addColorStop(0, '#2B2B3D');
-  floorGrad.addColorStop(1, '#35354D');
-  ctx.fillStyle = floorGrad;
-  ctx.fillRect(0, H * 0.55, W, H * 0.45);
+let ros = null;
+let reconnectTimer = null;
+let isConnected = false;
+let hasReceivedImage = false;
+let frameCount = 0;
+let fpsTimer = null;
+let lastFpsUpdate = Date.now();
+let framesInWindow = 0;
 
-  // Perspective grid (subtle)
-  ctx.strokeStyle = 'rgba(155,27,48,0.04)';
-  ctx.lineWidth = 1;
-  for (let i = 0; i < 20; i++) {
-    const y = H * 0.55 + i * (H * 0.45 / 20);
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+function setConnectionState(state) {
+  const dot       = document.getElementById('statusDot');
+  const statusTxt = document.getElementById('statusText');
+  const connBox   = document.getElementById('connStatus');
+  const connText  = document.getElementById('connText');
+  const connDet   = document.getElementById('connDetail');
+  const overlay   = document.getElementById('waitingOverlay');
+  const waitTxt   = document.getElementById('waitingText');
+
+  if (state === 'connected') {
+    dot.className = 'dot live';
+    statusTxt.textContent = 'LIVE';
+    connBox.className = 'conn-status connected';
+    connText.textContent = 'Conectado a ROS 2 bridge';
+    connDet.textContent = rosbridgeUrl;
+    isConnected = true;
+  } else if (state === 'connecting') {
+    dot.className = 'dot connecting';
+    statusTxt.textContent = 'CONECTANDO';
+    connBox.className = 'conn-status connecting';
+    connText.textContent = 'Conectando con ROS 2 bridge...';
+    connDet.textContent = rosbridgeUrl;
+    overlay.classList.remove('hidden', 'disconnected');
+    waitTxt.textContent = 'Conectando con rosbridge...';
+    isConnected = false;
+  } else {
+    dot.className = 'dot off';
+    statusTxt.textContent = 'DESCONECTADO';
+    connBox.className = 'conn-status disconnected';
+    connText.textContent = 'Sin conexión con ROS 2 bridge';
+    connDet.textContent = `Reintentando ${rosbridgeUrl}...`;
+    overlay.classList.remove('hidden');
+    overlay.classList.add('disconnected');
+    waitTxt.textContent = 'Conexión perdida — reintentando...';
+    isConnected = false;
+    hasReceivedImage = false;
+    document.getElementById('videoOverlay').style.display = 'none';
+    // Reset metrics to --
+    document.getElementById('metLatency').textContent = '--';
+    document.getElementById('metInference').textContent = '--';
+    document.getElementById('metDetections').textContent = '--';
+    document.getElementById('metPersons').textContent = '--';
+    document.getElementById('detList').innerHTML = '<div class="det-empty">Sin conexión</div>';
   }
-  for (let i = 0; i < 12; i++) {
-    const x = W * 0.5 + (i - 6) * (W / 8);
-    ctx.beginPath(); ctx.moveTo(W * 0.5, H * 0.5); ctx.lineTo(x, H); ctx.stroke();
-  }
-
-  // Wall lines (subtle architectural detail)
-  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(0, H*0.55); ctx.lineTo(W, H*0.55); ctx.stroke();
-
-  // Timestamp
-  const now = new Date();
-  ctx.fillStyle = 'rgba(255,255,255,0.25)';
-  ctx.font = '11px "JetBrains Mono", monospace';
-  ctx.fillText(now.toISOString().replace('T',' ').slice(0,19), W - 185, H - 40);
-
-  // Topic
-  ctx.fillStyle = 'rgba(198,32,64,0.35)';
-  ctx.font = '10px "JetBrains Mono", monospace';
-  ctx.fillText(imageTopicName, 10, H - 40);
 }
 
-// ── Detections ──
-function drawDetections() {
-  let personCount = 0;
-  const detItems = [];
+function initRosConnection() {
+  setConnectionState('connecting');
 
-  for (const p of persons) {
-    p.update();
-    const name = COCO_NAMES[p.cls] || `class_${p.cls}`;
-    const color = PALETTE[p.cls % PALETTE.length];
+  ros = new ROSLIB.Ros({ url: rosbridgeUrl });
 
-    // Silhouette fill
-    ctx.fillStyle = color + '18';
-    ctx.fillRect(p.x, p.y, p.w, p.h);
+  ros.on('connection', () => {
+    console.log('[dashboard] ROS connected to', rosbridgeUrl);
+    setConnectionState('connected');
+    subscribeToTopics();
+  });
 
-    // Box
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.strokeRect(p.x, p.y, p.w, p.h);
+  ros.on('error', (error) => {
+    console.log('[dashboard] ROS error:', error);
+    setConnectionState('disconnected');
+    scheduleReconnect();
+  });
 
-    // Label
-    const label = `${name} ${(p.conf*100).toFixed(0)}%`;
-    ctx.font = '600 12px "Inter", sans-serif';
-    const tw = ctx.measureText(label).width;
-    const lh = 22;
-
-    // Label bg with rounded top
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.roundRect(p.x - 1, p.y - lh - 1, tw + 14, lh, [5, 5, 0, 0]);
-    ctx.fill();
-
-    // Label text
-    ctx.fillStyle = '#fff';
-    ctx.fillText(label, p.x + 6, p.y - 6);
-
-    // Corner brackets (thicker, CIGIP style)
-    const cLen = 10;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(p.x, p.y+cLen); ctx.lineTo(p.x, p.y); ctx.lineTo(p.x+cLen, p.y); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(p.x+p.w-cLen, p.y); ctx.lineTo(p.x+p.w, p.y); ctx.lineTo(p.x+p.w, p.y+cLen); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(p.x, p.y+p.h-cLen); ctx.lineTo(p.x, p.y+p.h); ctx.lineTo(p.x+cLen, p.y+p.h); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(p.x+p.w-cLen, p.y+p.h); ctx.lineTo(p.x+p.w, p.y+p.h); ctx.lineTo(p.x+p.w, p.y+p.h-cLen); ctx.stroke();
-
-    if (p.cls === 0) personCount++;
-    detItems.push({ name, conf: p.conf, cls: p.cls });
-  }
-
-  return { personCount, detItems };
+  ros.on('close', () => {
+    console.log('[dashboard] ROS connection closed');
+    setConnectionState('disconnected');
+    scheduleReconnect();
+  });
 }
 
-// ── Metrics update (simulation) ──
-function updateMetrics(personCount, detItems) {
-  const latency = 18 + Math.random() * 15;
-  const inference = 95 + Math.random() * 20;
+function scheduleReconnect() {
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+  reconnectTimer = setTimeout(() => {
+    console.log('[dashboard] Reconnecting...');
+    initRosConnection();
+  }, 5000);
+}
 
-  // Only update if in simulation mode (live updates come from rosbridge)
-  if (!liveMode) {
-    document.getElementById('metLatency').textContent = latency.toFixed(1);
-    document.getElementById('metInference').textContent = inference.toFixed(1);
+function subscribeToTopics() {
+  // Image
+  const imageTopic = new ROSLIB.Topic({
+    ros, name: imageTopicName,
+    messageType: 'sensor_msgs/msg/Image',
+    throttle_rate: 100
+  });
+  imageTopic.subscribe(function(msg) {
+    if (!isConnected) return;
+    if (!hasReceivedImage) {
+      hasReceivedImage = true;
+      document.getElementById('waitingOverlay').classList.add('hidden');
+      document.getElementById('videoOverlay').style.display = 'block';
+    }
+    drawLiveImage(msg);
+    framesInWindow++;
+  });
+
+  // Latency
+  new ROSLIB.Topic({
+    ros, name: latencyTopicName,
+    messageType: 'std_msgs/msg/Float32'
+  }).subscribe(function(msg) {
+    if (!isConnected) return;
+    document.getElementById('metLatency').textContent = msg.data.toFixed(1);
+    latencyHistory[historyIdx % latencyHistory.length] = msg.data;
+    historyIdx++;
+  });
+
+  // Inference
+  new ROSLIB.Topic({
+    ros, name: inferenceTopicName,
+    messageType: 'std_msgs/msg/Float32'
+  }).subscribe(function(msg) {
+    if (!isConnected) return;
+    document.getElementById('metInference').textContent = msg.data.toFixed(1);
+  });
+
+  // Detections
+  new ROSLIB.Topic({
+    ros, name: detectionTopicName,
+    messageType: 'vision_msgs/msg/Detection2DArray'
+  }).subscribe(function(msg) {
+    if (!isConnected) return;
+    const dets = msg.detections;
+    let personCount = 0;
+    const detItems = [];
+
+    for (const d of dets) {
+      if (d.results && d.results.length > 0) {
+        const hyp = d.results[0].hypothesis;
+        const cls = parseInt(hyp.class_id) || 0;
+        const conf = hyp.score || 0;
+        const name = COCO_NAMES[cls] || `class_${cls}`;
+        if (cls === 0) personCount++;
+        detItems.push({ name, conf, cls });
+      }
+    }
+
     document.getElementById('metDetections').textContent = detItems.length;
     document.getElementById('metPersons').textContent = personCount;
 
-    latencyHistory[historyIdx % latencyHistory.length] = latency;
-    historyIdx++;
+    if (detItems.length === 0) {
+      document.getElementById('detList').innerHTML = '<div class="det-empty">Sin detecciones en este frame</div>';
+    } else {
+      document.getElementById('detList').innerHTML = detItems.map(d => `
+        <div class="det-item">
+          <div class="det-color" style="background:${PALETTE[d.cls % PALETTE.length]}"></div>
+          <span class="det-class">${d.name}</span>
+          <span class="det-conf">${(d.conf*100).toFixed(0)}%</span>
+        </div>
+      `).join('');
+    }
+  });
+}
 
-    const list = document.getElementById('detList');
-    list.innerHTML = detItems.map(d => `
-      <div class="det-item">
-        <div class="det-color" style="background:${PALETTE[d.cls % PALETTE.length]}"></div>
-        <span class="det-class">${d.name}</span>
-        <span class="det-conf">${(d.conf*100).toFixed(0)}%</span>
-      </div>
-    `).join('');
+function drawLiveImage(msg) {
+  const w = msg.width;
+  const h = msg.height;
+  const encoding = msg.encoding || 'bgr8';
 
-    const cpu = 35 + Math.random() * 25;
-    const memUsed = 1200 + Math.random() * 400;
-    const memTotal = 8192;
-    document.getElementById('cpuVal').textContent = `${cpu.toFixed(1)}%`;
-    document.getElementById('cpuBar').style.width = `${cpu}%`;
-    document.getElementById('memVal').textContent = `${(memUsed/1024).toFixed(1)} / ${(memTotal/1024).toFixed(1)} GB`;
-    document.getElementById('memBar').style.width = `${(memUsed/memTotal*100).toFixed(1)}%`;
+  document.getElementById('resDisplay').textContent =
+    `${w} × ${h} — ${imageTopicName}`;
 
-    document.getElementById('fpsDisplay').textContent = (9.5 + Math.random() * 1).toFixed(1);
+  try {
+    const raw = atob(msg.data);
+    const imgData = ctx.createImageData(w, h);
+
+    if (encoding === 'bgr8' || encoding === 'rgb8') {
+      for (let i = 0; i < w * h; i++) {
+        if (encoding === 'bgr8') {
+          imgData.data[i*4]   = raw.charCodeAt(i*3+2);
+          imgData.data[i*4+1] = raw.charCodeAt(i*3+1);
+          imgData.data[i*4+2] = raw.charCodeAt(i*3);
+        } else {
+          imgData.data[i*4]   = raw.charCodeAt(i*3);
+          imgData.data[i*4+1] = raw.charCodeAt(i*3+1);
+          imgData.data[i*4+2] = raw.charCodeAt(i*3+2);
+        }
+        imgData.data[i*4+3] = 255;
+      }
+    }
+
+    const tmpCanvas = document.createElement('canvas');
+    tmpCanvas.width = w;
+    tmpCanvas.height = h;
+    tmpCanvas.getContext('2d').putImageData(imgData, 0, 0);
+
+    resize();
+    ctx.drawImage(tmpCanvas, 0, 0, W, H);
+  } catch (e) {
+    console.error('[dashboard] Error decoding image:', e);
   }
 }
 
-// ── Main Loop ──
-let frame = 0;
-function loop() {
-  resize();
-
-  // Draw background and detections only if in simulation mode
-  if (!liveMode) {
-    drawBackground();
-    const { personCount, detItems } = drawDetections();
-
-    if (frame % 6 === 0) {
-      updateMetrics(personCount, detItems);
-      drawChart();
-    }
-  } else {
-    // In live mode, just draw the chart periodically
-    if (frame % 6 === 0) {
-      drawChart();
-    }
+// ── FPS Counter ──
+setInterval(() => {
+  if (hasReceivedImage) {
+    const now = Date.now();
+    const elapsed = (now - lastFpsUpdate) / 1000;
+    const fps = framesInWindow / elapsed;
+    document.getElementById('fpsDisplay').textContent = fps.toFixed(1);
+    framesInWindow = 0;
+    lastFpsUpdate = now;
   }
+}, 1000);
 
-  frame++;
-  requestAnimationFrame(loop);
-}
+// ── Chart update loop ──
+setInterval(drawChart, 1000);
 
-loop();
+// ── Uptime ticker ──
+setInterval(() => {
+  const elapsed = Math.floor((Date.now() - startTime.getTime()) / 1000);
+  const h = Math.floor(elapsed / 3600);
+  const m = Math.floor((elapsed % 3600) / 60);
+  const s = elapsed % 60;
+  const parts = [];
+  if (h > 0) parts.push(`${h}h`);
+  parts.push(`${m}m`);
+  parts.push(`${s}s`);
+  document.getElementById('uptimeDisplay').textContent = `Uptime: ${parts.join(' ')}`;
+}, 1000);
 
-// Initialize connection attempt
+// ── Start ──
+drawChart();
 initRosConnection();
 </script>
 </body>
