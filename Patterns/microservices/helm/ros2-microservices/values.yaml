@@ -68,8 +68,8 @@ dashboard:
   enabled: true
   image:
     repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-dashboard
-    tag: v1
-    pullPolicy: IfNotPresent
+    tag: latest
+    pullPolicy: Always
   nodeHostname: ""  # Pin to cloud node (e.g., worker1-kb2)
   resources: {}
   service:

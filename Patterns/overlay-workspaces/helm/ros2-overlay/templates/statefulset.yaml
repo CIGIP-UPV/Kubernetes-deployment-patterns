@@ -123,7 +123,7 @@ spec:
                 -p publish_metrics:=${YOLO_PUBLISH_METRICS} \
                 -p latency_topic:=${LATENCY_TOPIC} \
                 -p inference_topic:=${INFERENCE_TOPIC} \
-                -p filter_classes:=${YOLO_FILTER_CLASSES} &
+                -p filter_classes:="\"${YOLO_FILTER_CLASSES}\"" &
               YOLO_PID=$!
 
               wait -n ${CAMERA_PID} ${YOLO_PID}

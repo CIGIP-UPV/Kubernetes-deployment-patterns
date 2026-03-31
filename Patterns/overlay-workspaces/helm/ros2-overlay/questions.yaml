@@ -12,7 +12,7 @@ questions:
     label: "Image Tag"
     description: "Docker image tag for the overlay container"
     type: string
-    default: "v1"
+    default: "latest"
     required: true
     group: "Container Images"
 
@@ -131,7 +131,7 @@ questions:
     label: "Dashboard Image Tag"
     description: "Docker image tag for the dashboard container"
     type: string
-    default: "v1"
+    default: "latest"
     show_if: "dashboard.enabled=true"
     group: "Dashboard"
 

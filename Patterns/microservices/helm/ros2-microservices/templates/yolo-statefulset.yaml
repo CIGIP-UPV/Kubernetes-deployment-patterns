@@ -74,7 +74,7 @@ spec:
                 -p publish_metrics:={{ .Values.yolo.publishMetrics | quote }} \
                 -p latency_topic:={{ .Values.topics.latency | quote }} \
                 -p inference_topic:={{ .Values.topics.inference | quote }} \
-                -p filter_classes:={{ .Values.yolo.filterClasses | toString | quote }}
+                -p filter_classes:="{{ .Values.yolo.filterClasses | toString }}"
           resources:
             {{- toYaml .Values.yolo.resources | nindent 12 }}
           {{- if .Values.cyclonedds.enabled }}

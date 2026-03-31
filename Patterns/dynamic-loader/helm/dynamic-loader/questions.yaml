@@ -12,7 +12,7 @@ questions:
     label: "Camera Image Tag"
     description: "Docker image tag for the camera driver"
     type: string
-    default: "v1"
+    default: "latest"
     required: true
     group: "Container Images"
 
@@ -20,7 +20,7 @@ questions:
     label: "Dynamic Host Image Tag"
     description: "Docker image tag for the dynamic loader host"
     type: string
-    default: "v1"
+    default: "latest"
     required: true
     group: "Container Images"
 
@@ -188,7 +188,7 @@ questions:
     label: "Dashboard Image Tag"
     description: "Docker image tag for the ROS 2 dashboard"
     type: string
-    default: "v1"
+    default: "latest"
     required: true
     show_if: "dashboard.enabled=true"
     group: "Dashboard"

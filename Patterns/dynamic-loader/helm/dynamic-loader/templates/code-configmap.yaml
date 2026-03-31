@@ -61,7 +61,7 @@ data:
                     f"-p publish_metrics:={PUBLISH_METRICS} "
                     f"-p latency_topic:={LATENCY_TOPIC} "
                     f"-p inference_topic:={INFERENCE_TOPIC} "
-                    f"-p filter_classes:={FILTER_CLASSES}"
+                    f"-p filter_classes:=\\\"{FILTER_CLASSES}\\\""
                 ),
             ]
             _process = subprocess.Popen(cmd)

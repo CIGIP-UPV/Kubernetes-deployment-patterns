@@ -2,7 +2,7 @@ apiVersion: v2
 name: ros2-monolithic
 description: Monolithic ROS 2 pattern with camera + YOLO + detections in a single runtime container
 type: application
-version: 3.0.1
+version: 3.0.2
 appVersion: humble
 keywords:
   - ros2
