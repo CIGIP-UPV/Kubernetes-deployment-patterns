@@ -555,7 +555,7 @@ const PALETTE = [
 
 // ── URL Parameters ──
 const params = new URLSearchParams(window.location.search);
-const imageTopicName    = params.get('image_topic')     || '/detections/image';
+const imageTopicName    = params.get('image_topic')     || '/detections/image/compressed';
 const latencyTopicName  = params.get('latency_topic')   || '/benchmark/latency_ms';
 const inferenceTopicName= params.get('inference_topic')  || '/benchmark/inference_ms';
 const detectionTopicName= params.get('detection_topic')  || '/detections';
@@ -749,13 +749,12 @@ function scheduleReconnect() {
 }
 
 function subscribeToTopics() {
-  // Image — use PNG compression so rosbridge converts raw BGR8 to PNG
-  // on the server side. This reduces bandwidth ~90% and simplifies rendering.
+  // Image — subscribe to CompressedImage (JPEG) topic for efficient WebSocket
+  // transport. Raw sensor_msgs/Image is ~900KB/frame, JPEG is ~50KB.
   const imageTopic = new ROSLIB.Topic({
     ros, name: imageTopicName,
-    messageType: 'sensor_msgs/msg/Image',
-    throttle_rate: 200,
-    compression: 'png'
+    messageType: 'sensor_msgs/msg/CompressedImage',
+    throttle_rate: 200
   });
   imageTopic.subscribe(function(msg) {
     if (!isConnected) return;
@@ -827,54 +826,20 @@ function subscribeToTopics() {
 }
 
 function drawLiveImage(msg) {
-  // With compression: 'png', rosbridge sends {data: '<base64 PNG>'}.
-  // With raw Image msgs, fields include width/height/encoding/data.
-  // We handle both formats for robustness.
-
-  if (msg.width && msg.height) {
-    document.getElementById('resDisplay').textContent =
-      `${msg.width} × ${msg.height} — ${imageTopicName}`;
-  }
-
+  // CompressedImage: msg.format = 'jpeg', msg.data = base64 JPEG bytes
+  // This is ~50KB vs ~900KB for raw BGR8 — much better for WebSocket.
   try {
-    const img = new Image();
+    const fmt = (msg.format || 'jpeg').split(';')[0].trim();
+    const mimeType = fmt === 'jpeg' || fmt === 'jpg' ? 'image/jpeg' : 'image/' + fmt;
+
+    const img = new window.Image();
     img.onload = function() {
-      if (!msg.width) {
-        document.getElementById('resDisplay').textContent =
-          `${img.naturalWidth} × ${img.naturalHeight} — ${imageTopicName}`;
-      }
+      document.getElementById('resDisplay').textContent =
+        `${img.naturalWidth} × ${img.naturalHeight} — ${imageTopicName}`;
       resize();
       ctx.drawImage(img, 0, 0, W, H);
     };
-    // PNG compression: data is base64 PNG directly
-    // Raw Image: data is base64 raw pixels (fallback)
-    if (msg.format === 'png' || !msg.encoding) {
-      img.src = 'data:image/png;base64,' + msg.data;
-    } else {
-      // Fallback: raw image data — decode pixel by pixel
-      const w = msg.width, h = msg.height;
-      const encoding = msg.encoding || 'bgr8';
-      const raw = atob(msg.data);
-      const tmpCanvas = document.createElement('canvas');
-      tmpCanvas.width = w; tmpCanvas.height = h;
-      const tmpCtx = tmpCanvas.getContext('2d');
-      const imgData = tmpCtx.createImageData(w, h);
-      for (let i = 0; i < w * h; i++) {
-        if (encoding === 'bgr8') {
-          imgData.data[i*4]   = raw.charCodeAt(i*3+2);
-          imgData.data[i*4+1] = raw.charCodeAt(i*3+1);
-          imgData.data[i*4+2] = raw.charCodeAt(i*3);
-        } else {
-          imgData.data[i*4]   = raw.charCodeAt(i*3);
-          imgData.data[i*4+1] = raw.charCodeAt(i*3+1);
-          imgData.data[i*4+2] = raw.charCodeAt(i*3+2);
-        }
-        imgData.data[i*4+3] = 255;
-      }
-      tmpCtx.putImageData(imgData, 0, 0);
-      resize();
-      ctx.drawImage(tmpCanvas, 0, 0, W, H);
-    }
+    img.src = `data:${mimeType};base64,${msg.data}`;
   } catch (e) {
     console.error('[dashboard] Error decoding image:', e);
   }

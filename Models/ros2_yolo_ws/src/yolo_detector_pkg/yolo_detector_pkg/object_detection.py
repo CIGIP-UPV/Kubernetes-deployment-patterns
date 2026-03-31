@@ -2,9 +2,10 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 from rclpy.time import Time
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CompressedImage
 from vision_msgs.msg import Detection2DArray, Detection2D, ObjectHypothesisWithPose
 from std_msgs.msg import Float32
+import numpy as np
 from cv_bridge import CvBridge
 from ultralytics import YOLO
 import cv2
@@ -93,6 +94,12 @@ class YoloDetector(Node):
                 self.get_parameter('debug_image_topic').value,
                 10,
             )
+            # JPEG compressed version for web dashboard (much smaller over WebSocket)
+            self.pub_img_compressed = self.create_publisher(
+                CompressedImage,
+                self.get_parameter('debug_image_topic').value + '/compressed',
+                10,
+            )
 
         self.publish_metrics = bool(self.get_parameter('publish_metrics').value)
         if self.publish_metrics:
@@ -166,6 +173,12 @@ class YoloDetector(Node):
         self.pub_det.publish(out)
         if self.publish_debug:
             self.pub_img.publish(self.bridge.cv2_to_imgmsg(dbg, encoding='bgr8'))
+            # Publish JPEG compressed version for web dashboard
+            comp_msg = CompressedImage()
+            comp_msg.header = msg.header
+            comp_msg.format = 'jpeg'
+            comp_msg.data = np.array(cv2.imencode('.jpg', dbg, [cv2.IMWRITE_JPEG_QUALITY, 70])[1]).tobytes()
+            self.pub_img_compressed.publish(comp_msg)
         if self.publish_metrics:
             stamp = Time.from_msg(msg.header.stamp, clock_type=self.get_clock().clock_type)
             now = self.get_clock().now()
