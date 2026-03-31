@@ -146,6 +146,24 @@ questions:
     show_if: "dashboard.enabled=true"
     group: "Dashboard"
 
+  - variable: dashboard.service.httpNodePort
+    label: "Dashboard HTTP NodePort"
+    description: "Fixed NodePort for web UI (30000-32767). Leave empty for auto-assign."
+    type: int
+    default: ""
+    required: false
+    show_if: "dashboard.enabled=true&&dashboard.service.type=NodePort"
+    group: "Dashboard"
+
+  - variable: dashboard.service.wsNodePort
+    label: "Dashboard WebSocket NodePort"
+    description: "Fixed NodePort for rosbridge WebSocket (30000-32767). Leave empty for auto-assign."
+    type: int
+    default: ""
+    required: false
+    show_if: "dashboard.enabled=true&&dashboard.service.type=NodePort"
+    group: "Dashboard"
+
   # ── Benchmark Probe ──────────────────────────────────────────────
   - variable: benchmark.enabled
     label: "Run Benchmark Probe"

@@ -2,11 +2,11 @@ images:
   camera:
     repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-camera
     tag: latest
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
   yolo:
     repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-yolo
     tag: latest
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
 
 imagePullSecretName: regcred
 
