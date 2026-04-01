@@ -411,7 +411,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist/charts
           destination_dir: charts
-          keep_files: false
+          keep_files: true
           enable_jekyll: false
 
       - name: Summary
