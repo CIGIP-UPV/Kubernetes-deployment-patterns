@@ -89,12 +89,7 @@ class YoloDetector(Node):
 
         self.publish_debug = bool(self.get_parameter('publish_debug_image').value)
         if self.publish_debug:
-            self.pub_img = self.create_publisher(
-                Image,
-                self.get_parameter('debug_image_topic').value,
-                10,
-            )
-            # JPEG compressed version for web dashboard (much smaller over WebSocket)
+            # JPEG compressed image for web dashboard (much smaller over WebSocket)
             self.pub_img_compressed = self.create_publisher(
                 CompressedImage,
                 self.get_parameter('debug_image_topic').value + '/compressed',
@@ -172,12 +167,12 @@ class YoloDetector(Node):
         # Publicaciones
         self.pub_det.publish(out)
         if self.publish_debug:
-            self.pub_img.publish(self.bridge.cv2_to_imgmsg(dbg, encoding='bgr8'))
-            # Publish JPEG compressed version for web dashboard
+            # Publish JPEG compressed image for web dashboard
+            # Quality 90 ≈ 100-150 KB/frame (good visual quality, viable over WebSocket)
             comp_msg = CompressedImage()
             comp_msg.header = msg.header
             comp_msg.format = 'jpeg'
-            comp_msg.data = np.array(cv2.imencode('.jpg', dbg, [cv2.IMWRITE_JPEG_QUALITY, 70])[1]).tobytes()
+            comp_msg.data = np.array(cv2.imencode('.jpg', dbg, [cv2.IMWRITE_JPEG_QUALITY, 90])[1]).tobytes()
             self.pub_img_compressed.publish(comp_msg)
         if self.publish_metrics:
             stamp = Time.from_msg(msg.header.stamp, clock_type=self.get_clock().clock_type)
