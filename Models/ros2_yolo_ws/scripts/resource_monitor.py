@@ -3,7 +3,8 @@
 Lightweight resource monitor — publishes CPU, memory & GPU usage as ROS 2
 Float32 topics so the web dashboard can display them.
 
-Uses /proc/stat, /proc/meminfo (no psutil dependency) and nvidia-smi for GPU.
+Uses /proc/stat, /proc/meminfo (no psutil dependency).
+GPU: nvidia-smi (desktop) or tegrastats (Jetson Orin/Xavier).
 
 Published topics:
   /node/cpu_percent     (std_msgs/Float32)  — total CPU usage  0-100
@@ -16,6 +17,8 @@ from rclpy.node import Node
 from std_msgs.msg import Float32
 import subprocess
 import shutil
+import re
+import os
 
 
 class ResourceMonitor(Node):
@@ -28,14 +31,20 @@ class ResourceMonitor(Node):
         self.pub_cpu = self.create_publisher(Float32, '/node/cpu_percent', 10)
         self.pub_mem = self.create_publisher(Float32, '/node/memory_percent', 10)
 
-        # GPU — only if nvidia-smi is available
-        self._has_gpu = shutil.which('nvidia-smi') is not None
-        if self._has_gpu:
+        # GPU detection: nvidia-smi (desktop/server) or tegrastats (Jetson)
+        self._gpu_method = None
+        if shutil.which('nvidia-smi') is not None:
+            self._gpu_method = 'nvidia-smi'
+        elif shutil.which('tegrastats') is not None or os.path.exists('/usr/bin/tegrastats'):
+            self._gpu_method = 'tegrastats'
+
+        if self._gpu_method:
             self.pub_gpu = self.create_publisher(Float32, '/node/gpu_percent', 10)
-            self.get_logger().info('NVIDIA GPU detected — publishing /node/gpu_percent')
+            self.get_logger().info(
+                f'GPU detected via {self._gpu_method} — publishing /node/gpu_percent')
         else:
             self.pub_gpu = None
-            self.get_logger().info('No NVIDIA GPU detected — GPU metrics disabled')
+            self.get_logger().info('No GPU tool found (nvidia-smi / tegrastats) — GPU metrics disabled')
 
         self._prev_idle = 0
         self._prev_total = 0
@@ -48,7 +57,6 @@ class ResourceMonitor(Node):
     def _read_cpu(self):
         with open('/proc/stat') as f:
             parts = f.readline().split()
-        # user nice system idle iowait irq softirq steal
         values = [int(v) for v in parts[1:]]
         idle = values[3] + values[4]  # idle + iowait
         total = sum(values)
@@ -76,8 +84,15 @@ class ResourceMonitor(Node):
         avail = info.get('MemAvailable', 0)
         return (1.0 - avail / total) * 100.0
 
-    # ── GPU via nvidia-smi ──────────────────────────────────────
+    # ── GPU ──────────────────────────────────────────────────────
     def _gpu_percent(self):
+        if self._gpu_method == 'nvidia-smi':
+            return self._gpu_nvidia_smi()
+        elif self._gpu_method == 'tegrastats':
+            return self._gpu_tegrastats()
+        return 0.0
+
+    def _gpu_nvidia_smi(self):
         try:
             out = subprocess.check_output(
                 ['nvidia-smi',
@@ -85,8 +100,25 @@ class ResourceMonitor(Node):
                  '--format=csv,noheader,nounits'],
                 timeout=2, stderr=subprocess.DEVNULL
             ).decode().strip()
-            # May return multiple GPUs — take the first
             return float(out.split('\n')[0])
+        except Exception:
+            return 0.0
+
+    def _gpu_tegrastats(self):
+        """Parse Jetson tegrastats for GPU utilization.
+        tegrastats --interval 100 prints one line like:
+          RAM 5348/7620MB ... GR3D_FREQ 78% ...
+        We grab the GR3D_FREQ percentage.
+        """
+        try:
+            proc = subprocess.run(
+                ['tegrastats', '--interval', '200'],
+                capture_output=True, text=True, timeout=1
+            )
+            line = proc.stdout.strip().split('\n')[-1] if proc.stdout else ''
+            # GR3D_FREQ 45%  or  GR3D_FREQ 45%@1300
+            m = re.search(r'GR3D_FREQ\s+(\d+)%', line)
+            return float(m.group(1)) if m else 0.0
         except Exception:
             return 0.0
 
@@ -94,7 +126,7 @@ class ResourceMonitor(Node):
     def _tick(self):
         self.pub_cpu.publish(Float32(data=float(self._cpu_percent())))
         self.pub_mem.publish(Float32(data=float(self._mem_percent())))
-        if self._has_gpu:
+        if self.pub_gpu:
             self.pub_gpu.publish(Float32(data=float(self._gpu_percent())))
 
 

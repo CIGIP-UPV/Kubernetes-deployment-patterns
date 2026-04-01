@@ -68,7 +68,7 @@ questions:
     label: "Camera Source"
     description: "true = Synthetic test frames (no hardware) | false = Real camera on edge node"
     type: boolean
-    default: true
+    default: false
     group: "Camera"
 
   - variable: camera.mountVideoDevice

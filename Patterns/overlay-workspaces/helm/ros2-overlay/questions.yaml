@@ -60,14 +60,14 @@ questions:
     label: "Camera Source"
     description: "true = Synthetic test frames (no hardware) | false = Real camera on edge node"
     type: boolean
-    default: true
+    default: false
     group: "Camera"
 
   - variable: camera.mountVideoDevice
     label: "Mount /dev/video0"
     description: "Mount the physical camera device into the container (required for real camera)"
     type: boolean
-    default: false
+    default: true
     show_if: "camera.syntheticMode=false"
     group: "Camera"
 

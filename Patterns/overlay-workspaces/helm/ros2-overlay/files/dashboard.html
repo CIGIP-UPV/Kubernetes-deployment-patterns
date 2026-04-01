@@ -505,7 +505,7 @@
         </div>
         <div class="bar-track"><div class="bar-fill mem" id="memBar" style="width:0%"></div></div>
       </div>
-      <div class="resource-bar" id="gpuRow" style="display:none">
+      <div class="resource-bar" id="gpuRow">
         <div class="bar-header">
           <span>GPU</span>
           <span id="gpuVal">--</span>
@@ -860,7 +860,6 @@ function subscribeToTopics() {
     messageType: 'std_msgs/msg/Float32'
   }).subscribe(function(msg) {
     if (!isConnected) return;
-    document.getElementById('gpuRow').style.display = '';
     const pct = Math.min(100, Math.max(0, msg.data));
     document.getElementById('gpuVal').textContent = pct.toFixed(1) + ' %';
     document.getElementById('gpuBar').style.width = pct.toFixed(1) + '%';
