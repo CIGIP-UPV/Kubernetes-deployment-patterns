@@ -17,15 +17,15 @@ camera:
   device: /dev/video0
   width: 1280
   height: 720
-  fps: 10
+  fps: 0  # 0 = unlimited; override with 10/20/30 for benchmark scenarios
   frameId: camera
-  syntheticMode: true
-  mountVideoDevice: false
+  syntheticMode: false
+  mountVideoDevice: true
 
 yolo:
   modelPath: /opt/models/yolov8n.pt
   conf: 0.25
-  publishDebugImage: "false"
+  publishDebugImage: "true"
   publishMetrics: "true"
   startDelaySeconds: 2
 

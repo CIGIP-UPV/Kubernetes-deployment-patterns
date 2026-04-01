@@ -20,7 +20,7 @@ class CameraDriver(Node):
         self.declare_parameter('device', '/dev/video0')
         self.declare_parameter('width', 1280)
         self.declare_parameter('height', 720)
-        self.declare_parameter('fps', 30)
+        self.declare_parameter('fps', 0)  # 0 = unlimited (native camera rate)
         self.declare_parameter('frame_id', 'camera')
         self.declare_parameter('image_topic', '/camera/image_raw')
         self.declare_parameter('synthetic_mode', False)
@@ -52,9 +52,18 @@ class CameraDriver(Node):
                 self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
 
         fps = float(self.get_parameter('fps').value)
-        self.timer = self.create_timer(max(1.0 / fps, 1e-3), self._publish_frame)
+        if fps <= 0:
+            # 0 = unlimited — timer fires every 1 ms; actual rate is
+            # limited by the camera hardware (cap.read blocks until
+            # the next frame is ready).
+            period = 1e-3
+            fps_label = 'unlimited (native camera rate)'
+        else:
+            period = 1.0 / fps
+            fps_label = f'{fps} FPS'
+        self.timer = self.create_timer(max(period, 1e-3), self._publish_frame)
         source = 'synthetic' if self.synthetic_mode else dev
-        self.get_logger().info(f'Publicando {source} -> {topic} @ {fps} FPS')
+        self.get_logger().info(f'Publishing {source} -> {topic} @ {fps_label}')
 
     def _synthetic_frame(self):
         w = int(self.get_parameter('width').value)

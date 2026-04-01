@@ -32,12 +32,13 @@ questions:
 
   # ── Experiment Scenario ──────────────────────────────────────────
   - variable: camera.fps
-    label: "Camera FPS (Scenario)"
-    description: "Frame rate: S1=10 Hz, S2=20 Hz, S3=30 Hz"
+    label: "Camera FPS"
+    description: "0 = unlimited (native camera rate). For benchmarks: S1=10, S2=20, S3=30"
     type: enum
-    default: 10
+    default: 0
     required: true
     options:
+      - 0
       - 10
       - 20
       - 30
@@ -56,19 +57,19 @@ questions:
       - "3"
     group: "Experiment"
 
-  - variable: camera.syntheticMode
-    label: "Camera Source"
-    description: "true = Synthetic test frames (no hardware) | false = Real camera on edge node"
-    type: boolean
-    default: false
-    group: "Camera"
-
   - variable: camera.mountVideoDevice
     label: "Mount /dev/video0"
     description: "Mount the physical camera device into the container (required for real camera)"
     type: boolean
     default: true
-    show_if: "camera.syntheticMode=false"
+    group: "Camera"
+
+  - variable: camera.syntheticMode
+    label: "Camera Source"
+    description: "true = Synthetic test frames (no hardware) | false = Real camera on edge node"
+    type: boolean
+    default: false
+    show_if: "camera.mountVideoDevice=false"
     group: "Camera"
 
   - variable: yolo.publishDebugImage
@@ -98,24 +99,6 @@ questions:
     default: ""
     group: "Experiment"
 
-  # ── CycloneDDS (Cloud-Edge Communication) ────────────────────────
-  - variable: cyclonedds.enabled
-    label: "Enable CycloneDDS Unicast"
-    description: "Use CycloneDDS unicast peers for cross-node DDS communication (required for cloud-edge)"
-    type: boolean
-    default: true
-    group: "DDS Network"
-
-  - variable: cyclonedds.allowMulticast
-    label: "Allow Multicast"
-    description: "false = unicast peers only (recommended for cloud-edge), true = use multicast"
-    type: enum
-    default: "false"
-    options:
-      - "false"
-      - "true"
-    show_if: "cyclonedds.enabled=true"
-    group: "DDS Network"
 
   # ── Dashboard (Cloud Observability) ─────────────────────────────
   - variable: dashboard.enabled
@@ -134,6 +117,7 @@ questions:
       - ""
       - "kb2"
       - "worker1-kb2"
+      - "edgenode01"
     show_if: "dashboard.enabled=true"
     group: "Dashboard"
 
@@ -142,17 +126,6 @@ questions:
     description: "Docker image tag for the dashboard container"
     type: string
     default: "latest"
-    show_if: "dashboard.enabled=true"
-    group: "Dashboard"
-
-  - variable: dashboard.service.type
-    label: "Dashboard Service Type"
-    description: "NodePort to access from outside the cluster, ClusterIP for internal only"
-    type: enum
-    default: "NodePort"
-    options:
-      - "NodePort"
-      - "ClusterIP"
     show_if: "dashboard.enabled=true"
     group: "Dashboard"
 

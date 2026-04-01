@@ -4,7 +4,11 @@ Lightweight resource monitor — publishes CPU, memory & GPU usage as ROS 2
 Float32 topics so the web dashboard can display them.
 
 Uses /proc/stat, /proc/meminfo (no psutil dependency).
-GPU: nvidia-smi (desktop) or tegrastats (Jetson Orin/Xavier).
+GPU detection priority:
+  1. nvidia-smi  (desktop/server with NVIDIA GPU)
+  2. tegrastats  (Jetson Orin/Xavier — requires binary on host or in image)
+  3. sysfs       (Jetson — reads /sys/devices/gpu.0/load or similar, works
+                  inside containers without extra mounts if running privileged)
 
 Published topics:
   /node/cpu_percent     (std_msgs/Float32)  — total CPU usage  0-100
@@ -17,6 +21,7 @@ from rclpy.node import Node
 from std_msgs.msg import Float32
 import subprocess
 import shutil
+import glob
 import re
 import os
 
@@ -31,20 +36,45 @@ class ResourceMonitor(Node):
         self.pub_cpu = self.create_publisher(Float32, '/node/cpu_percent', 10)
         self.pub_mem = self.create_publisher(Float32, '/node/memory_percent', 10)
 
-        # GPU detection: nvidia-smi (desktop/server) or tegrastats (Jetson)
+        # GPU detection order: nvidia-smi > tegrastats > sysfs
         self._gpu_method = None
+        self._gpu_sysfs_path = None
+
         if shutil.which('nvidia-smi') is not None:
             self._gpu_method = 'nvidia-smi'
         elif shutil.which('tegrastats') is not None or os.path.exists('/usr/bin/tegrastats'):
             self._gpu_method = 'tegrastats'
+        else:
+            # Fallback: Jetson sysfs GPU load file
+            # Typical paths:
+            #   /sys/devices/platform/gpu.0/load          (Jetson Orin / Xavier)
+            #   /sys/devices/platform/17000000.ga10b/load  (Jetson Orin device-tree)
+            #   /sys/devices/gpu.0/load                   (older Jetsons)
+            candidates = (
+                glob.glob('/sys/devices/platform/*/load') +
+                glob.glob('/sys/devices/platform/gpu.*/load') +
+                glob.glob('/sys/devices/gpu.*/load')
+            )
+            for path in candidates:
+                try:
+                    val = open(path).read().strip()
+                    # The file returns 0-1000 (per-mille) on Jetson
+                    if val.isdigit():
+                        self._gpu_sysfs_path = path
+                        self._gpu_method = 'sysfs'
+                        break
+                except Exception:
+                    continue
 
         if self._gpu_method:
             self.pub_gpu = self.create_publisher(Float32, '/node/gpu_percent', 10)
+            extra = f' ({self._gpu_sysfs_path})' if self._gpu_method == 'sysfs' else ''
             self.get_logger().info(
-                f'GPU detected via {self._gpu_method} — publishing /node/gpu_percent')
+                f'GPU detected via {self._gpu_method}{extra} — publishing /node/gpu_percent')
         else:
             self.pub_gpu = None
-            self.get_logger().info('No GPU tool found (nvidia-smi / tegrastats) — GPU metrics disabled')
+            self.get_logger().info(
+                'No GPU tool found (nvidia-smi / tegrastats / sysfs) — GPU metrics disabled')
 
         self._prev_idle = 0
         self._prev_total = 0
@@ -90,6 +120,8 @@ class ResourceMonitor(Node):
             return self._gpu_nvidia_smi()
         elif self._gpu_method == 'tegrastats':
             return self._gpu_tegrastats()
+        elif self._gpu_method == 'sysfs':
+            return self._gpu_sysfs()
         return 0.0
 
     def _gpu_nvidia_smi(self):
@@ -119,6 +151,16 @@ class ResourceMonitor(Node):
             # GR3D_FREQ 45%  or  GR3D_FREQ 45%@1300
             m = re.search(r'GR3D_FREQ\s+(\d+)%', line)
             return float(m.group(1)) if m else 0.0
+        except Exception:
+            return 0.0
+
+    def _gpu_sysfs(self):
+        """Read Jetson GPU load from sysfs (works inside containers).
+        The file returns a value 0-1000 (per-mille), divide by 10 for %.
+        """
+        try:
+            val = open(self._gpu_sysfs_path).read().strip()
+            return float(val) / 10.0
         except Exception:
             return 0.0
 

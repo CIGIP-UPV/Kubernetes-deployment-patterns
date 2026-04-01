@@ -26,10 +26,10 @@ camera:
   device: /dev/video0
   width: 1280
   height: 720
-  fps: 10
+  fps: 0  # 0 = unlimited (native camera rate); >0 = limit to N FPS
   frameId: camera
-  syntheticMode: true
-  mountVideoDevice: false
+  syntheticMode: false
+  mountVideoDevice: true
 
 dynamic:
   apiPort: 5000

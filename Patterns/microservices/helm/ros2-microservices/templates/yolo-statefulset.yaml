@@ -52,6 +52,26 @@ spec:
               value: {{ .Values.ros.rmwImplementation | quote }}
             - name: ROS_LOCALHOST_ONLY
               value: {{ .Values.ros.localhostOnly | quote }}
+            - name: YOLO_MODEL_PATH
+              value: {{ .Values.yolo.modelPath | quote }}
+            - name: YOLO_CONF
+              value: {{ .Values.yolo.conf | quote }}
+            - name: YOLO_PUBLISH_DEBUG
+              value: {{ .Values.yolo.publishDebugImage | quote }}
+            - name: YOLO_PUBLISH_METRICS
+              value: {{ .Values.yolo.publishMetrics | quote }}
+            - name: YOLO_FILTER_CLASSES
+              value: {{ .Values.yolo.filterClasses | toString | quote }}
+            - name: IMAGE_TOPIC
+              value: {{ .Values.topics.image | quote }}
+            - name: DETECTIONS_TOPIC
+              value: {{ .Values.topics.detections | quote }}
+            - name: DEBUG_IMAGE_TOPIC
+              value: {{ .Values.topics.debugImage | quote }}
+            - name: LATENCY_TOPIC
+              value: {{ .Values.topics.latency | quote }}
+            - name: INFERENCE_TOPIC
+              value: {{ .Values.topics.inference | quote }}
             {{- if .Values.cyclonedds.enabled }}
             - name: CYCLONEDDS_URI
               value: "file:///etc/cyclonedds/cyclonedds.xml"
@@ -65,16 +85,16 @@ spec:
                 source /opt/ros_ws/install/setup.bash
               fi
               ros2 run yolo_detector_pkg yolo_detector --ros-args \
-                -p model_path:={{ .Values.yolo.modelPath | quote }} \
-                -p conf:={{ .Values.yolo.conf }} \
-                -p image_topic:={{ .Values.topics.image | quote }} \
-                -p detections_topic:={{ .Values.topics.detections | quote }} \
-                -p debug_image_topic:={{ .Values.topics.debugImage | quote }} \
-                -p publish_debug_image:={{ .Values.yolo.publishDebugImage | quote }} \
-                -p publish_metrics:={{ .Values.yolo.publishMetrics | quote }} \
-                -p latency_topic:={{ .Values.topics.latency | quote }} \
-                -p inference_topic:={{ .Values.topics.inference | quote }} \
-                -p filter_classes:="{{ .Values.yolo.filterClasses | toString }}" &
+                -p model_path:="${YOLO_MODEL_PATH}" \
+                -p conf:=${YOLO_CONF} \
+                -p image_topic:="${IMAGE_TOPIC}" \
+                -p detections_topic:="${DETECTIONS_TOPIC}" \
+                -p debug_image_topic:="${DEBUG_IMAGE_TOPIC}" \
+                -p publish_debug_image:="${YOLO_PUBLISH_DEBUG}" \
+                -p publish_metrics:="${YOLO_PUBLISH_METRICS}" \
+                -p latency_topic:="${LATENCY_TOPIC}" \
+                -p inference_topic:="${INFERENCE_TOPIC}" \
+                -p filter_classes:="\"${YOLO_FILTER_CLASSES}\"" &
               YOLO_PID=$!
               python3 /opt/scripts/resource_monitor.py &
               MONITOR_PID=$!

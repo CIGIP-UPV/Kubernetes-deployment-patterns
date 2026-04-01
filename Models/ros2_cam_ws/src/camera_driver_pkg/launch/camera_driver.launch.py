@@ -12,7 +12,7 @@ def generate_launch_description():
                 'device': '/dev/video0',
                 'width': 1280,
                 'height': 720,
-                'fps': 30,
+                'fps': 0,  # 0 = unlimited (native camera rate)
                 'frame_id': 'camera',
                 'image_topic': '/camera/image_raw',
                 'synthetic_mode': False
