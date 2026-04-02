@@ -213,7 +213,7 @@ spec:
           volumeMounts:
             {{- if and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode) }}
             - name: video-device
-              mountPath: /dev/video0
+              mountPath: {{ .Values.camera.device }}
             {{- end }}
             {{- if .Values.cyclonedds.enabled }}
             - name: cyclonedds
@@ -247,7 +247,7 @@ spec:
         {{- if and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode) }}
         - name: video-device
           hostPath:
-            path: /dev/video0
+            path: {{ .Values.camera.device }}
             type: CharDevice
         {{- end }}
         {{- if .Values.cyclonedds.enabled }}
