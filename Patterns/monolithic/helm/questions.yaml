@@ -35,10 +35,10 @@ questions:
     label: "Camera FPS"
     description: "0 = unlimited (native camera rate). For benchmarks: S1=10, S2=20, S3=30"
     type: enum
-    default: 0
+    default:
     required: true
     options:
-      -
+      - 40
       - 0
       - 10
       - 20
