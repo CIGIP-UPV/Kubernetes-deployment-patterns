@@ -194,6 +194,7 @@ jobs:
             ${{ env.REGISTRY_PREFIX }}/ros2-camera:latest
           build-args: |
             TORCH_VARIANT=${{ env.TORCH_VARIANT }}
+          provenance: false
           cache-from: type=gha,scope=ros2-camera
           cache-to: type=gha,mode=max,scope=ros2-camera
 
@@ -237,6 +238,7 @@ jobs:
             ${{ env.REGISTRY_PREFIX }}/ros2-yolo:latest
           build-args: |
             TORCH_VARIANT=${{ env.TORCH_VARIANT }}
+          provenance: false
           cache-from: type=gha,scope=ros2-yolo
           cache-to: type=gha,mode=max,scope=ros2-yolo
 
@@ -280,6 +282,7 @@ jobs:
             ${{ env.REGISTRY_PREFIX }}/ros2-llava:latest
           build-args: |
             TORCH_VARIANT=${{ env.TORCH_VARIANT }}
+          provenance: false
           cache-from: type=gha,scope=ros2-llava
           cache-to: type=gha,mode=max,scope=ros2-llava
 
@@ -323,6 +326,7 @@ jobs:
             ${{ env.REGISTRY_PREFIX }}/ros2-voxtral:latest
           build-args: |
             TORCH_VARIANT=${{ env.TORCH_VARIANT }}
+          provenance: false
           cache-from: type=gha,scope=ros2-voxtral
           cache-to: type=gha,mode=max,scope=ros2-voxtral
 
@@ -366,6 +370,7 @@ jobs:
             ${{ env.REGISTRY_PREFIX }}/ros2-monolithic:latest
           build-args: |
             TORCH_VARIANT=${{ env.TORCH_VARIANT }}
+          provenance: false
           cache-from: type=gha,scope=ros2-monolithic
           cache-to: type=gha,mode=max,scope=ros2-monolithic
 
@@ -409,6 +414,7 @@ jobs:
             ${{ env.REGISTRY_PREFIX }}/ros2-overlay:latest
           build-args: |
             TORCH_VARIANT=${{ env.TORCH_VARIANT }}
+          provenance: false
           cache-from: type=gha,scope=ros2-overlay
           cache-to: type=gha,mode=max,scope=ros2-overlay
 
@@ -450,6 +456,7 @@ jobs:
           tags: |
             ${{ env.REGISTRY_PREFIX }}/ros2-dashboard:${{ needs.set-tag.outputs.tag }}
             ${{ env.REGISTRY_PREFIX }}/ros2-dashboard:latest
+          provenance: false
           cache-from: type=gha,scope=ros2-dashboard
           cache-to: type=gha,mode=max,scope=ros2-dashboard
 
