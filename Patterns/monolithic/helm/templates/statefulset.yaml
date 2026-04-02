@@ -101,7 +101,7 @@ spec:
             - name: LLAVA_TRIGGER_ON_YOLO
               value: {{ .Values.llava.triggerOnYolo | quote }}
             - name: LLAVA_YOLO_INTERVAL_S
-              value: {{ printf "%.1f" (float64 .Values.llava.yoloTriggerIntervalS) | quote }}
+              value: {{ .Values.llava.yoloTriggerIntervalS | quote }}
             - name: LLAVA_MAX_TOKENS
               value: {{ .Values.llava.maxNewTokens | quote }}
             - name: LLAVA_LOAD_4BIT
@@ -185,7 +185,7 @@ spec:
                   -p latency_topic:=${LLAVA_LATENCY_TOPIC} \
                   -p inference_topic:=${LLAVA_INFERENCE_TOPIC} \
                   -p trigger_on_yolo:=${LLAVA_TRIGGER_ON_YOLO} \
-                  -p yolo_trigger_interval_s:=${LLAVA_YOLO_INTERVAL_S} \
+                  -p yolo_trigger_interval_s:=$(printf "%.1f" "${LLAVA_YOLO_INTERVAL_S}") \
                   -p max_new_tokens:=${LLAVA_MAX_TOKENS} \
                   -p load_in_4bit:=${LLAVA_LOAD_4BIT} &
                 LLAVA_PID=$!
