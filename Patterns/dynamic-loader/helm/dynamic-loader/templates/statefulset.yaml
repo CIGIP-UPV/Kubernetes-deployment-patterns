@@ -129,6 +129,36 @@ spec:
               value: {{ .Values.topics.latency | quote }}
             - name: INFERENCE_TOPIC
               value: {{ .Values.topics.inference | quote }}
+            # LLaVA
+            - name: LLAVA_ENABLED
+              value: {{ .Values.llava.enabled | quote }}
+            - name: LLAVA_MODEL_ID
+              value: {{ .Values.llava.modelId | quote }}
+            - name: LLAVA_AUTO_LOAD
+              value: {{ .Values.llava.autoLoad | quote }}
+            - name: LLAVA_RESPONSE_TOPIC
+              value: {{ .Values.topics.llavaResponse | quote }}
+            - name: LLAVA_LATENCY_TOPIC
+              value: {{ .Values.topics.llavaLatency | quote }}
+            - name: LLAVA_INFERENCE_TOPIC
+              value: {{ .Values.topics.llavaInference | quote }}
+            # Voxtral
+            - name: VOXTRAL_ENABLED
+              value: {{ .Values.voxtral.enabled | quote }}
+            - name: VOXTRAL_AUDIO_MODE
+              value: {{ .Values.voxtral.audioMode | quote }}
+            - name: VOXTRAL_MODEL_ID
+              value: {{ .Values.voxtral.modelId | quote }}
+            - name: VOXTRAL_AUTO_LOAD
+              value: {{ .Values.voxtral.autoLoad | quote }}
+            - name: VOICE_COMMAND_TOPIC
+              value: {{ .Values.topics.voiceCommand | quote }}
+            - name: VOICE_TRANSCRIPT_TOPIC
+              value: {{ .Values.topics.voiceTranscript | quote }}
+            - name: VOICE_RESPONSE_TOPIC
+              value: {{ .Values.topics.voiceResponse | quote }}
+            - name: VOICE_LATENCY_TOPIC
+              value: {{ .Values.topics.voiceLatency | quote }}
           command: ["/bin/bash", "-lc"]
           args:
             - |

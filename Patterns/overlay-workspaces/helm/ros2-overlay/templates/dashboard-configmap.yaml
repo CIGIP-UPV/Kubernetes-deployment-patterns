@@ -7,6 +7,6 @@ metadata:
     {{- include "ros2-overlay.labels" . | nindent 4 }}
     component: dashboard
 data:
-  dashboard.html: |
+  index.html: |
 {{ .Files.Get "files/dashboard.html" | indent 4 }}
 {{- end }}

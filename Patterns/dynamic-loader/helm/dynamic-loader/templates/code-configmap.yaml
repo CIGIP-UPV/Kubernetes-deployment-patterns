@@ -21,6 +21,7 @@ data:
     )
     AUTO_LOAD_YOLO = os.getenv("AUTO_LOAD_YOLO", "true").lower() == "true"
 
+    # YOLO config
     MODEL_PATH = os.getenv("YOLO_MODEL_PATH", "yolov8n.pt")
     YOLO_CONF = os.getenv("YOLO_CONF", "0.25")
     IMAGE_TOPIC = os.getenv("IMAGE_TOPIC", "/camera/image_raw")
@@ -32,11 +33,37 @@ data:
     LATENCY_TOPIC = os.getenv("LATENCY_TOPIC", "/benchmark/latency_ms")
     INFERENCE_TOPIC = os.getenv("INFERENCE_TOPIC", "/benchmark/inference_ms")
 
+    # LLaVA config
+    LLAVA_ENABLED = os.getenv("LLAVA_ENABLED", "false").lower() == "true"
+    LLAVA_MODEL_ID = os.getenv("LLAVA_MODEL_ID", "llava-hf/llava-1.5-7b-hf")
+    LLAVA_AUTO_LOAD = os.getenv("LLAVA_AUTO_LOAD", "false").lower() == "true"
+    LLAVA_RESPONSE_TOPIC = os.getenv("LLAVA_RESPONSE_TOPIC", "/llava/response")
+    LLAVA_LATENCY_TOPIC = os.getenv("LLAVA_LATENCY_TOPIC", "/llava/metrics_latency_ms")
+    LLAVA_INFERENCE_TOPIC = os.getenv("LLAVA_INFERENCE_TOPIC", "/llava/metrics_inference_ms")
+
+    # Voxtral config
+    VOXTRAL_ENABLED = os.getenv("VOXTRAL_ENABLED", "false").lower() == "true"
+    VOXTRAL_AUDIO_MODE = os.getenv("VOXTRAL_AUDIO_MODE", "false").lower() == "true"
+    VOXTRAL_MODEL_ID = os.getenv("VOXTRAL_MODEL_ID", "mistralai/Voxtral-Mini-4B-Realtime-2602")
+    VOXTRAL_AUTO_LOAD = os.getenv("VOXTRAL_AUTO_LOAD", "false").lower() == "true"
+    VOICE_COMMAND_TOPIC = os.getenv("VOICE_COMMAND_TOPIC", "/voice/command")
+    VOICE_TRANSCRIPT_TOPIC = os.getenv("VOICE_TRANSCRIPT_TOPIC", "/voice/transcript")
+    VOICE_RESPONSE_TOPIC = os.getenv("VOICE_RESPONSE_TOPIC", "/voice/response")
+    VOICE_LATENCY_TOPIC = os.getenv("VOICE_LATENCY_TOPIC", "/voice/metrics_latency_ms")
+
     _lock = threading.Lock()
     _process: subprocess.Popen | None = None
+    _llava_process: subprocess.Popen | None = None
+    _voxtral_process: subprocess.Popen | None = None
 
     def _is_running() -> bool:
         return _process is not None and _process.poll() is None
+
+    def _is_llava_running() -> bool:
+        return _llava_process is not None and _llava_process.poll() is None
+
+    def _is_voxtral_running() -> bool:
+        return _voxtral_process is not None and _voxtral_process.poll() is None
 
     def _start_yolo() -> Dict[str, str]:
         global _process
@@ -82,14 +109,100 @@ data:
             _process = None
             return {"status": "stopped", "pid": str(pid)}
 
+    def _start_llava() -> Dict[str, str]:
+        global _llava_process
+        with _lock:
+            if _is_llava_running():
+                return {"status": "already_running", "pid": str(_llava_process.pid)}
+
+            cmd = [
+                "/bin/bash",
+                "-lc",
+                (
+                    "set -e; "
+                    "source /opt/ros/humble/setup.bash; "
+                    "if [ -f /opt/ros_ws/install/setup.bash ]; then source /opt/ros_ws/install/setup.bash; fi; "
+                    "ros2 run llava_pkg llava_node --ros-args "
+                    f"-p model_id:={LLAVA_MODEL_ID} "
+                    f"-p image_topic:={IMAGE_TOPIC} "
+                    f"-p detection_topic:={DETECTIONS_TOPIC} "
+                    f"-p response_topic:={LLAVA_RESPONSE_TOPIC} "
+                    f"-p latency_topic:={LLAVA_LATENCY_TOPIC} "
+                    f"-p inference_topic:={LLAVA_INFERENCE_TOPIC}"
+                ),
+            ]
+            _llava_process = subprocess.Popen(cmd)
+            return {"status": "started", "pid": str(_llava_process.pid)}
+
+    def _stop_llava() -> Dict[str, str]:
+        global _llava_process
+        with _lock:
+            if not _is_llava_running():
+                _llava_process = None
+                return {"status": "not_running"}
+            _llava_process.send_signal(signal.SIGTERM)
+            try:
+                _llava_process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                _llava_process.kill()
+            pid = _llava_process.pid
+            _llava_process = None
+            return {"status": "stopped", "pid": str(pid)}
+
+    def _start_voxtral() -> Dict[str, str]:
+        global _voxtral_process
+        with _lock:
+            if _is_voxtral_running():
+                return {"status": "already_running", "pid": str(_voxtral_process.pid)}
+
+            cmd = [
+                "/bin/bash",
+                "-lc",
+                (
+                    "set -e; "
+                    "source /opt/ros/humble/setup.bash; "
+                    "if [ -f /opt/ros_ws/install/setup.bash ]; then source /opt/ros_ws/install/setup.bash; fi; "
+                    "ros2 run voxtral_pkg voxtral_node --ros-args "
+                    f"-p audio_mode:={VOXTRAL_AUDIO_MODE} "
+                    f"-p model_id:={VOXTRAL_MODEL_ID} "
+                    f"-p command_topic:={VOICE_COMMAND_TOPIC} "
+                    f"-p transcript_topic:={VOICE_TRANSCRIPT_TOPIC} "
+                    f"-p response_topic:={VOICE_RESPONSE_TOPIC} "
+                    f"-p latency_topic:={VOICE_LATENCY_TOPIC}"
+                ),
+            ]
+            _voxtral_process = subprocess.Popen(cmd)
+            return {"status": "started", "pid": str(_voxtral_process.pid)}
+
+    def _stop_voxtral() -> Dict[str, str]:
+        global _voxtral_process
+        with _lock:
+            if not _is_voxtral_running():
+                _voxtral_process = None
+                return {"status": "not_running"}
+            _voxtral_process.send_signal(signal.SIGTERM)
+            try:
+                _voxtral_process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                _voxtral_process.kill()
+            pid = _voxtral_process.pid
+            _voxtral_process = None
+            return {"status": "stopped", "pid": str(pid)}
+
     @app.on_event("startup")
     def _startup() -> None:
         if AUTO_LOAD_YOLO:
             _start_yolo()
+        if LLAVA_AUTO_LOAD:
+            _start_llava()
+        if VOXTRAL_AUTO_LOAD:
+            _start_voxtral()
 
     @app.on_event("shutdown")
     def _shutdown() -> None:
         _stop_yolo()
+        _stop_llava()
+        _stop_voxtral()
 
     @app.get("/")
     def root() -> Dict[str, str]:
@@ -97,25 +210,49 @@ data:
 
     @app.get("/health")
     def health() -> Dict[str, str]:
-        return {"status": "healthy", "yolo_running": str(_is_running()).lower()}
+        return {
+            "status": "healthy",
+            "yolo_running": str(_is_running()).lower(),
+            "llava_running": str(_is_llava_running()).lower(),
+            "voxtral_running": str(_is_voxtral_running()).lower(),
+        }
 
     @app.get("/status")
     def status() -> Dict[str, str]:
-        pid = str(_process.pid) if _is_running() else ""
-        return {"yolo_running": str(_is_running()).lower(), "pid": pid}
+        yolo_pid = str(_process.pid) if _is_running() else ""
+        llava_pid = str(_llava_process.pid) if _is_llava_running() else ""
+        voxtral_pid = str(_voxtral_process.pid) if _is_voxtral_running() else ""
+        return {
+            "yolo_running": str(_is_running()).lower(),
+            "yolo_pid": yolo_pid,
+            "llava_running": str(_is_llava_running()).lower(),
+            "llava_pid": llava_pid,
+            "voxtral_running": str(_is_voxtral_running()).lower(),
+            "voxtral_pid": voxtral_pid,
+        }
 
     @app.post("/modules/load/{module_name}")
     def load_module(module_name: str) -> Dict[str, str]:
         if module_name not in ALLOWED_MODULES:
             raise HTTPException(status_code=403, detail=f"module '{module_name}' not allowed")
-        if module_name != "yolo_detector":
-            raise HTTPException(status_code=400, detail="only 'yolo_detector' is supported")
-        return _start_yolo()
+        if module_name == "yolo_detector":
+            return _start_yolo()
+        elif module_name == "llava_detector":
+            return _start_llava()
+        elif module_name == "voxtral_detector":
+            return _start_voxtral()
+        else:
+            raise HTTPException(status_code=400, detail=f"module '{module_name}' is not supported")
 
     @app.post("/modules/unload/{module_name}")
     def unload_module(module_name: str) -> Dict[str, str]:
         if module_name not in ALLOWED_MODULES:
             raise HTTPException(status_code=403, detail=f"module '{module_name}' not allowed")
-        if module_name != "yolo_detector":
-            raise HTTPException(status_code=400, detail="only 'yolo_detector' is supported")
-        return _stop_yolo()
+        if module_name == "yolo_detector":
+            return _stop_yolo()
+        elif module_name == "llava_detector":
+            return _stop_llava()
+        elif module_name == "voxtral_detector":
+            return _stop_voxtral()
+        else:
+            raise HTTPException(status_code=400, detail=f"module '{module_name}' is not supported")

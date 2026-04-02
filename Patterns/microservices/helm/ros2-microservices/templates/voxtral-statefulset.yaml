@@ -1,0 +1,129 @@
+{{- if .Values.voxtral.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "ros2-microservices.fullname" . }}-voxtral
+  labels:
+    {{- include "ros2-microservices.labels" . | nindent 4 }}
+    pattern: microservices
+    component: voxtral
+spec:
+  serviceName: {{ include "ros2-microservices.fullname" . }}-voxtral-peers
+  replicas: 1
+  selector:
+    matchLabels:
+      app: voxtral
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        {{- include "ros2-microservices.labels" . | nindent 8 }}
+        app: voxtral
+        component: voxtral
+        pattern: microservices
+    spec:
+      {{- if .Values.imagePullSecretName }}
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecretName }}
+      {{- end }}
+      {{- if .Values.voxtral.nodeHostname }}
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.voxtral.nodeHostname }}
+      {{- else if .Values.voxtral.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.voxtral.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if .Values.voxtral.affinity }}
+      affinity:
+        {{- toYaml .Values.voxtral.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.voxtral.tolerations }}
+      tolerations:
+        {{- toYaml .Values.voxtral.tolerations | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: voxtral
+          image: "{{ .Values.images.voxtral.repository }}:{{ .Values.images.voxtral.tag }}"
+          imagePullPolicy: {{ .Values.images.voxtral.pullPolicy }}
+          env:
+            - name: ROS_DOMAIN_ID
+              value: {{ .Values.ros.domainId | quote }}
+            - name: RMW_IMPLEMENTATION
+              value: {{ .Values.ros.rmwImplementation | quote }}
+            - name: ROS_LOCALHOST_ONLY
+              value: {{ .Values.ros.localhostOnly | quote }}
+            - name: VOXTRAL_AUDIO_MODE
+              value: {{ .Values.voxtral.audioMode | quote }}
+            - name: VOXTRAL_MODEL_ID
+              value: {{ .Values.voxtral.modelId | quote }}
+            - name: VOICE_COMMAND_TOPIC
+              value: {{ .Values.topics.voiceCommand | quote }}
+            - name: VOICE_TRANSCRIPT_TOPIC
+              value: {{ .Values.topics.voiceTranscript | quote }}
+            - name: VOICE_RESPONSE_TOPIC
+              value: {{ .Values.topics.voiceResponse | quote }}
+            - name: VOICE_LATENCY_TOPIC
+              value: {{ .Values.topics.voiceLatency | quote }}
+            {{- if .Values.cyclonedds.enabled }}
+            - name: CYCLONEDDS_URI
+              value: "file:///etc/cyclonedds/cyclonedds.xml"
+            {{- end }}
+          command: ["/bin/bash", "-lc"]
+          args:
+            - |
+              set -e
+              source /opt/ros/humble/setup.bash
+              if [ -f /opt/ros_ws/install/setup.bash ]; then
+                source /opt/ros_ws/install/setup.bash
+              fi
+              ros2 run voxtral_pkg voxtral_node --ros-args \
+                -p audio_mode:=${VOXTRAL_AUDIO_MODE} \
+                -p model_id:="${VOXTRAL_MODEL_ID}" \
+                -p command_topic:="${VOICE_COMMAND_TOPIC}" \
+                -p transcript_topic:="${VOICE_TRANSCRIPT_TOPIC}" \
+                -p response_topic:="${VOICE_RESPONSE_TOPIC}" \
+                -p latency_topic:="${VOICE_LATENCY_TOPIC}" &
+              VOXTRAL_PID=$!
+              python3 /opt/scripts/resource_monitor.py &
+              MONITOR_PID=$!
+              wait -n ${VOXTRAL_PID} ${MONITOR_PID}
+              exit 1
+          resources:
+            {{- toYaml .Values.voxtral.resources | nindent 12 }}
+          {{- if .Values.cyclonedds.enabled }}
+          volumeMounts:
+            - name: cyclonedds
+              mountPath: /etc/cyclonedds
+              readOnly: true
+          {{- end }}
+          startupProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  source /opt/ros/humble/setup.bash && ros2 node list | grep -q "/voxtral_node"
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 18
+          livenessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  source /opt/ros/humble/setup.bash && ros2 node list | grep -q "/voxtral_node"
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 3
+      {{- if .Values.cyclonedds.enabled }}
+      volumes:
+        - name: cyclonedds
+          configMap:
+            name: {{ include "ros2-microservices.fullname" . }}-cyclonedds
+            items:
+              - key: cyclonedds.xml
+                path: cyclonedds.xml
+      {{- end }}
+{{- end }}

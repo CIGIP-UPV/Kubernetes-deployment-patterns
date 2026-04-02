@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-monolithic
+  repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-monolithic
   tag: latest
   pullPolicy: Always
 
@@ -34,12 +34,34 @@ yolo:
   startDelaySeconds: 2
   filterClasses: ""  # "" = all 80 COCO classes, "0" = person only, "0,16,17" = person+dog+cat
 
+llava:
+  enabled: true
+  modelId: llava-hf/llava-1.5-7b-hf
+  triggerOnYolo: true
+  yoloTriggerIntervalS: 8
+  maxNewTokens: 150
+  load4bit: true
+  startDelaySeconds: 15  # wait for YOLO to be ready first
+
+voxtral:
+  enabled: true
+  audioMode: false  # Phase 1: text simulation; Phase 2: set true + mount mic device
+  modelId: mistralai/Voxtral-Mini-4B-Realtime-2602
+
 topics:
   image: /camera/image_raw
   detections: /detections
   debugImage: /detections/image
   latency: /benchmark/latency_ms
   inference: /benchmark/inference_ms
+  llavaResponse: /llava/response
+  llavaLatency: /llava/metrics_latency_ms
+  llavaInference: /llava/metrics_inference_ms
+  llavaTrigger: /llava/trigger
+  voiceCommand: /voice/command
+  voiceTranscript: /voice/transcript
+  voiceResponse: /voice/response
+  voiceLatency: /voice/metrics_latency_ms
 
 resources: {}
 
@@ -53,7 +75,7 @@ cyclonedds:
 dashboard:
   enabled: true
   image:
-    repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-dashboard
+    repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard
     tag: latest
     pullPolicy: Always
   nodeHostname: ""  # Pin to cloud node (e.g., worker1-kb2)

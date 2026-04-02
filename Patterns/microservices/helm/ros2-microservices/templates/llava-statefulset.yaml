@@ -1,0 +1,144 @@
+{{- if .Values.llava.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "ros2-microservices.fullname" . }}-llava
+  labels:
+    {{- include "ros2-microservices.labels" . | nindent 4 }}
+    pattern: microservices
+    component: llava
+spec:
+  serviceName: {{ include "ros2-microservices.fullname" . }}-llava-peers
+  replicas: 1
+  selector:
+    matchLabels:
+      app: llava
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        {{- include "ros2-microservices.labels" . | nindent 8 }}
+        app: llava
+        component: llava
+        pattern: microservices
+    spec:
+      {{- if .Values.imagePullSecretName }}
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecretName }}
+      {{- end }}
+      {{- if .Values.llava.nodeHostname }}
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.llava.nodeHostname }}
+      {{- else if .Values.llava.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.llava.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if .Values.llava.affinity }}
+      affinity:
+        {{- toYaml .Values.llava.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.llava.tolerations }}
+      tolerations:
+        {{- toYaml .Values.llava.tolerations | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: llava
+          image: "{{ .Values.images.llava.repository }}:{{ .Values.images.llava.tag }}"
+          imagePullPolicy: {{ .Values.images.llava.pullPolicy }}
+          env:
+            - name: ROS_DOMAIN_ID
+              value: {{ .Values.ros.domainId | quote }}
+            - name: RMW_IMPLEMENTATION
+              value: {{ .Values.ros.rmwImplementation | quote }}
+            - name: ROS_LOCALHOST_ONLY
+              value: {{ .Values.ros.localhostOnly | quote }}
+            - name: LLAVA_MODEL_ID
+              value: {{ .Values.llava.modelId | quote }}
+            - name: LLAVA_TRIGGER_ON_YOLO
+              value: {{ .Values.llava.triggerOnYolo | quote }}
+            - name: LLAVA_YOLO_INTERVAL_S
+              value: {{ .Values.llava.yoloTriggerIntervalS | quote }}
+            - name: LLAVA_MAX_TOKENS
+              value: {{ .Values.llava.maxNewTokens | quote }}
+            - name: LLAVA_LOAD_4BIT
+              value: {{ .Values.llava.load4bit | quote }}
+            - name: IMAGE_TOPIC
+              value: {{ .Values.topics.image | quote }}
+            - name: DETECTIONS_TOPIC
+              value: {{ .Values.topics.detections | quote }}
+            - name: LLAVA_TRIGGER_TOPIC
+              value: {{ .Values.topics.llavaTrigger | quote }}
+            - name: LLAVA_RESPONSE_TOPIC
+              value: {{ .Values.topics.llavaResponse | quote }}
+            - name: LLAVA_LATENCY_TOPIC
+              value: {{ .Values.topics.llavaLatency | quote }}
+            - name: LLAVA_INFERENCE_TOPIC
+              value: {{ .Values.topics.llavaInference | quote }}
+            {{- if .Values.cyclonedds.enabled }}
+            - name: CYCLONEDDS_URI
+              value: "file:///etc/cyclonedds/cyclonedds.xml"
+            {{- end }}
+          command: ["/bin/bash", "-lc"]
+          args:
+            - |
+              set -e
+              source /opt/ros/humble/setup.bash
+              if [ -f /opt/ros_ws/install/setup.bash ]; then
+                source /opt/ros_ws/install/setup.bash
+              fi
+              ros2 run llava_pkg llava_node --ros-args \
+                -p model_id:=${LLAVA_MODEL_ID} \
+                -p image_topic:="${IMAGE_TOPIC}" \
+                -p detection_topic:="${DETECTIONS_TOPIC}" \
+                -p trigger_topic:="${LLAVA_TRIGGER_TOPIC}" \
+                -p response_topic:="${LLAVA_RESPONSE_TOPIC}" \
+                -p latency_topic:="${LLAVA_LATENCY_TOPIC}" \
+                -p inference_topic:="${LLAVA_INFERENCE_TOPIC}" \
+                -p trigger_on_yolo:=${LLAVA_TRIGGER_ON_YOLO} \
+                -p yolo_trigger_interval_s:=${LLAVA_YOLO_INTERVAL_S} \
+                -p max_new_tokens:=${LLAVA_MAX_TOKENS} \
+                -p load_in_4bit:=${LLAVA_LOAD_4BIT} &
+              LLAVA_PID=$!
+              python3 /opt/scripts/resource_monitor.py &
+              MONITOR_PID=$!
+              wait -n ${LLAVA_PID} ${MONITOR_PID}
+              exit 1
+          resources:
+            {{- toYaml .Values.llava.resources | nindent 12 }}
+          {{- if .Values.cyclonedds.enabled }}
+          volumeMounts:
+            - name: cyclonedds
+              mountPath: /etc/cyclonedds
+              readOnly: true
+          {{- end }}
+          startupProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  source /opt/ros/humble/setup.bash && ros2 node list | grep -q "/llava_node"
+            initialDelaySeconds: 90
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 18
+          livenessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  source /opt/ros/humble/setup.bash && ros2 node list | grep -q "/llava_node"
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 3
+      {{- if .Values.cyclonedds.enabled }}
+      volumes:
+        - name: cyclonedds
+          configMap:
+            name: {{ include "ros2-microservices.fullname" . }}-cyclonedds
+            items:
+              - key: cyclonedds.xml
+                path: cyclonedds.xml
+      {{- end }}
+{{- end }}

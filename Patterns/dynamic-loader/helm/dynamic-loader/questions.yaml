@@ -235,3 +235,43 @@ questions:
     required: false
     show_if: "dashboard.enabled=true"
     group: "Dashboard"
+
+  # ── LLaVA — Visual Reasoning ─────────────────────────────────────
+  - variable: llava.enabled
+    label: "Enable LLaVA"
+    description: "Enable LLaVA-1.5-7b for visual scene understanding and reasoning (load manually via API)"
+    type: boolean
+    default: true
+    group: "LLaVA — Razonamiento Visual"
+
+  - variable: llava.autoLoad
+    label: "Auto-load LLaVA on startup"
+    description: "Automatically start LLaVA when the pod starts (requires GPU with enough VRAM)"
+    type: boolean
+    default: false
+    show_if: "llava.enabled=true"
+    group: "LLaVA — Razonamiento Visual"
+
+  # ── Voxtral — Voice Interaction ──────────────────────────────────
+  - variable: voxtral.enabled
+    label: "Enable Voxtral"
+    description: "Enable Voxtral-Mini-4B for human-robot voice interaction (load manually via API)"
+    type: boolean
+    default: true
+    group: "Voxtral — Interacción por Voz"
+
+  - variable: voxtral.audioMode
+    label: "Audio Mode"
+    description: "false = text simulation (send commands via /voice/command topic) | true = microphone capture (requires USB mic mounted)"
+    type: boolean
+    default: false
+    show_if: "voxtral.enabled=true"
+    group: "Voxtral — Interacción por Voz"
+
+  - variable: voxtral.autoLoad
+    label: "Auto-load Voxtral on startup"
+    description: "Automatically start Voxtral when the pod starts (requires GPU with enough VRAM)"
+    type: boolean
+    default: false
+    show_if: "voxtral.enabled=true"
+    group: "Voxtral — Interacción por Voz"

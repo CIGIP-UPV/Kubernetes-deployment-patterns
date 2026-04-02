@@ -1,10 +1,18 @@
 images:
   camera:
-    repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-camera
+    repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-camera
     tag: latest
     pullPolicy: Always
   yolo:
-    repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-yolo
+    repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-yolo
+    tag: latest
+    pullPolicy: Always
+  llava:
+    repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-llava
+    tag: latest
+    pullPolicy: Always
+  voxtral:
+    repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-voxtral
     tag: latest
     pullPolicy: Always
 
@@ -43,12 +51,43 @@ yolo:
   filterClasses: ""  # "" = all 80 COCO classes, "0" = person only, "0,16,17" = person+dog+cat
   resources: {}
 
+llava:
+  enabled: true
+  nodeHostname: ""
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  modelId: llava-hf/llava-1.5-7b-hf
+  triggerOnYolo: true
+  yoloTriggerIntervalS: 8
+  maxNewTokens: 150
+  load4bit: true
+  resources: {}
+
+voxtral:
+  enabled: true
+  nodeHostname: ""
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  audioMode: false  # Phase 1: text simulation; Phase 2: set true + mount mic device
+  modelId: mistralai/Voxtral-Mini-4B-Realtime-2602
+  resources: {}
+
 topics:
   image: /camera/image_raw
   detections: /detections
   debugImage: /detections/image
   latency: /benchmark/latency_ms
   inference: /benchmark/inference_ms
+  llavaResponse: /llava/response
+  llavaLatency: /llava/metrics_latency_ms
+  llavaInference: /llava/metrics_inference_ms
+  llavaTrigger: /llava/trigger
+  voiceCommand: /voice/command
+  voiceTranscript: /voice/transcript
+  voiceResponse: /voice/response
+  voiceLatency: /voice/metrics_latency_ms
 
 benchmark:
   enabled: false
@@ -67,7 +106,7 @@ cyclonedds:
 dashboard:
   enabled: true
   image:
-    repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-dashboard
+    repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard
     tag: latest
     pullPolicy: Always
   nodeHostname: ""  # Pin to cloud node (e.g., worker1-kb2)

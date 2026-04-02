@@ -88,6 +88,44 @@ spec:
               value: {{ .Values.yolo.filterClasses | toString | quote }}
             - name: YOLO_START_DELAY
               value: {{ .Values.yolo.startDelaySeconds | quote }}
+            # LLaVA visual reasoning
+            - name: LLAVA_ENABLED
+              value: {{ .Values.llava.enabled | quote }}
+            - name: LLAVA_MODEL_ID
+              value: {{ .Values.llava.modelId | quote }}
+            - name: LLAVA_TRIGGER_ON_YOLO
+              value: {{ .Values.llava.triggerOnYolo | quote }}
+            - name: LLAVA_YOLO_INTERVAL_S
+              value: {{ .Values.llava.yoloTriggerIntervalS | quote }}
+            - name: LLAVA_MAX_TOKENS
+              value: {{ .Values.llava.maxNewTokens | quote }}
+            - name: LLAVA_LOAD_4BIT
+              value: {{ .Values.llava.load4bit | quote }}
+            - name: LLAVA_START_DELAY
+              value: {{ .Values.llava.startDelaySeconds | quote }}
+            - name: LLAVA_TRIGGER_TOPIC
+              value: {{ .Values.topics.llavaTrigger | quote }}
+            - name: LLAVA_RESPONSE_TOPIC
+              value: {{ .Values.topics.llavaResponse | quote }}
+            - name: LLAVA_LATENCY_TOPIC
+              value: {{ .Values.topics.llavaLatency | quote }}
+            - name: LLAVA_INFERENCE_TOPIC
+              value: {{ .Values.topics.llavaInference | quote }}
+            # Voxtral voice interaction
+            - name: VOXTRAL_ENABLED
+              value: {{ .Values.voxtral.enabled | quote }}
+            - name: VOXTRAL_AUDIO_MODE
+              value: {{ .Values.voxtral.audioMode | quote }}
+            - name: VOXTRAL_MODEL_ID
+              value: {{ .Values.voxtral.modelId | quote }}
+            - name: VOICE_COMMAND_TOPIC
+              value: {{ .Values.topics.voiceCommand | quote }}
+            - name: VOICE_TRANSCRIPT_TOPIC
+              value: {{ .Values.topics.voiceTranscript | quote }}
+            - name: VOICE_RESPONSE_TOPIC
+              value: {{ .Values.topics.voiceResponse | quote }}
+            - name: VOICE_LATENCY_TOPIC
+              value: {{ .Values.topics.voiceLatency | quote }}
             {{- if .Values.cyclonedds.enabled }}
             - name: CYCLONEDDS_URI
               value: "file:///etc/cyclonedds/cyclonedds.xml"
@@ -128,6 +166,36 @@ spec:
 
               python3 /opt/scripts/resource_monitor.py &
               MONITOR_PID=$!
+
+              if [ "${LLAVA_ENABLED}" = "true" ]; then
+                sleep ${LLAVA_START_DELAY}
+                echo "[overlay] Starting LLaVA reasoning node..."
+                ros2 run llava_pkg llava_node --ros-args \
+                  -p model_id:=${LLAVA_MODEL_ID} \
+                  -p image_topic:="${IMAGE_TOPIC}" \
+                  -p detection_topic:="${DETECTIONS_TOPIC}" \
+                  -p trigger_topic:="${LLAVA_TRIGGER_TOPIC}" \
+                  -p response_topic:="${LLAVA_RESPONSE_TOPIC}" \
+                  -p latency_topic:="${LLAVA_LATENCY_TOPIC}" \
+                  -p inference_topic:="${LLAVA_INFERENCE_TOPIC}" \
+                  -p trigger_on_yolo:=${LLAVA_TRIGGER_ON_YOLO} \
+                  -p yolo_trigger_interval_s:=${LLAVA_YOLO_INTERVAL_S} \
+                  -p max_new_tokens:=${LLAVA_MAX_TOKENS} \
+                  -p load_in_4bit:=${LLAVA_LOAD_4BIT} &
+                LLAVA_PID=$!
+              fi
+
+              if [ "${VOXTRAL_ENABLED}" = "true" ]; then
+                echo "[overlay] Starting Voxtral interaction node..."
+                ros2 run voxtral_pkg voxtral_node --ros-args \
+                  -p audio_mode:=${VOXTRAL_AUDIO_MODE} \
+                  -p model_id:="${VOXTRAL_MODEL_ID}" \
+                  -p command_topic:="${VOICE_COMMAND_TOPIC}" \
+                  -p transcript_topic:="${VOICE_TRANSCRIPT_TOPIC}" \
+                  -p response_topic:="${VOICE_RESPONSE_TOPIC}" \
+                  -p latency_topic:="${VOICE_LATENCY_TOPIC}" &
+                VOXTRAL_PID=$!
+              fi
 
               wait -n ${CAMERA_PID} ${YOLO_PID} ${MONITOR_PID}
               exit 1

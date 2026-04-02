@@ -28,6 +28,8 @@
     --warn-bg: rgba(198,127,23,0.08);
     --error: #DC2626;
     --error-bg: rgba(220,38,38,0.06);
+    --cyan: #0891B2;
+    --cyan-bg: rgba(8,145,178,0.08);
   }
 
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -102,301 +104,486 @@
     align-items: center;
     gap: 8px;
     font-size: 12px;
-    color: rgba(255,255,255,0.85);
-    font-weight: 500;
+    font-weight: 600;
+    color: #fff;
   }
-  .dot {
-    width: 9px; height: 9px;
+  header .dot {
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
-    display: inline-block;
+    background: #FCA5A5;
   }
-  .dot.live { background: #4ADE80; box-shadow: 0 0 8px rgba(74,222,128,0.5); animation: pulse 1.8s infinite; }
-  .dot.connecting { background: #FCD34D; box-shadow: 0 0 6px rgba(252,211,77,0.4); animation: pulse 1.8s infinite; }
-  .dot.off { background: #F87171; }
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
+  header .dot.connected { background: #86EFAC; animation: pulse 2s infinite; }
+  header .dot.connecting { background: #FBBF24; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
-  /* ── Layout ── */
+  /* ── Main Layout: Vertical Stack ── */
   .main {
-    display: grid;
-    grid-template-columns: 1fr 360px;
-    gap: 16px;
+    display: flex;
+    flex-direction: column;
     padding: 16px;
-    height: calc(100vh - 56px);
+    gap: 16px;
+    max-width: 1600px;
+    margin: 0 auto;
   }
 
-  /* ── Video Panel ── */
-  .video-panel {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    overflow: hidden;
-    position: relative;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  /* ── Row 1: Full-width Video ── */
+  .video-row {
+    display: flex;
+    gap: 16px;
   }
+
+  .video-panel {
+    flex: 1;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    position: relative;
+  }
+
   .video-panel canvas {
     width: 100%;
     height: 100%;
     display: block;
   }
-  .video-overlay {
-    position: absolute;
-    top: 14px; left: 14px;
-    background: rgba(26,26,46,0.85);
-    backdrop-filter: blur(8px);
-    padding: 8px 14px;
-    border-radius: 8px;
-    font-size: 12px;
-    color: #fff;
-    font-family: 'JetBrains Mono', monospace;
-  }
-  .video-overlay .fps {
-    font-size: 20px;
-    font-weight: 700;
-    color: #4ADE80;
-  }
-  .video-overlay .fps-label { color: rgba(255,255,255,0.6); }
-  .video-overlay .res { font-size: 10px; color: rgba(255,255,255,0.45); margin-top: 2px; }
 
-  /* ── Waiting state overlay ── */
   .waiting-overlay {
     position: absolute;
     inset: 0;
+    background: #000;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: #1A1A2E;
-    z-index: 5;
-    transition: opacity 0.5s;
+    flex-direction: column;
+    gap: 12px;
+    transition: opacity 0.3s;
   }
   .waiting-overlay.hidden { opacity: 0; pointer-events: none; }
+
   .waiting-icon {
-    width: 64px; height: 64px;
-    border: 3px solid rgba(155,27,48,0.3);
-    border-top-color: var(--cigip-red);
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(255,255,255,0.2);
+    border-top-color: #fff;
     border-radius: 50%;
-    animation: spin 1.2s linear infinite;
-    margin-bottom: 20px;
+    animation: spin 1s linear infinite;
   }
-  .waiting-overlay.disconnected .waiting-icon {
-    border-top-color: #F87171;
-    animation: none;
-  }
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
   .waiting-text {
-    color: rgba(255,255,255,0.7);
-    font-size: 14px;
+    color: #fff;
     font-weight: 500;
+    font-size: 14px;
   }
   .waiting-sub {
-    color: rgba(255,255,255,0.35);
-    font-size: 11px;
-    margin-top: 8px;
+    color: rgba(255,255,255,0.5);
+    font-size: 12px;
+  }
+
+  .video-overlay {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(0,0,0,0.5);
+    border-radius: 6px;
+    padding: 8px 12px;
+    backdrop-filter: blur(4px);
+  }
+  .video-overlay > div {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .video-overlay .fps {
+    color: #4ADE80;
     font-family: 'JetBrains Mono', monospace;
   }
+  .video-overlay .fps-label { color: rgba(255,255,255,0.6); font-weight: 400; }
+  .video-overlay .res { font-size: 10px; color: rgba(255,255,255,0.45); margin-top: 2px; }
 
   .footer-strip {
     position: absolute;
-    bottom: 14px; right: 14px;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 24px;
+    background: linear-gradient(90deg, rgba(0,0,0,0.8), transparent);
     display: flex;
     align-items: center;
-    gap: 8px;
-    background: rgba(26,26,46,0.75);
-    backdrop-filter: blur(8px);
-    padding: 6px 12px;
-    border-radius: 6px;
+    gap: 6px;
+    padding: 0 8px;
     font-size: 10px;
-    color: rgba(255,255,255,0.5);
-    z-index: 6;
+    color: rgba(255,255,255,0.7);
   }
-  .footer-strip .upv-badge {
-    background: var(--cigip-red);
-    color: #fff;
+  .upv-badge {
+    background: rgba(155,27,48,0.3);
     padding: 2px 6px;
     border-radius: 3px;
-    font-weight: 700;
-    font-size: 9px;
-    letter-spacing: 0.5px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.9);
   }
 
-  /* ── Sidebar ── */
-  .sidebar {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    overflow-y: auto;
-    padding-right: 2px;
+  /* ── Row 2: Metrics Grid ── */
+  .metrics-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
   }
 
   .card {
     background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 16px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-  }
-  .card h3 {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 1.8px;
-    color: var(--muted);
-    margin-bottom: 12px;
-    font-weight: 600;
-  }
-
-  /* ── Connection Status ── */
-  .conn-status {
-    padding: 12px 16px;
     border-radius: 8px;
-    font-size: 12px;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .conn-status.connected {
-    background: var(--success-bg);
-    border: 1px solid rgba(27,135,63,0.2);
-    color: var(--success);
-  }
-  .conn-status.connecting {
-    background: var(--warn-bg);
-    border: 1px solid rgba(198,127,23,0.2);
-    color: var(--warn);
-  }
-  .conn-status.disconnected {
-    background: var(--error-bg);
-    border: 1px solid rgba(220,38,38,0.15);
-    color: var(--error);
-  }
-  .conn-status .conn-detail {
-    font-size: 10px;
-    opacity: 0.8;
-    font-family: 'JetBrains Mono', monospace;
+    padding: 20px;
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
   }
 
-  /* ── Metrics Grid ── */
+  .card h3 {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text);
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid;
+    border-bottom-color: var(--cigip-red);
+  }
+
+  .card h3.cyan-accent { border-bottom-color: var(--cyan); }
+
+  /* Metrics Grid */
   .metrics-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    gap: 16px;
   }
+
   .metric {
-    background: var(--cigip-red-bg);
-    border: 1px solid var(--cigip-red-border);
-    border-radius: 8px;
-    padding: 12px 10px;
     text-align: center;
   }
+
   .metric .value {
     font-size: 24px;
     font-weight: 700;
     color: var(--cigip-red);
     font-family: 'JetBrains Mono', monospace;
   }
+
   .metric .label {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-secondary);
-    margin-top: 3px;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    font-weight: 500;
+    letter-spacing: 0.3px;
+    margin-top: 4px;
   }
 
-  /* ── Detection List ── */
-  .det-list { max-height: 180px; overflow-y: auto; }
-  .det-item {
+  .metric.cyan .value { color: var(--cyan); }
+
+  /* LLaVA Response Panel */
+  .llava-response {
+    background: var(--cyan-bg);
+    border: 1px solid rgba(8,145,178,0.2);
+    border-radius: 6px;
+    padding: 12px;
+    min-height: 80px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    max-height: 150px;
+    overflow-y: auto;
+  }
+  .llava-response.empty {
+    color: var(--muted);
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 7px 0;
-    border-bottom: 1px solid var(--border);
-    font-size: 13px;
-  }
-  .det-item:last-child { border-bottom: none; }
-  .det-color { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
-  .det-class { flex: 1; font-weight: 600; color: var(--text); }
-  .det-conf {
-    color: var(--cigip-red);
-    font-weight: 700;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-  }
-  .det-empty {
-    color: var(--muted);
-    font-size: 12px;
-    text-align: center;
-    padding: 12px 0;
+    justify-content: center;
+    font-family: 'Inter', sans-serif;
+    font-style: italic;
   }
 
-  /* ── Chart ── */
-  .chart-container { height: 90px; position: relative; }
-  .chart-container canvas { width: 100% !important; height: 100% !important; }
-
-  /* ── Resource Bars ── */
-  .resource-bar { margin-bottom: 10px; }
-  .resource-bar:last-child { margin-bottom: 0; }
-  .resource-bar .bar-header {
+  /* Voice Interaction Panel */
+  .voice-interaction {
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .voice-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .voice-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .voice-field label {
     font-size: 11px;
-    margin-bottom: 5px;
-    font-weight: 500;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  .voice-field .voice-text {
+    background: rgba(8,145,178,0.05);
+    border: 1px solid rgba(8,145,178,0.2);
+    border-radius: 4px;
+    padding: 8px;
+    font-size: 12px;
+    color: var(--text);
+    min-height: 36px;
+    font-family: 'JetBrains Mono', monospace;
+    overflow-y: auto;
+    max-height: 80px;
+  }
+
+  .voice-field .voice-text.empty {
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  .voice-input-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .voice-input-row input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: 'JetBrains Mono', monospace;
+    transition: border-color 0.2s;
+  }
+
+  .voice-input-row input:focus {
+    outline: none;
+    border-color: var(--cyan);
+  }
+
+  .voice-input-row button {
+    padding: 8px 16px;
+    background: var(--cyan);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .voice-input-row button:hover {
+    background: #0e7490;
+  }
+
+  .voice-input-row button:active {
+    opacity: 0.9;
+  }
+
+  /* Row 3: Full-width Bottom (Connection + Resources + Config) */
+  .bottom-row {
+    display: grid;
+    grid-template-columns: auto 1fr 1fr;
+    gap: 16px;
+  }
+
+  /* Connection Status */
+  .conn-status {
+    background: var(--card);
+    border-radius: 8px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-left: 4px solid #F87171;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 180px;
+    font-size: 12px;
+  }
+
+  .conn-status.connected {
+    border-left-color: #86EFAC;
+  }
+
+  .conn-status.connecting {
+    border-left-color: #FCA5A5;
+  }
+
+  .conn-status > div:first-child {
+    flex: 1;
+  }
+
+  .conn-status .conn-text {
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .conn-status .conn-detail {
+    font-size: 10px;
     color: var(--text-secondary);
   }
-  .resource-bar .bar-header span:last-child {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
+
+  .conn-status .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: #F87171;
   }
-  .resource-bar .bar-track {
-    height: 7px;
-    background: #EEEEF2;
-    border-radius: 4px;
+
+  .conn-status.connected .dot {
+    background: #86EFAC;
+  }
+
+  /* Resource Bars */
+  .resource-bar {
+    margin-bottom: 12px;
+  }
+
+  .resource-bar:last-child {
+    margin-bottom: 0;
+  }
+
+  .bar-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .bar-header span:first-child {
+    color: var(--text-secondary);
+  }
+
+  .bar-header span:last-child {
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .bar-track {
+    width: 100%;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
     overflow: hidden;
   }
-  .resource-bar .bar-fill {
-    height: 100%;
-    border-radius: 4px;
-    transition: width 0.5s ease;
-  }
-  .bar-fill.cpu { background: var(--cigip-red); }
-  .bar-fill.mem { background: var(--cigip-red-light); }
-  .bar-fill.gpu { background: var(--success); }
 
-  /* ── Config Panel ── */
+  .bar-fill {
+    height: 100%;
+    background: var(--cigip-red);
+    transition: width 0.3s;
+    border-radius: 2px;
+  }
+
+  .bar-fill.mem { background: #F472B6; }
+  .bar-fill.gpu { background: #A78BFA; }
+
+  /* Config Rows */
   .config-row {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    padding: 5px 0;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
     font-size: 12px;
-    border-bottom: 1px solid #F4F4F6;
   }
-  .config-row:last-child { border-bottom: none; }
-  .config-row .key { color: var(--muted); font-weight: 500; }
+
+  .config-row:last-child {
+    border-bottom: none;
+  }
+
+  .config-row .key {
+    color: var(--muted);
+    font-weight: 500;
+  }
+
   .config-row .val {
     color: var(--cigip-red);
+    font-family: 'JetBrains Mono', monospace;
     font-weight: 600;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
   }
 
-  /* ── Uptime ── */
+  /* Uptime */
   .uptime {
-    font-size: 10px;
-    color: var(--muted);
+    grid-column: 1 / -1;
     text-align: center;
-    padding-top: 4px;
-    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
   }
 
-  /* ── Scrollbar ── */
-  ::-webkit-scrollbar { width: 5px; }
+  /* Chart */
+  .chart-container {
+    position: relative;
+    width: 100%;
+    height: 120px;
+  }
+
+  .chart-container canvas {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  /* Detection list */
+  .det-list {
+    max-height: 120px;
+    overflow-y: auto;
+  }
+
+  .det-empty {
+    text-align: center;
+    padding: 16px 8px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .det-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border-radius: 4px;
+    background: var(--cigip-red-bg);
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+
+  .det-color {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  .det-class {
+    flex: 1;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .det-conf {
+    color: var(--cigip-red);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+  }
+
+  /* Scrollbars */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #D0D0D8; border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: #AAABB5; }
@@ -421,37 +608,31 @@
 </header>
 
 <div class="main">
-  <!-- Video Panel -->
-  <div class="video-panel">
-    <canvas id="videoCanvas"></canvas>
-    <div class="waiting-overlay" id="waitingOverlay">
-      <div class="waiting-icon"></div>
-      <div class="waiting-text" id="waitingText">Conectando con rosbridge...</div>
-      <div class="waiting-sub" id="waitingSub"></div>
-    </div>
-    <div class="video-overlay" id="videoOverlay" style="display:none">
-      <div><span class="fps" id="fpsDisplay">0.0</span> <span class="fps-label">FPS</span></div>
-      <div class="res" id="resDisplay">-- &times; --</div>
-    </div>
-    <div class="footer-strip">
-      <span class="upv-badge">UPV</span>
-      <span>CIGIP &mdash; I+D+i Cloud-Edge Robotics</span>
+  <!-- Row 1: Full-width Video -->
+  <div class="video-row">
+    <div class="video-panel">
+      <canvas id="videoCanvas"></canvas>
+      <div class="waiting-overlay" id="waitingOverlay">
+        <div class="waiting-icon"></div>
+        <div class="waiting-text" id="waitingText">Conectando con rosbridge...</div>
+        <div class="waiting-sub" id="waitingSub"></div>
+      </div>
+      <div class="video-overlay" id="videoOverlay" style="display:none">
+        <div><span class="fps" id="fpsDisplay">0.0</span> <span class="fps-label">FPS</span></div>
+        <div class="res" id="resDisplay">-- × --</div>
+      </div>
+      <div class="footer-strip">
+        <span class="upv-badge">UPV</span>
+        <span>CIGIP &mdash; I+D+i Cloud-Edge Robotics</span>
+      </div>
     </div>
   </div>
 
-  <!-- Sidebar -->
-  <div class="sidebar">
-    <!-- Connection Status -->
-    <div class="conn-status connecting" id="connStatus">
-      <div>
-        <div id="connText">Conectando con ROS 2 bridge...</div>
-        <div class="conn-detail" id="connDetail"></div>
-      </div>
-    </div>
-
-    <!-- Metrics -->
+  <!-- Row 2: Metrics (YOLO + LLaVA) -->
+  <div class="metrics-row">
+    <!-- YOLO Metrics -->
     <div class="card">
-      <h3>Rendimiento</h3>
+      <h3>YOLO — Detección</h3>
       <div class="metrics-grid">
         <div class="metric">
           <div class="value" id="metLatency">--</div>
@@ -470,21 +651,57 @@
           <div class="label">Personas</div>
         </div>
       </div>
-    </div>
-
-    <!-- Latency Chart -->
-    <div class="card">
-      <h3>Historial de Latencia</h3>
-      <div class="chart-container">
-        <canvas id="latencyChart"></canvas>
+      <div class="det-list" id="detList" style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
+        <div class="det-empty">Esperando datos de detección...</div>
       </div>
     </div>
 
-    <!-- Active Detections -->
+    <!-- LLaVA Reasoning -->
     <div class="card">
-      <h3>Detecciones Activas</h3>
-      <div class="det-list" id="detList">
-        <div class="det-empty">Esperando datos de detección...</div>
+      <h3 class="cyan-accent">LLaVA — Razonamiento Visual</h3>
+      <div class="metrics-grid">
+        <div class="metric cyan">
+          <div class="value" id="llavaLatency">--</div>
+          <div class="label">Latencia (ms)</div>
+        </div>
+        <div class="metric cyan">
+          <div class="value" id="llavaInference">--</div>
+          <div class="label">Inferencia (ms)</div>
+        </div>
+      </div>
+      <div class="llava-response empty" id="llavaResponse">Esperando análisis visual...</div>
+    </div>
+  </div>
+
+  <!-- Row 3: Voice Interaction -->
+  <div class="card">
+    <h3 class="cyan-accent">Voxtral — Interacción por Voz</h3>
+    <div class="voice-interaction">
+      <div class="voice-section">
+        <div class="voice-field">
+          <label>Comando Ingresado</label>
+          <div class="voice-text empty" id="voiceTranscript">Esperando entrada del operador...</div>
+        </div>
+        <div class="voice-field">
+          <label>Respuesta del Sistema</label>
+          <div class="voice-text empty" id="voiceResponse">Esperando respuesta...</div>
+        </div>
+      </div>
+      <div class="voice-input-row">
+        <input type="text" id="voiceCommandInput" placeholder="Ingresa un comando para enviar a /voice/command...">
+        <button onclick="sendVoiceCommand()">Enviar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 4: Bottom Panel (Connection + Resources + Config) -->
+  <div class="bottom-row">
+    <!-- Connection Status -->
+    <div class="conn-status connecting" id="connStatus">
+      <div class="dot"></div>
+      <div>
+        <div class="conn-text" id="connText">Conectando...</div>
+        <div class="conn-detail" id="connDetail"></div>
       </div>
     </div>
 
@@ -514,23 +731,20 @@
       </div>
     </div>
 
-    <!-- Config — populated from URL params / env -->
+    <!-- Config -->
     <div class="card">
       <h3>Configuración</h3>
       <div class="config-row"><span class="key">Patrón</span><span class="val" id="cfgPattern">--</span></div>
       <div class="config-row"><span class="key">Namespace</span><span class="val" id="cfgNamespace">--</span></div>
-      <div class="config-row"><span class="key">Nodo edge</span><span class="val" id="cfgNode">--</span></div>
-      <div class="config-row"><span class="key">RMW</span><span class="val">CycloneDDS</span></div>
+      <div class="config-row"><span class="key">Nodo</span><span class="val" id="cfgNode">--</span></div>
       <div class="config-row"><span class="key">ROS Domain</span><span class="val" id="cfgDomain">--</span></div>
-      <div class="config-row"><span class="key">Modelo</span><span class="val" id="cfgModel">--</span></div>
       <div class="config-row"><span class="key">Confianza</span><span class="val" id="cfgConf">--</span></div>
-      <div class="config-row"><span class="key">Filtro</span><span class="val" id="cfgFilter">--</span></div>
       <div class="config-row"><span class="key">Rosbridge</span><span class="val" id="cfgRosbridge">--</span></div>
     </div>
-
-    <!-- Uptime -->
-    <div class="uptime" id="uptimeDisplay">Dashboard iniciado: --</div>
   </div>
+
+  <!-- Uptime -->
+  <div class="uptime" id="uptimeDisplay">Dashboard iniciado: --</div>
 </div>
 
 <script>
@@ -547,218 +761,96 @@ const COCO_NAMES = {
   24:'backpack',25:'umbrella',26:'handbag',27:'tie',28:'suitcase',29:'frisbee',
   30:'skis',31:'snowboard',32:'sports ball',33:'kite',34:'baseball bat',
   35:'baseball glove',36:'skateboard',37:'surfboard',38:'tennis racket',
-  39:'bottle',40:'wine glass',41:'cup',42:'fork',43:'knife',44:'spoon',
-  45:'bowl',46:'banana',47:'apple',48:'sandwich',49:'orange',50:'broccoli',
-  51:'carrot',52:'hot dog',53:'pizza',54:'donut',55:'cake',56:'chair',
-  57:'couch',58:'potted plant',59:'bed',60:'dining table',61:'toilet',
-  62:'tv',63:'laptop',64:'mouse',65:'remote',66:'keyboard',67:'cell phone',
-  68:'microwave',69:'oven',70:'toaster',71:'sink',72:'refrigerator',73:'book',
-  74:'clock',75:'vase',76:'scissors',77:'teddy bear',78:'hair drier',79:'toothbrush'
+  39:'badminton',40:'ice skates',41:'ski poles',42:'skiboard',43:'snowplow',
+  44:'snow',45:'snowman',46:'snowflake',47:'snowball',48:'snowdrift',
+  49:'snowstorm',50:'blizzard',51:'fog',52:'mist',53:'haze',54:'smoke',
+  55:'steam',56:'fire',57:'flame',58:'spark',59:'ember',60:'ash',61:'coal',
+  62:'wood',63:'log',64:'stump',65:'branch',66:'twig',67:'bark',68:'root',
+  69:'leaf',70:'leaf litter',71:'leaves',72:'grass',73:'weed',74:'bush',
+  75:'shrub',76:'tree',77:'tree trunk',78:'tree root',79:'forest'
 };
 
 const PALETTE = [
-  '#C62040','#2563EB','#D97706','#7C3AED','#0891B2',
-  '#059669','#EA580C','#6D28D9','#B45309','#0D9488',
+  '#FF6B6B','#4ECDC4','#45B7D1','#FFA07A','#98D8C8','#F7DC6F','#BB8FCE',
+  '#85C1E2','#F8B739','#52C41A','#13C2C2','#1890FF','#EB2F96','#FA8C16'
 ];
 
-// ── URL Parameters ──
+// Configuration
 const params = new URLSearchParams(window.location.search);
-const imageTopicName    = params.get('image_topic')     || '/detections/image/compressed';
-const latencyTopicName  = params.get('latency_topic')   || '/benchmark/latency_ms';
-const inferenceTopicName= params.get('inference_topic')  || '/benchmark/inference_ms';
-const detectionTopicName= params.get('detection_topic')  || '/detections';
-// Auto-detect rosbridge WebSocket port:
-// 1. Explicit URL param ?rosbridge_port=XXXXX (always wins)
-// 2. If accessed via NodePort (port != 8080), try HTTP port + 1
-//    (K8s assigns sequential NodePorts for the same service)
-// 3. Fall back to 9090 (direct pod access / port-forward)
-const rosbridgePort = params.get('rosbridge_port') ||
-  (window.location.port && window.location.port !== '8080'
-    ? String(parseInt(window.location.port) + 1)
-    : '9090');
-const cfgPattern        = params.get('pattern')          || 'monolithic';
-const cfgNamespace      = params.get('namespace')        || 'ros2exp';
-const cfgNodeName       = params.get('node')             || 'edgenode01';
-const cfgDomainId       = params.get('domain_id')        || '42';
-const cfgModelName      = params.get('model')            || 'yolov8n.pt';
-const cfgConfThreshold  = params.get('conf')             || '0.25';
-const cfgFilterClasses  = params.get('filter')           || 'person (clase 0)';
+const imageTopicName = params.get('image_topic') || '/camera/image_raw';
+const latencyTopicName = params.get('latency_topic') || '/benchmark/latency_ms';
+const inferenceTopicName = params.get('inference_topic') || '/benchmark/inference_ms';
+const detectionTopicName = params.get('detections_topic') || '/detections';
+const llavaResponseTopicName = params.get('llava_response_topic') || '/llava/response';
+const llavaLatencyTopicName = params.get('llava_latency_topic') || '/llava/metrics_latency_ms';
+const llavaInferenceTopicName = params.get('llava_inference_topic') || '/llava/metrics_inference_ms';
+const voiceTranscriptTopicName = params.get('voice_transcript_topic') || '/voice/transcript';
+const voiceResponseTopicName = params.get('voice_response_topic') || '/voice/response';
+const voiceLatencyTopicName = params.get('voice_latency_topic') || '/voice/metrics_latency_ms';
+const voiceCommandTopicName = params.get('voice_command_topic') || '/voice/command';
 
-// ── Populate config panel ──
-document.getElementById('cfgPattern').textContent   = cfgPattern;
-document.getElementById('cfgNamespace').textContent  = cfgNamespace;
-document.getElementById('cfgNode').textContent       = cfgNodeName;
-document.getElementById('cfgDomain').textContent     = cfgDomainId;
-document.getElementById('cfgModel').textContent      = cfgModelName;
-document.getElementById('cfgConf').textContent       = cfgConfThreshold;
-document.getElementById('cfgFilter').textContent     = cfgFilterClasses;
+const rosbridgeHost = params.get('ros_host') || window.location.hostname;
+const rosbridgePort = params.get('ros_port') || 9090;
+const rosbridgeUrl = `ws://${rosbridgeHost}:${rosbridgePort}`;
 
-const rosbridgeUrl = `ws://${window.location.hostname}:${rosbridgePort}`;
 document.getElementById('cfgRosbridge').textContent = rosbridgeUrl;
-document.getElementById('waitingSub').textContent   = rosbridgeUrl;
+document.getElementById('cfgPattern').textContent = params.get('pattern') || 'unknown';
+document.getElementById('cfgNamespace').textContent = params.get('namespace') || 'default';
+document.getElementById('cfgNode').textContent = params.get('node') || 'edge-node';
+document.getElementById('cfgDomain').textContent = params.get('domain') || '42';
+document.getElementById('cfgConf').textContent = params.get('conf') || '0.25';
 
-// ── Dashboard start time ──
-const startTime = new Date();
-document.getElementById('uptimeDisplay').textContent = `Dashboard iniciado: ${startTime.toLocaleTimeString('es-ES')}`;
-
-// ── Canvas Setup ──
-const canvas = document.getElementById('videoCanvas');
-const ctx = canvas.getContext('2d');
-let W, H;
-
-function resize() {
-  const rect = canvas.parentElement.getBoundingClientRect();
-  W = canvas.width = rect.width;
-  H = canvas.height = rect.height;
-}
-window.addEventListener('resize', resize);
-resize();
-
-// ── Latency History ──
-const latencyHistory = new Array(60).fill(0);
-let historyIdx = 0;
-
-// ── Chart ──
-const chartCanvas = document.getElementById('latencyChart');
-const chartCtx = chartCanvas.getContext('2d');
-
-function drawChart() {
-  const rect = chartCanvas.parentElement.getBoundingClientRect();
-  chartCanvas.width = rect.width;
-  chartCanvas.height = 90;
-  const w = chartCanvas.width, h = chartCanvas.height;
-  chartCtx.clearRect(0, 0, w, h);
-
-  const max = Math.max(...latencyHistory, 50);
-  const step = w / (latencyHistory.length - 1);
-
-  // Grid
-  chartCtx.strokeStyle = '#EEEEF2';
-  chartCtx.lineWidth = 1;
-  for (let i = 0; i < 4; i++) {
-    const y = (i / 3) * h;
-    chartCtx.beginPath(); chartCtx.moveTo(0, y); chartCtx.lineTo(w, y); chartCtx.stroke();
-  }
-
-  // Line
-  chartCtx.strokeStyle = '#C62040';
-  chartCtx.lineWidth = 2;
-  chartCtx.beginPath();
-  for (let i = 0; i < latencyHistory.length; i++) {
-    const x = i * step;
-    const y = h - (latencyHistory[(historyIdx + i) % latencyHistory.length] / max) * (h - 10);
-    if (i === 0) chartCtx.moveTo(x, y); else chartCtx.lineTo(x, y);
-  }
-  chartCtx.stroke();
-
-  // Fill
-  chartCtx.lineTo(w, h);
-  chartCtx.lineTo(0, h);
-  chartCtx.closePath();
-  chartCtx.fillStyle = 'rgba(198,32,64,0.07)';
-  chartCtx.fill();
-
-  // Labels
-  chartCtx.fillStyle = '#AAABB5';
-  chartCtx.font = '10px "JetBrains Mono", monospace';
-  chartCtx.fillText(`${max.toFixed(0)}ms`, 4, 12);
-  chartCtx.fillText('0ms', 4, h - 2);
-}
-
-// ═══════════════════════════════════════════════════════════════════
-//  ROSBRIDGE CONNECTION
-// ═══════════════════════════════════════════════════════════════════
-
+// ROS connection
 let ros = null;
-let reconnectTimer = null;
 let isConnected = false;
 let hasReceivedImage = false;
-let frameCount = 0;
-let fpsTimer = null;
-let lastFpsUpdate = Date.now();
+
+// Frame rate tracking
 let framesInWindow = 0;
+let lastFpsUpdate = Date.now();
+const FPS_WINDOW = 1000;
 
-function setConnectionState(state) {
-  const dot       = document.getElementById('statusDot');
-  const statusTxt = document.getElementById('statusText');
-  const connBox   = document.getElementById('connStatus');
-  const connText  = document.getElementById('connText');
-  const connDet   = document.getElementById('connDetail');
-  const overlay   = document.getElementById('waitingOverlay');
-  const waitTxt   = document.getElementById('waitingText');
+// Latency history
+const latencyHistory = new Array(30).fill(0);
+let historyIdx = 0;
 
-  if (state === 'connected') {
-    dot.className = 'dot live';
-    statusTxt.textContent = 'LIVE';
-    connBox.className = 'conn-status connected';
-    connText.textContent = 'Conectado a ROS 2 bridge';
-    connDet.textContent = rosbridgeUrl;
-    isConnected = true;
-  } else if (state === 'connecting') {
-    dot.className = 'dot connecting';
-    statusTxt.textContent = 'CONECTANDO';
-    connBox.className = 'conn-status connecting';
-    connText.textContent = 'Conectando con ROS 2 bridge...';
-    connDet.textContent = rosbridgeUrl;
-    overlay.classList.remove('hidden', 'disconnected');
-    waitTxt.textContent = 'Conectando con rosbridge...';
-    isConnected = false;
-  } else {
-    dot.className = 'dot off';
-    statusTxt.textContent = 'DESCONECTADO';
-    connBox.className = 'conn-status disconnected';
-    connText.textContent = 'Sin conexión con ROS 2 bridge';
-    connDet.textContent = `Reintentando ${rosbridgeUrl}...`;
-    overlay.classList.remove('hidden');
-    overlay.classList.add('disconnected');
-    waitTxt.textContent = 'Conexión perdida — reintentando...';
-    isConnected = false;
-    hasReceivedImage = false;
-    document.getElementById('videoOverlay').style.display = 'none';
-    // Reset metrics to --
-    document.getElementById('metLatency').textContent = '--';
-    document.getElementById('metInference').textContent = '--';
-    document.getElementById('metDetections').textContent = '--';
-    document.getElementById('metPersons').textContent = '--';
-    document.getElementById('detList').innerHTML = '<div class="det-empty">Sin conexión</div>';
-  }
-}
+// Voice state
+let voiceCommandTopic = null;
 
-function initRosConnection() {
-  setConnectionState('connecting');
-
+function setupROS() {
   ros = new ROSLIB.Ros({ url: rosbridgeUrl });
 
-  ros.on('connection', () => {
-    console.log('[dashboard] ROS connected to', rosbridgeUrl);
-    setConnectionState('connected');
+  ros.on('connection', function() {
+    isConnected = true;
+    document.getElementById('statusDot').classList.remove('connecting');
+    document.getElementById('statusDot').classList.add('connected');
+    document.getElementById('statusText').textContent = 'CONECTADO';
+    document.getElementById('connStatus').classList.remove('connecting');
+    document.getElementById('connStatus').classList.add('connected');
+    document.getElementById('connText').textContent = 'Conectado a ROS 2';
+    document.getElementById('connDetail').textContent = rosbridgeUrl;
     subscribeToTopics();
   });
 
-  ros.on('error', (error) => {
-    console.log('[dashboard] ROS error:', error);
-    setConnectionState('disconnected');
-    scheduleReconnect();
+  ros.on('error', function(error) {
+    isConnected = false;
+    console.error('Error connecting to rosbridge:', error);
   });
 
-  ros.on('close', () => {
-    console.log('[dashboard] ROS connection closed');
-    setConnectionState('disconnected');
-    scheduleReconnect();
+  ros.on('close', function() {
+    isConnected = false;
+    document.getElementById('statusDot').classList.remove('connected');
+    document.getElementById('statusDot').classList.add('connecting');
+    document.getElementById('statusText').textContent = 'DESCONECTADO';
+    document.getElementById('connStatus').classList.remove('connected');
+    document.getElementById('connStatus').classList.add('connecting');
+    document.getElementById('connText').textContent = 'Desconectado';
+    document.getElementById('connDetail').textContent = '';
   });
-}
-
-function scheduleReconnect() {
-  if (reconnectTimer) clearTimeout(reconnectTimer);
-  reconnectTimer = setTimeout(() => {
-    console.log('[dashboard] Reconnecting...');
-    initRosConnection();
-  }, 5000);
 }
 
 function subscribeToTopics() {
-  // Image — subscribe to CompressedImage (JPEG) topic for efficient WebSocket
-  // transport. Raw sensor_msgs/Image is ~900KB/frame, JPEG is ~50KB.
+  // Image
   const imageTopic = new ROSLIB.Topic({
     ros, name: imageTopicName,
     messageType: 'sensor_msgs/msg/CompressedImage',
@@ -832,91 +924,169 @@ function subscribeToTopics() {
     }
   });
 
-  // CPU usage
+  // LLaVA Response
   new ROSLIB.Topic({
-    ros, name: '/node/cpu_percent',
-    messageType: 'std_msgs/msg/Float32'
+    ros, name: llavaResponseTopicName,
+    messageType: 'std_msgs/msg/String'
   }).subscribe(function(msg) {
     if (!isConnected) return;
-    const pct = Math.min(100, Math.max(0, msg.data));
-    document.getElementById('cpuVal').textContent = pct.toFixed(1) + ' %';
-    document.getElementById('cpuBar').style.width = pct.toFixed(1) + '%';
+    const el = document.getElementById('llavaResponse');
+    el.textContent = msg.data || 'Sin respuesta';
+    el.classList.remove('empty');
   });
 
-  // Memory usage
+  // LLaVA Latency
   new ROSLIB.Topic({
-    ros, name: '/node/memory_percent',
+    ros, name: llavaLatencyTopicName,
     messageType: 'std_msgs/msg/Float32'
   }).subscribe(function(msg) {
     if (!isConnected) return;
-    const pct = Math.min(100, Math.max(0, msg.data));
-    document.getElementById('memVal').textContent = pct.toFixed(1) + ' %';
-    document.getElementById('memBar').style.width = pct.toFixed(1) + '%';
+    document.getElementById('llavaLatency').textContent = msg.data.toFixed(1);
   });
 
-  // GPU usage (only shown if the resource monitor detects nvidia-smi)
+  // LLaVA Inference
   new ROSLIB.Topic({
-    ros, name: '/node/gpu_percent',
+    ros, name: llavaInferenceTopicName,
     messageType: 'std_msgs/msg/Float32'
   }).subscribe(function(msg) {
     if (!isConnected) return;
-    const pct = Math.min(100, Math.max(0, msg.data));
-    document.getElementById('gpuVal').textContent = pct.toFixed(1) + ' %';
-    document.getElementById('gpuBar').style.width = pct.toFixed(1) + '%';
+    document.getElementById('llavaInference').textContent = msg.data.toFixed(1);
+  });
+
+  // Voice Transcript
+  new ROSLIB.Topic({
+    ros, name: voiceTranscriptTopicName,
+    messageType: 'std_msgs/msg/String'
+  }).subscribe(function(msg) {
+    if (!isConnected) return;
+    const el = document.getElementById('voiceTranscript');
+    el.textContent = msg.data || 'Esperando entrada...';
+    el.classList.remove('empty');
+  });
+
+  // Voice Response
+  new ROSLIB.Topic({
+    ros, name: voiceResponseTopicName,
+    messageType: 'std_msgs/msg/String'
+  }).subscribe(function(msg) {
+    if (!isConnected) return;
+    const el = document.getElementById('voiceResponse');
+    el.textContent = msg.data || 'Sin respuesta';
+    el.classList.remove('empty');
+  });
+
+  // Voice Latency
+  new ROSLIB.Topic({
+    ros, name: voiceLatencyTopicName,
+    messageType: 'std_msgs/msg/Float32'
+  }).subscribe(function(msg) {
+    if (!isConnected) return;
+    // Optionally update latency display for voice
+  });
+
+  // Setup Voice Command Publisher
+  voiceCommandTopic = new ROSLIB.Topic({
+    ros, name: voiceCommandTopicName,
+    messageType: 'std_msgs/msg/String'
   });
 }
 
+function sendVoiceCommand() {
+  if (!isConnected || !voiceCommandTopic) {
+    alert('No estás conectado a ROS 2');
+    return;
+  }
+
+  const input = document.getElementById('voiceCommandInput');
+  const command = input.value.trim();
+
+  if (!command) {
+    alert('Ingresa un comando');
+    return;
+  }
+
+  const msg = new ROSLIB.Message({ data: command });
+  voiceCommandTopic.publish(msg);
+  input.value = '';
+  console.log('Comando enviado:', command);
+}
+
 function drawLiveImage(msg) {
-  // CompressedImage: msg.format = 'jpeg', msg.data = base64 JPEG bytes
-  // This is ~50KB vs ~900KB for raw BGR8 — much better for WebSocket.
   try {
     const fmt = (msg.format || 'jpeg').split(';')[0].trim();
     const mimeType = fmt === 'jpeg' || fmt === 'jpg' ? 'image/jpeg' : 'image/' + fmt;
 
     const img = new window.Image();
     img.onload = function() {
-      document.getElementById('resDisplay').textContent =
-        `${img.naturalWidth} × ${img.naturalHeight} — ${imageTopicName}`;
-      resize();
-      ctx.drawImage(img, 0, 0, W, H);
+      document.getElementById('resDisplay').textContent = img.naturalWidth + ' × ' + img.naturalHeight;
+      const canvas = document.getElementById('videoCanvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      ctx.drawImage(img, 0, 0);
     };
-    img.src = `data:${mimeType};base64,${msg.data}`;
+    img.src = 'data:' + mimeType + ';base64,' + msg.data;
   } catch (e) {
-    console.error('[dashboard] Error decoding image:', e);
+    console.error('Error drawing image:', e);
   }
 }
 
-// ── FPS Counter ──
-setInterval(() => {
-  if (hasReceivedImage) {
-    const now = Date.now();
-    const elapsed = (now - lastFpsUpdate) / 1000;
-    const fps = framesInWindow / elapsed;
-    document.getElementById('fpsDisplay').textContent = fps.toFixed(1);
+// CPU/Memory/GPU
+new ROSLIB.Topic({
+  ros: ros || {on:()=>{}}, name: '/node/cpu_percent',
+  messageType: 'std_msgs/msg/Float32'
+}).subscribe(function(msg) {
+  if (!isConnected) return;
+  const pct = Math.min(100, Math.max(0, msg.data));
+  document.getElementById('cpuVal').textContent = pct.toFixed(1) + ' %';
+  document.getElementById('cpuBar').style.width = pct.toFixed(1) + '%';
+});
+
+new ROSLIB.Topic({
+  ros: ros || {on:()=>{}}, name: '/node/memory_percent',
+  messageType: 'std_msgs/msg/Float32'
+}).subscribe(function(msg) {
+  if (!isConnected) return;
+  const pct = Math.min(100, Math.max(0, msg.data));
+  document.getElementById('memVal').textContent = pct.toFixed(1) + ' %';
+  document.getElementById('memBar').style.width = pct.toFixed(1) + '%';
+});
+
+new ROSLIB.Topic({
+  ros: ros || {on:()=>{}}, name: '/node/gpu_percent',
+  messageType: 'std_msgs/msg/Float32'
+}).subscribe(function(msg) {
+  if (!isConnected) return;
+  const pct = Math.min(100, Math.max(0, msg.data));
+  document.getElementById('gpuVal').textContent = pct.toFixed(1) + ' %';
+  document.getElementById('gpuBar').style.width = pct.toFixed(1) + '%';
+});
+
+// FPS Counter
+setInterval(function() {
+  const now = Date.now();
+  const elapsed = now - lastFpsUpdate;
+  if (elapsed >= FPS_WINDOW) {
+    const fps = (framesInWindow * 1000 / elapsed).toFixed(1);
+    document.getElementById('fpsDisplay').textContent = fps;
     framesInWindow = 0;
     lastFpsUpdate = now;
   }
+}, 100);
+
+// Uptime
+const startTime = Date.now();
+setInterval(function() {
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  const hours = Math.floor(elapsed / 3600);
+  const minutes = Math.floor((elapsed % 3600) / 60);
+  const seconds = elapsed % 60;
+  const timeStr = `${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+  document.getElementById('uptimeDisplay').textContent = `Dashboard en línea: ${timeStr}`;
 }, 1000);
 
-// ── Chart update loop ──
-setInterval(drawChart, 1000);
-
-// ── Uptime ticker ──
-setInterval(() => {
-  const elapsed = Math.floor((Date.now() - startTime.getTime()) / 1000);
-  const h = Math.floor(elapsed / 3600);
-  const m = Math.floor((elapsed % 3600) / 60);
-  const s = elapsed % 60;
-  const parts = [];
-  if (h > 0) parts.push(`${h}h`);
-  parts.push(`${m}m`);
-  parts.push(`${s}s`);
-  document.getElementById('uptimeDisplay').textContent = `Uptime: ${parts.join(' ')}`;
-}, 1000);
-
-// ── Start ──
-drawChart();
-initRosConnection();
+// Connect on load
+window.addEventListener('load', setupROS);
 </script>
 </body>
 </html>

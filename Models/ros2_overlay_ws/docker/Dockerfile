@@ -33,7 +33,7 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip && \
     else \
       python3 -m pip install --no-cache-dir torch==2.4.1 torchvision==0.19.1 ; \
     fi && \
-    python3 -m pip install --no-cache-dir ultralytics==8.3.2 numpy
+    python3 -m pip install --no-cache-dir ultralytics==8.3.2 numpy transformers==4.40.0 accelerate==0.30.0 bitsandbytes==0.43.1 Pillow
 
 # Base workspace: camera package only
 WORKDIR /opt/base_ws
@@ -43,15 +43,35 @@ SHELL ["/bin/bash", "-lc"]
 RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
     colcon build --symlink-install --packages-select camera_driver_pkg
 
-# Overlay workspace: yolo package on top of base_ws
+# Overlay workspace: yolo, llava, voxtral packages on top of base_ws
 WORKDIR /opt/overlay_ws
 COPY Models/ros2_yolo_ws/src/yolo_detector_pkg src/yolo_detector_pkg
+COPY Models/ros2_llava_ws/src/llava_pkg src/llava_pkg
+COPY Models/ros2_voxtral_ws/src/voxtral_pkg src/voxtral_pkg
 RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
     source /opt/base_ws/install/setup.bash && \
-    colcon build --symlink-install --packages-select yolo_detector_pkg
+    colcon build --symlink-install --packages-select yolo_detector_pkg llava_pkg voxtral_pkg
 
 RUN mkdir -p /opt/models && \
     python3 -c "from ultralytics import YOLO; YOLO('/opt/models/yolov8n.pt')"
+
+# Cache directories for transformers/huggingface models
+ENV TRANSFORMERS_CACHE=/opt/huggingface_cache
+ENV HF_HOME=/opt/huggingface_cache
+
+# Pre-download LLaVA model during build (FP16 weights ~14GB).
+# At runtime, bitsandbytes quantizes to 4-bit (~4GB VRAM).
+# Zero network dependency at deploy time (factory / edge scenario).
+RUN mkdir -p /opt/huggingface_cache && \
+    python3 -c "\
+from transformers import AutoProcessor, LlavaForConditionalGeneration; \
+import torch; \
+print('[build] Downloading LLaVA processor...'); \
+AutoProcessor.from_pretrained('llava-hf/llava-1.5-7b-hf', cache_dir='/opt/huggingface_cache'); \
+print('[build] Downloading LLaVA model weights (FP16)...'); \
+LlavaForConditionalGeneration.from_pretrained('llava-hf/llava-1.5-7b-hf', cache_dir='/opt/huggingface_cache', torch_dtype=torch.float16, low_cpu_mem_usage=True); \
+print('[build] LLaVA model cached successfully.'); \
+"
 
 # Standalone resource monitor (no colcon build needed — uses rclpy directly)
 COPY Models/ros2_monolithic_ws/scripts/resource_monitor.py /opt/scripts/resource_monitor.py
