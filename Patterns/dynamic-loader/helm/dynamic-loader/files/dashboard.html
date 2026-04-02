@@ -777,7 +777,7 @@ const PALETTE = [
 
 // Configuration
 const params = new URLSearchParams(window.location.search);
-const imageTopicName = params.get('image_topic') || '/camera/image_raw';
+const imageTopicName = params.get('image_topic') || '/detections/image/compressed';
 const latencyTopicName = params.get('latency_topic') || '/benchmark/latency_ms';
 const inferenceTopicName = params.get('inference_topic') || '/benchmark/inference_ms';
 const detectionTopicName = params.get('detections_topic') || '/detections';
@@ -790,7 +790,7 @@ const voiceLatencyTopicName = params.get('voice_latency_topic') || '/voice/metri
 const voiceCommandTopicName = params.get('voice_command_topic') || '/voice/command';
 
 const rosbridgeHost = params.get('ros_host') || window.location.hostname;
-const rosbridgePort = params.get('ros_port') || 9090;
+const rosbridgePort = params.get('ros_port') || (parseInt(window.location.port) + 1) || 9090;
 const rosbridgeUrl = `ws://${rosbridgeHost}:${rosbridgePort}`;
 
 document.getElementById('cfgRosbridge').textContent = rosbridgeUrl;
