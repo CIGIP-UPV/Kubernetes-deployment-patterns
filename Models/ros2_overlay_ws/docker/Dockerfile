@@ -25,13 +25,19 @@ RUN for attempt in 1 2 3; do \
            apt-get install -f -y || true; sleep 2; }; \
     done && rm -rf /var/lib/apt/lists/*
 
+# PyTorch — architecture-aware installation
+#   arm64 (Jetson AGX Orin / JetPack 6, CUDA 12.6): NVIDIA pre-built wheels
+#   amd64: standard CUDA 12.1 wheels from PyTorch
 RUN python3 -m pip install --no-cache-dir --upgrade pip && \
-    if [ "${TORCH_VARIANT}" = "cuda121" ]; then \
+    ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "arm64" ]; then \
+      python3 -m pip install --no-cache-dir \
+        torch torchvision \
+        --index-url https://pypi.jetson-ai-lab.dev/jp6/cu126 ; \
+    else \
       python3 -m pip install --no-cache-dir \
         torch==2.4.1+cu121 torchvision==0.19.1+cu121 \
         --index-url https://download.pytorch.org/whl/cu121 ; \
-    else \
-      python3 -m pip install --no-cache-dir torch==2.4.1 torchvision==0.19.1 ; \
     fi && \
     python3 -m pip install --no-cache-dir ultralytics==8.3.2 numpy "transformers>=4.48,<5" "accelerate>=0.34" bitsandbytes Pillow
 

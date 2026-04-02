@@ -62,6 +62,15 @@ topics:
   voiceResponse: /voice/response
   voiceLatency: /voice/metrics_latency_ms
 
+# ── NVIDIA GPU (Jetson AGX Orin) ──
+gpu:
+  enabled: true
+  runtimeClassName: nvidia
+  visibleDevices: "all"
+  driverCapabilities: "compute,utility"
+  requestGpuResource: true
+  count: 1
+
 resources: {}
 
 # ── CycloneDDS Unicast (cloud-edge communication) ──

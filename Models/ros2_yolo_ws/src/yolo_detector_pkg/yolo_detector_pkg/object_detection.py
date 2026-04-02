@@ -53,8 +53,20 @@ class YoloDetector(Node):
             ('filter_classes', ''),
         ])
 
+        # ── GPU diagnostic ───────────────────────────────────────────
+        import torch
+        cuda_ok = torch.cuda.is_available()
+        self.get_logger().info(f'[YOLO] torch.cuda.is_available() = {cuda_ok}')
+        if cuda_ok:
+            self.get_logger().info(
+                f'[YOLO] GPU: {torch.cuda.get_device_name(0)} | '
+                f'CUDA {torch.version.cuda} | '
+                f'VRAM {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB')
+        else:
+            self.get_logger().warn('[YOLO] CUDA not available — model will run on CPU (slow!)')
+
         self.model = YOLO(self.get_parameter('model_path').value)
-        self.model.fuse()  # ligera optimización
+        self.model.fuse()  # slight optimisation
 
         # Parse filter_classes: "" → None (all), "0" → {0}, "0,16" → {0,16}
         raw = str(self.get_parameter('filter_classes').value).strip()

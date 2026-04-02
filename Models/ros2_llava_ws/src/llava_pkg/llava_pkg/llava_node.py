@@ -104,6 +104,17 @@ class LlavaNode(Node):
         import torch
         from transformers import LlavaForConditionalGeneration, AutoProcessor
 
+        # ── GPU diagnostic ───────────────────────────────────────────
+        cuda_ok = torch.cuda.is_available()
+        self.get_logger().info(f'[LLaVA] torch.cuda.is_available() = {cuda_ok}')
+        if cuda_ok:
+            self.get_logger().info(
+                f'[LLaVA] GPU: {torch.cuda.get_device_name(0)} | '
+                f'CUDA {torch.version.cuda} | '
+                f'VRAM {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB')
+        else:
+            self.get_logger().warn('[LLaVA] CUDA not available — model will run on CPU (slow!)')
+
         self._dtype = torch.float16
         kwargs = dict(
             cache_dir=cache_dir,

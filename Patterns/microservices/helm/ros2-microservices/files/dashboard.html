@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -101,11 +101,23 @@
   header .status {
     margin-left: auto;
     display: flex;
-    align-items: center;
-    gap: 8px;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
     font-size: 12px;
     font-weight: 600;
     color: #fff;
+  }
+  header .status .status-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  header .ws-url {
+    font-size: 9px;
+    font-weight: 400;
+    color: rgba(255,255,255,0.6);
+    font-family: 'JetBrains Mono', monospace;
   }
   header .dot {
     width: 8px;
@@ -396,57 +408,8 @@
   /* Row 3: Full-width Bottom (Connection + Resources + Config) */
   .bottom-row {
     display: grid;
-    grid-template-columns: auto 1fr 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: 16px;
-  }
-
-  /* Connection Status */
-  .conn-status {
-    background: var(--card);
-    border-radius: 8px;
-    padding: 16px;
-    border: 1px solid var(--border);
-    border-left: 4px solid #F87171;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-width: 180px;
-    font-size: 12px;
-  }
-
-  .conn-status.connected {
-    border-left-color: #86EFAC;
-  }
-
-  .conn-status.connecting {
-    border-left-color: #FCA5A5;
-  }
-
-  .conn-status > div:first-child {
-    flex: 1;
-  }
-
-  .conn-status .conn-text {
-    font-weight: 600;
-    color: var(--text);
-    margin-bottom: 4px;
-  }
-
-  .conn-status .conn-detail {
-    font-size: 10px;
-    color: var(--text-secondary);
-  }
-
-  .conn-status .dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    background: #F87171;
-  }
-
-  .conn-status.connected .dot {
-    background: #86EFAC;
   }
 
   /* Resource Bars */
@@ -602,8 +565,11 @@
   <div class="separator"></div>
   <div class="nav-label">Kubernetes Deployment Patterns</div>
   <div class="status">
-    <span class="dot connecting" id="statusDot"></span>
-    <span id="statusText">CONECTANDO</span>
+    <div class="status-line">
+      <span class="dot connecting" id="statusDot"></span>
+      <span id="statusText">CONNECTING</span>
+    </div>
+    <span class="ws-url" id="headerWsUrl"></span>
   </div>
 </header>
 
@@ -614,7 +580,7 @@
       <canvas id="videoCanvas"></canvas>
       <div class="waiting-overlay" id="waitingOverlay">
         <div class="waiting-icon"></div>
-        <div class="waiting-text" id="waitingText">Conectando con rosbridge...</div>
+        <div class="waiting-text" id="waitingText">Connecting to rosbridge...</div>
         <div class="waiting-sub" id="waitingSub"></div>
       </div>
       <div class="video-overlay" id="videoOverlay" style="display:none">
@@ -632,82 +598,73 @@
   <div class="metrics-row">
     <!-- YOLO Metrics -->
     <div class="card">
-      <h3>YOLO — Detección</h3>
+      <h3>YOLO — Detection</h3>
       <div class="metrics-grid">
         <div class="metric">
           <div class="value" id="metLatency">--</div>
-          <div class="label">Latencia (ms)</div>
+          <div class="label">Latency (ms)</div>
         </div>
         <div class="metric">
           <div class="value" id="metInference">--</div>
-          <div class="label">Inferencia (ms)</div>
+          <div class="label">Inference (ms)</div>
         </div>
         <div class="metric">
           <div class="value" id="metDetections">--</div>
-          <div class="label">Detecciones</div>
+          <div class="label">Detections</div>
         </div>
         <div class="metric">
           <div class="value" id="metPersons">--</div>
-          <div class="label">Personas</div>
+          <div class="label">Persons</div>
         </div>
       </div>
       <div class="det-list" id="detList" style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
-        <div class="det-empty">Esperando datos de detección...</div>
+        <div class="det-empty">Awaiting detection data...</div>
       </div>
     </div>
 
     <!-- LLaVA Reasoning -->
     <div class="card">
-      <h3 class="cyan-accent">LLaVA — Razonamiento Visual</h3>
+      <h3 class="cyan-accent">LLaVA — Visual Reasoning</h3>
       <div class="metrics-grid">
         <div class="metric cyan">
           <div class="value" id="llavaLatency">--</div>
-          <div class="label">Latencia (ms)</div>
+          <div class="label">Latency (ms)</div>
         </div>
         <div class="metric cyan">
           <div class="value" id="llavaInference">--</div>
-          <div class="label">Inferencia (ms)</div>
+          <div class="label">Inference (ms)</div>
         </div>
       </div>
-      <div class="llava-response empty" id="llavaResponse">Esperando análisis visual...</div>
+      <div class="llava-response empty" id="llavaResponse">Awaiting visual analysis...</div>
     </div>
   </div>
 
   <!-- Row 3: Voice Interaction -->
   <div class="card">
-    <h3 class="cyan-accent">Voxtral — Interacción por Voz</h3>
+    <h3 class="cyan-accent">Voxtral — Voice Interaction</h3>
     <div class="voice-interaction">
       <div class="voice-section">
         <div class="voice-field">
-          <label>Comando Ingresado</label>
-          <div class="voice-text empty" id="voiceTranscript">Esperando entrada del operador...</div>
+          <label>Operator Command</label>
+          <div class="voice-text empty" id="voiceTranscript">Awaiting operator input...</div>
         </div>
         <div class="voice-field">
-          <label>Respuesta del Sistema</label>
-          <div class="voice-text empty" id="voiceResponse">Esperando respuesta...</div>
+          <label>System Response</label>
+          <div class="voice-text empty" id="voiceResponse">Awaiting response...</div>
         </div>
       </div>
       <div class="voice-input-row">
-        <input type="text" id="voiceCommandInput" placeholder="Ingresa un comando para enviar a /voice/command...">
-        <button onclick="sendVoiceCommand()">Enviar</button>
+        <input type="text" id="voiceCommandInput" placeholder="Enter a command to send to /voice/command...">
+        <button onclick="sendVoiceCommand()">Send</button>
       </div>
     </div>
   </div>
 
-  <!-- Row 4: Bottom Panel (Connection + Resources + Config) -->
+  <!-- Row 4: Bottom Panel (Resources + Config) -->
   <div class="bottom-row">
-    <!-- Connection Status -->
-    <div class="conn-status connecting" id="connStatus">
-      <div class="dot"></div>
-      <div>
-        <div class="conn-text" id="connText">Conectando...</div>
-        <div class="conn-detail" id="connDetail"></div>
-      </div>
-    </div>
-
     <!-- Resources -->
     <div class="card">
-      <h3>Recursos del Nodo</h3>
+      <h3>Node Resources</h3>
       <div class="resource-bar">
         <div class="bar-header">
           <span>CPU</span>
@@ -717,7 +674,7 @@
       </div>
       <div class="resource-bar">
         <div class="bar-header">
-          <span>Memoria</span>
+          <span>Memory</span>
           <span id="memVal">--</span>
         </div>
         <div class="bar-track"><div class="bar-fill mem" id="memBar" style="width:0%"></div></div>
@@ -733,18 +690,18 @@
 
     <!-- Config -->
     <div class="card">
-      <h3>Configuración</h3>
-      <div class="config-row"><span class="key">Patrón</span><span class="val" id="cfgPattern">--</span></div>
+      <h3>Configuration</h3>
+      <div class="config-row"><span class="key">Pattern</span><span class="val" id="cfgPattern">--</span></div>
       <div class="config-row"><span class="key">Namespace</span><span class="val" id="cfgNamespace">--</span></div>
-      <div class="config-row"><span class="key">Nodo</span><span class="val" id="cfgNode">--</span></div>
+      <div class="config-row"><span class="key">Node</span><span class="val" id="cfgNode">--</span></div>
       <div class="config-row"><span class="key">ROS Domain</span><span class="val" id="cfgDomain">--</span></div>
-      <div class="config-row"><span class="key">Confianza</span><span class="val" id="cfgConf">--</span></div>
+      <div class="config-row"><span class="key">Confidence</span><span class="val" id="cfgConf">--</span></div>
       <div class="config-row"><span class="key">Rosbridge</span><span class="val" id="cfgRosbridge">--</span></div>
     </div>
   </div>
 
   <!-- Uptime -->
-  <div class="uptime" id="uptimeDisplay">Dashboard iniciado: --</div>
+  <div class="uptime" id="uptimeDisplay">Dashboard uptime: --</div>
 </div>
 
 <script>
@@ -794,6 +751,7 @@ const rosbridgePort = params.get('ros_port') || (parseInt(window.location.port) 
 const rosbridgeUrl = `ws://${rosbridgeHost}:${rosbridgePort}`;
 
 document.getElementById('cfgRosbridge').textContent = rosbridgeUrl;
+document.getElementById('headerWsUrl').textContent = rosbridgeUrl;
 document.getElementById('cfgPattern').textContent = params.get('pattern') || 'unknown';
 document.getElementById('cfgNamespace').textContent = params.get('namespace') || 'default';
 document.getElementById('cfgNode').textContent = params.get('node') || 'edge-node';
@@ -824,11 +782,7 @@ function setupROS() {
     isConnected = true;
     document.getElementById('statusDot').classList.remove('connecting');
     document.getElementById('statusDot').classList.add('connected');
-    document.getElementById('statusText').textContent = 'CONECTADO';
-    document.getElementById('connStatus').classList.remove('connecting');
-    document.getElementById('connStatus').classList.add('connected');
-    document.getElementById('connText').textContent = 'Conectado a ROS 2';
-    document.getElementById('connDetail').textContent = rosbridgeUrl;
+    document.getElementById('statusText').textContent = 'CONNECTED';
     subscribeToTopics();
   });
 
@@ -841,11 +795,7 @@ function setupROS() {
     isConnected = false;
     document.getElementById('statusDot').classList.remove('connected');
     document.getElementById('statusDot').classList.add('connecting');
-    document.getElementById('statusText').textContent = 'DESCONECTADO';
-    document.getElementById('connStatus').classList.remove('connected');
-    document.getElementById('connStatus').classList.add('connecting');
-    document.getElementById('connText').textContent = 'Desconectado';
-    document.getElementById('connDetail').textContent = '';
+    document.getElementById('statusText').textContent = 'DISCONNECTED';
   });
 }
 
@@ -912,7 +862,7 @@ function subscribeToTopics() {
     document.getElementById('metPersons').textContent = personCount;
 
     if (detItems.length === 0) {
-      document.getElementById('detList').innerHTML = '<div class="det-empty">Sin detecciones en este frame</div>';
+      document.getElementById('detList').innerHTML = '<div class="det-empty">No detections in this frame</div>';
     } else {
       document.getElementById('detList').innerHTML = detItems.map(d => `
         <div class="det-item">
@@ -931,7 +881,7 @@ function subscribeToTopics() {
   }).subscribe(function(msg) {
     if (!isConnected) return;
     const el = document.getElementById('llavaResponse');
-    el.textContent = msg.data || 'Sin respuesta';
+    el.textContent = msg.data || 'No response';
     el.classList.remove('empty');
   });
 
@@ -960,7 +910,7 @@ function subscribeToTopics() {
   }).subscribe(function(msg) {
     if (!isConnected) return;
     const el = document.getElementById('voiceTranscript');
-    el.textContent = msg.data || 'Esperando entrada...';
+    el.textContent = msg.data || 'Awaiting input...';
     el.classList.remove('empty');
   });
 
@@ -971,7 +921,7 @@ function subscribeToTopics() {
   }).subscribe(function(msg) {
     if (!isConnected) return;
     const el = document.getElementById('voiceResponse');
-    el.textContent = msg.data || 'Sin respuesta';
+    el.textContent = msg.data || 'No response';
     el.classList.remove('empty');
   });
 
@@ -1024,7 +974,7 @@ function subscribeToTopics() {
 
 function sendVoiceCommand() {
   if (!isConnected || !voiceCommandTopic) {
-    alert('No estás conectado a ROS 2');
+    alert('Not connected to ROS 2');
     return;
   }
 
@@ -1032,14 +982,14 @@ function sendVoiceCommand() {
   const command = input.value.trim();
 
   if (!command) {
-    alert('Ingresa un comando');
+    alert('Enter a command');
     return;
   }
 
   const msg = new ROSLIB.Message({ data: command });
   voiceCommandTopic.publish(msg);
   input.value = '';
-  console.log('Comando enviado:', command);
+  console.log('Command sent:', command);
 }
 
 function drawLiveImage(msg) {
@@ -1084,7 +1034,7 @@ setInterval(function() {
   const minutes = Math.floor((elapsed % 3600) / 60);
   const seconds = elapsed % 60;
   const timeStr = `${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
-  document.getElementById('uptimeDisplay').textContent = `Dashboard en línea: ${timeStr}`;
+  document.getElementById('uptimeDisplay').textContent = `Dashboard uptime: ${timeStr}`;
 }, 1000);
 
 // Connect on load

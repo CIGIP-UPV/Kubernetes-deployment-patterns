@@ -41,6 +41,9 @@ spec:
       tolerations:
         {{- toYaml .Values.yolo.tolerations | nindent 8 }}
       {{- end }}
+      {{- if .Values.gpu.runtimeClassName }}
+      runtimeClassName: {{ .Values.gpu.runtimeClassName }}
+      {{- end }}
       containers:
         - name: yolo
           image: "{{ .Values.images.yolo.repository }}:{{ .Values.images.yolo.tag }}"
@@ -72,6 +75,12 @@ spec:
               value: {{ .Values.topics.latency | quote }}
             - name: INFERENCE_TOPIC
               value: {{ .Values.topics.inference | quote }}
+            {{- if .Values.gpu.enabled }}
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: {{ .Values.gpu.visibleDevices | default "all" | quote }}
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: {{ .Values.gpu.driverCapabilities | default "compute,utility" | quote }}
+            {{- end }}
             {{- if .Values.cyclonedds.enabled }}
             - name: CYCLONEDDS_URI
               value: "file:///etc/cyclonedds/cyclonedds.xml"
@@ -101,7 +110,13 @@ spec:
               wait -n ${YOLO_PID} ${MONITOR_PID}
               exit 1
           resources:
-            {{- toYaml .Values.yolo.resources | nindent 12 }}
+            {{- if and .Values.gpu.enabled .Values.gpu.requestGpuResource }}
+            limits:
+              nvidia.com/gpu: {{ .Values.gpu.count | default 1 }}
+            {{- end }}
+            {{- with .Values.yolo.resources }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- if .Values.cyclonedds.enabled }}
           volumeMounts:
             - name: cyclonedds

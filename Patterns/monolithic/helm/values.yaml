@@ -63,6 +63,15 @@ topics:
   voiceResponse: /voice/response
   voiceLatency: /voice/metrics_latency_ms
 
+# ── NVIDIA GPU (Jetson AGX Orin) ──
+gpu:
+  enabled: true
+  runtimeClassName: nvidia        # Pod-level runtimeClass (nvidia-container-runtime)
+  visibleDevices: "all"           # NVIDIA_VISIBLE_DEVICES
+  driverCapabilities: "compute,utility"  # NVIDIA_DRIVER_CAPABILITIES
+  requestGpuResource: true        # Request nvidia.com/gpu in resource limits
+  count: 1                        # Number of GPUs to request
+
 resources: {}
 
 # ── CycloneDDS Unicast (cloud-edge communication) ──

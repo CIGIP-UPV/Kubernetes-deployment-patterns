@@ -276,3 +276,27 @@ questions:
     default: false
     show_if: "voxtral.enabled=true"
     group: "Voxtral — Interacción por Voz"
+
+  # ── GPU Configuration ────────────────────────────────────────────
+  - variable: gpu.enabled
+    label: "Enable GPU"
+    description: "Expose NVIDIA GPU to model containers (Jetson AGX Orin). Sets NVIDIA_VISIBLE_DEVICES and NVIDIA_DRIVER_CAPABILITIES env vars."
+    type: boolean
+    default: true
+    group: "GPU"
+
+  - variable: gpu.runtimeClassName
+    label: "Runtime Class"
+    description: "Kubernetes runtimeClassName for NVIDIA container runtime. Leave 'nvidia' for standard Jetson/K3s setups."
+    type: string
+    default: "nvidia"
+    show_if: "gpu.enabled=true"
+    group: "GPU"
+
+  - variable: gpu.requestGpuResource
+    label: "Request nvidia.com/gpu Resource"
+    description: "Request nvidia.com/gpu in pod resource limits. Enable for single-pod patterns; disable if multiple pods share one GPU."
+    type: boolean
+    default: true
+    show_if: "gpu.enabled=true"
+    group: "GPU"

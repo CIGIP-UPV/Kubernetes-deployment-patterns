@@ -96,6 +96,18 @@ benchmark:
   httpPort: 9999
   ttlSecondsAfterFinished: 3600
 
+# ── NVIDIA GPU (Jetson AGX Orin) ──
+# requestGpuResource is false by default for microservices because multiple
+# pods share the single Jetson GPU. The env vars + runtimeClassName are enough.
+# Set to true only if GPU time-slicing is configured in the device plugin.
+gpu:
+  enabled: true
+  runtimeClassName: nvidia
+  visibleDevices: "all"
+  driverCapabilities: "compute,utility"
+  requestGpuResource: false
+  count: 1
+
 # ── CycloneDDS Unicast (cloud-edge communication) ──
 cyclonedds:
   enabled: true

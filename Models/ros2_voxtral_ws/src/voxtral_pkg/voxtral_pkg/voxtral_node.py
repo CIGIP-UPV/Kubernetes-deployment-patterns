@@ -116,6 +116,17 @@ class VoxtralNode(Node):
             import torch
             from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq, BitsAndBytesConfig
 
+            # ── GPU diagnostic ───────────────────────────────────────
+            cuda_ok = torch.cuda.is_available()
+            self.get_logger().info(f'[Voxtral] torch.cuda.is_available() = {cuda_ok}')
+            if cuda_ok:
+                self.get_logger().info(
+                    f'[Voxtral] GPU: {torch.cuda.get_device_name(0)} | '
+                    f'CUDA {torch.version.cuda} | '
+                    f'VRAM {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB')
+            else:
+                self.get_logger().warn('[Voxtral] CUDA not available — model will run on CPU (slow!)')
+
             quant_cfg = BitsAndBytesConfig(
                 load_in_4bit=True,
                 bnb_4bit_compute_dtype=torch.float16,
