@@ -37,7 +37,7 @@ llava:
   enabled: true
   modelId: llava-hf/llava-1.5-7b-hf
   triggerOnYolo: true
-  yoloTriggerIntervalS: 8
+  yoloTriggerIntervalS: 8.0
   maxNewTokens: 150
   load4bit: true
   startDelaySeconds: 15  # wait for YOLO to be ready first

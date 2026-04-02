@@ -46,6 +46,7 @@ questions:
     default: 0
     required: true
     options:
+      -
       - 0
       - 10
       - 20

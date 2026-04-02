@@ -101,7 +101,7 @@ spec:
             - name: LLAVA_TRIGGER_ON_YOLO
               value: {{ .Values.llava.triggerOnYolo | quote }}
             - name: LLAVA_YOLO_INTERVAL_S
-              value: {{ .Values.llava.yoloTriggerIntervalS | quote }}
+              value: {{ printf "%.1f" (float64 .Values.llava.yoloTriggerIntervalS) | quote }}
             - name: LLAVA_MAX_TOKENS
               value: {{ .Values.llava.maxNewTokens | quote }}
             - name: LLAVA_LOAD_4BIT
