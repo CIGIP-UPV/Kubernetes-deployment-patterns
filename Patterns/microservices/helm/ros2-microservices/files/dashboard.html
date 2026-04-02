@@ -989,6 +989,37 @@ function subscribeToTopics() {
     ros, name: voiceCommandTopicName,
     messageType: 'std_msgs/msg/String'
   });
+
+  // CPU/Memory/GPU resources
+  new ROSLIB.Topic({
+    ros, name: '/node/cpu_percent',
+    messageType: 'std_msgs/msg/Float32'
+  }).subscribe(function(msg) {
+    if (!isConnected) return;
+    const pct = Math.min(100, Math.max(0, msg.data));
+    document.getElementById('cpuVal').textContent = pct.toFixed(1) + ' %';
+    document.getElementById('cpuBar').style.width = pct.toFixed(1) + '%';
+  });
+
+  new ROSLIB.Topic({
+    ros, name: '/node/memory_percent',
+    messageType: 'std_msgs/msg/Float32'
+  }).subscribe(function(msg) {
+    if (!isConnected) return;
+    const pct = Math.min(100, Math.max(0, msg.data));
+    document.getElementById('memVal').textContent = pct.toFixed(1) + ' %';
+    document.getElementById('memBar').style.width = pct.toFixed(1) + '%';
+  });
+
+  new ROSLIB.Topic({
+    ros, name: '/node/gpu_percent',
+    messageType: 'std_msgs/msg/Float32'
+  }).subscribe(function(msg) {
+    if (!isConnected) return;
+    const pct = Math.min(100, Math.max(0, msg.data));
+    document.getElementById('gpuVal').textContent = pct.toFixed(1) + ' %';
+    document.getElementById('gpuBar').style.width = pct.toFixed(1) + '%';
+  });
 }
 
 function sendVoiceCommand() {
@@ -1031,36 +1062,7 @@ function drawLiveImage(msg) {
   }
 }
 
-// CPU/Memory/GPU
-new ROSLIB.Topic({
-  ros: ros || {on:()=>{}}, name: '/node/cpu_percent',
-  messageType: 'std_msgs/msg/Float32'
-}).subscribe(function(msg) {
-  if (!isConnected) return;
-  const pct = Math.min(100, Math.max(0, msg.data));
-  document.getElementById('cpuVal').textContent = pct.toFixed(1) + ' %';
-  document.getElementById('cpuBar').style.width = pct.toFixed(1) + '%';
-});
-
-new ROSLIB.Topic({
-  ros: ros || {on:()=>{}}, name: '/node/memory_percent',
-  messageType: 'std_msgs/msg/Float32'
-}).subscribe(function(msg) {
-  if (!isConnected) return;
-  const pct = Math.min(100, Math.max(0, msg.data));
-  document.getElementById('memVal').textContent = pct.toFixed(1) + ' %';
-  document.getElementById('memBar').style.width = pct.toFixed(1) + '%';
-});
-
-new ROSLIB.Topic({
-  ros: ros || {on:()=>{}}, name: '/node/gpu_percent',
-  messageType: 'std_msgs/msg/Float32'
-}).subscribe(function(msg) {
-  if (!isConnected) return;
-  const pct = Math.min(100, Math.max(0, msg.data));
-  document.getElementById('gpuVal').textContent = pct.toFixed(1) + ' %';
-  document.getElementById('gpuBar').style.width = pct.toFixed(1) + '%';
-});
+// setupROS is called via window.addEventListener('load', setupROS) below
 
 // FPS Counter
 setInterval(function() {
