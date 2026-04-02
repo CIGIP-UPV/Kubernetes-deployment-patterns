@@ -42,8 +42,8 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip && \
 # YOLO + LLaVA Python dependencies
 RUN python3 -m pip install --no-cache-dir \
       ultralytics==8.3.2 \
-      transformers==4.40.0 \
-      accelerate==0.30.0 \
+      transformers==4.44.0 \
+      accelerate==0.33.0 \
       bitsandbytes==0.43.1 \
       Pillow \
       numpy

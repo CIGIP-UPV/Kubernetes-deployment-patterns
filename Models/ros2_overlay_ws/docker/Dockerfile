@@ -33,7 +33,7 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip && \
     else \
       python3 -m pip install --no-cache-dir torch==2.4.1 torchvision==0.19.1 ; \
     fi && \
-    python3 -m pip install --no-cache-dir ultralytics==8.3.2 numpy transformers==4.40.0 accelerate==0.30.0 bitsandbytes==0.43.1 Pillow
+    python3 -m pip install --no-cache-dir ultralytics==8.3.2 numpy transformers==4.44.0 accelerate==0.33.0 bitsandbytes==0.43.1 Pillow
 
 # Base workspace: camera package only
 WORKDIR /opt/base_ws

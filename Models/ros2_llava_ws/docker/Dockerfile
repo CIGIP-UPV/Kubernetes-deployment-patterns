@@ -46,8 +46,8 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip && \
 
 # ── HuggingFace + LLaVA deps ─────────────────────────────────────────────────
 RUN python3 -m pip install --no-cache-dir \
-      transformers==4.40.0 \
-      accelerate==0.30.0 \
+      transformers==4.44.0 \
+      accelerate==0.33.0 \
       bitsandbytes==0.43.1 \
       Pillow \
       numpy
