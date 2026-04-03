@@ -87,7 +87,7 @@ print(f'[build] Saved {os.path.getsize(dst)/1e6:.1f} MB to {dst}'); \
 # under QEMU where CUDA libraries are absent.
 RUN python3 -m pip install --no-cache-dir huggingface_hub && \
     mkdir -p /opt/huggingface_cache && \
-    python3 -c "\
+    HF_HUB_DISABLE_XET=1 python3 -c "\
 from huggingface_hub import snapshot_download; \
 print('[build] Downloading LLaVA model files...'); \
 snapshot_download('llava-hf/llava-1.5-7b-hf', cache_dir='/opt/huggingface_cache'); \
