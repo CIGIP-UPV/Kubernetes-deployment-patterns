@@ -33,14 +33,14 @@ RUN for attempt in 1 2 3; do \
     done && rm -rf /var/lib/apt/lists/*
 
 # ── PyTorch ──────────────────────────────────────────────────────────────────
-#   arm64 (Jetson AGX Orin / JetPack 6, CUDA 12.6): NVIDIA pre-built wheels
+#   arm64 (Jetson AGX Orin / JetPack 6.1, CUDA 12.6): NVIDIA pre-built wheel
 #   amd64: standard CUDA 12.1 wheels from PyTorch
 RUN python3 -m pip install --no-cache-dir --upgrade pip && \
     ARCH=$(dpkg --print-architecture) && \
     if [ "$ARCH" = "arm64" ]; then \
       python3 -m pip install --no-cache-dir \
-        torch torchvision \
-        --index-url https://pypi.jetson-ai-lab.dev/jp6/cu126 ; \
+        "https://developer.download.nvidia.com/compute/redist/jp/v61/pytorch/torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl" && \
+      python3 -m pip install --no-cache-dir torchvision --no-deps ; \
     else \
       python3 -m pip install --no-cache-dir \
         torch==2.4.1+cu121 torchvision==0.19.1+cu121 \
