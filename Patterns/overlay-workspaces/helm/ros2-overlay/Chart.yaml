@@ -2,7 +2,7 @@ apiVersion: v2
 name: ros2-overlay
 description: Helm chart for ROS2 overlay-workspaces pattern with camera, YOLO, LLaVA, and Voxtral
 type: application
-version: 5.1.0
+version: 5.2.0
 appVersion: humble
 keywords:
   - ros2

@@ -28,18 +28,24 @@ RUN for attempt in 1 2 3; do \
 # PyTorch — architecture-aware installation
 #   arm64 (Jetson AGX Orin / JetPack 6.1, CUDA 12.6): NVIDIA pre-built wheel
 #   amd64: standard CUDA 12.1 wheels from PyTorch
+# Python dependencies (installed BEFORE PyTorch so they don't overwrite the NVIDIA wheel)
 RUN python3 -m pip install --no-cache-dir --upgrade pip && \
-    ARCH=$(dpkg --print-architecture) && \
+    python3 -m pip install --no-cache-dir \
+      ultralytics==8.3.2 numpy "transformers>=4.48,<5" "accelerate>=0.34" bitsandbytes Pillow
+
+# PyTorch — architecture-aware installation (MUST run AFTER deps to prevent pip overwrite)
+#   arm64 (Jetson AGX Orin / JetPack 6.1, CUDA 12.6): NVIDIA pre-built wheel
+#   amd64: standard CUDA 12.1 wheels from PyTorch
+RUN ARCH=$(dpkg --print-architecture) && \
     if [ "$ARCH" = "arm64" ]; then \
-      python3 -m pip install --no-cache-dir \
+      python3 -m pip install --no-cache-dir --force-reinstall --no-deps \
         "https://developer.download.nvidia.com/compute/redist/jp/v61/pytorch/torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl" && \
-      python3 -m pip install --no-cache-dir torchvision --no-deps ; \
+      python3 -m pip install --no-cache-dir --force-reinstall --no-deps torchvision ; \
     else \
       python3 -m pip install --no-cache-dir \
         torch==2.4.1+cu121 torchvision==0.19.1+cu121 \
         --index-url https://download.pytorch.org/whl/cu121 ; \
-    fi && \
-    python3 -m pip install --no-cache-dir ultralytics==8.3.2 numpy "transformers>=4.48,<5" "accelerate>=0.34" bitsandbytes Pillow
+    fi
 
 # Base workspace: camera package only
 WORKDIR /opt/base_ws
