@@ -2,7 +2,7 @@ apiVersion: v2
 name: ros2-monolithic
 description: Monolithic ROS 2 pattern with camera + YOLO + LLaVA + Voxtral in a single runtime container
 type: application
-version: 5.3.0
+version: 5.4.0
 appVersion: humble
 keywords:
   - ros2

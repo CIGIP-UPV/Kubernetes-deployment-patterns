@@ -1,5 +1,8 @@
 ARG ROS_DISTRO=humble
 ARG TORCH_VARIANT=auto
+
+FROM nvcr.io/nvidia/cuda:12.6.3-runtime-ubuntu22.04 AS cuda-libs
+
 FROM ros:${ROS_DISTRO}-ros-base
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -24,6 +27,9 @@ RUN for attempt in 1 2 3; do \
       || { echo "[apt] Attempt $attempt failed (QEMU?), retrying..."; \
            apt-get install -f -y || true; sleep 2; }; \
     done && rm -rf /var/lib/apt/lists/*
+
+# Copy CUDA 12.6 runtime libs from NVIDIA image
+COPY --from=cuda-libs /usr/local/cuda/lib64/ /usr/local/cuda/lib64/
 
 # PyTorch — architecture-aware installation
 #   arm64 (Jetson AGX Orin / JetPack 6.1, CUDA 12.6): NVIDIA pre-built wheel

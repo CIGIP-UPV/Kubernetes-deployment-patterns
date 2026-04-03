@@ -66,7 +66,7 @@ topics:
 # ── NVIDIA GPU (Jetson AGX Orin) ──
 gpu:
   enabled: true
-  runtimeClassName: nvidia-cdi    # Pod-level runtimeClass (CDI mounts full CUDA toolkit)
+  runtimeClassName: nvidia         # Pod-level runtimeClass (nvidia-container-runtime)
   visibleDevices: "all"           # NVIDIA_VISIBLE_DEVICES
   driverCapabilities: "compute,utility"  # NVIDIA_DRIVER_CAPABILITIES
   requestGpuResource: true        # Request nvidia.com/gpu in resource limits

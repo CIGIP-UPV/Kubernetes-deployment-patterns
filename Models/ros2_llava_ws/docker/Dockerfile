@@ -5,6 +5,9 @@
 ARG ROS_DISTRO=humble
 ARG TARGETARCH
 ARG TORCH_VARIANT=auto
+
+FROM nvcr.io/nvidia/cuda:12.6.3-runtime-ubuntu22.04 AS cuda-libs
+
 FROM ros:${ROS_DISTRO}-ros-base
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -31,6 +34,9 @@ RUN for attempt in 1 2 3; do \
       || { echo "[apt] Attempt $attempt failed (QEMU?), retrying..."; \
            apt-get install -f -y || true; sleep 2; }; \
     done && rm -rf /var/lib/apt/lists/*
+
+# Copy CUDA 12.6 runtime libs from NVIDIA image
+COPY --from=cuda-libs /usr/local/cuda/lib64/ /usr/local/cuda/lib64/
 
 # ── HuggingFace + LLaVA deps (installed BEFORE PyTorch so they don't overwrite the NVIDIA wheel)
 RUN python3 -m pip install --no-cache-dir --upgrade pip && \
