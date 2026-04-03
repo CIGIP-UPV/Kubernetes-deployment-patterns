@@ -73,7 +73,7 @@ topics:
 # ── NVIDIA GPU (Jetson AGX Orin) ──
 gpu:
   enabled: true
-  runtimeClassName: nvidia
+  runtimeClassName: nvidia-cdi
   visibleDevices: "all"
   driverCapabilities: "compute,utility"
   requestGpuResource: true

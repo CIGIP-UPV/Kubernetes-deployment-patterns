@@ -277,9 +277,9 @@ questions:
 
   - variable: gpu.runtimeClassName
     label: "Runtime Class"
-    description: "Kubernetes runtimeClassName for NVIDIA container runtime. Leave 'nvidia' for standard Jetson/K3s setups."
+    description: "Kubernetes runtimeClassName. Use 'nvidia-cdi' for Jetson (mounts full CUDA toolkit) or 'nvidia' for legacy setups."
     type: string
-    default: "nvidia"
+    default: "nvidia-cdi"
     show_if: "gpu.enabled=true"
     group: "GPU"
 

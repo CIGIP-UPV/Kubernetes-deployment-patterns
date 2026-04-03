@@ -46,12 +46,18 @@ RUN ARCH=$(dpkg --print-architecture) && \
     if [ "$ARCH" = "arm64" ]; then \
       python3 -m pip install --no-cache-dir --force-reinstall --no-deps \
         "https://developer.download.nvidia.com/compute/redist/jp/v61/pytorch/torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl" && \
-      python3 -m pip install --no-cache-dir --force-reinstall --no-deps torchvision ; \
+      python3 -m pip install --no-cache-dir --force-reinstall --no-deps torchvision && \
+      # Remove pip-installed CUDA 13 stubs (x86 only, conflict with Jetson CUDA 12.6)
+      pip uninstall -y $(pip list 2>/dev/null | grep -i 'nvidia-cu' | awk '{print $1}' | tr '\n' ' ') 2>/dev/null || true ; \
     else \
       python3 -m pip install --no-cache-dir \
         torch==2.4.1+cu121 torchvision==0.19.1+cu121 \
         --index-url https://download.pytorch.org/whl/cu121 ; \
     fi
+
+# CUDA library paths — on Jetson the nvidia-cdi runtime mounts host CUDA libs;
+# on amd64 the pip nvidia-cu* packages provide them.
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/lib/aarch64-linux-gnu:/usr/lib/aarch64-linux-gnu/nvidia:${LD_LIBRARY_PATH}
 
 WORKDIR /opt/ros2_monolithic_ws
 COPY Models/ros2_cam_ws/src/camera_driver_pkg     src/camera_driver_pkg

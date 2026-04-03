@@ -40,12 +40,15 @@ RUN ARCH=$(dpkg --print-architecture) && \
     if [ "$ARCH" = "arm64" ]; then \
       python3 -m pip install --no-cache-dir --force-reinstall --no-deps \
         "https://developer.download.nvidia.com/compute/redist/jp/v61/pytorch/torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl" && \
-      python3 -m pip install --no-cache-dir --force-reinstall --no-deps torchvision ; \
+      python3 -m pip install --no-cache-dir --force-reinstall --no-deps torchvision && \
+      pip uninstall -y $(pip list 2>/dev/null | grep -i 'nvidia-cu' | awk '{print $1}' | tr '\n' ' ') 2>/dev/null || true ; \
     else \
       python3 -m pip install --no-cache-dir \
         torch==2.4.1+cu121 torchvision==0.19.1+cu121 \
         --index-url https://download.pytorch.org/whl/cu121 ; \
     fi
+
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/lib/aarch64-linux-gnu:/usr/lib/aarch64-linux-gnu/nvidia:${LD_LIBRARY_PATH}
 
 # Base workspace: camera package only
 WORKDIR /opt/base_ws
