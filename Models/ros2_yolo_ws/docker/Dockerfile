@@ -61,8 +61,22 @@ RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
     colcon build --symlink-install --packages-select yolo_detector_pkg
 
 # Pre-download the model during build so runtime validation does not depend on network access.
+# On arm64 the NVIDIA torch requires CUDA libs that are absent under QEMU,
+# so we download the weights with urllib instead of importing ultralytics.
 RUN mkdir -p /opt/models && \
-    python3 -c "from ultralytics import YOLO; YOLO('/opt/models/yolov8n.pt')"
+    ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "arm64" ]; then \
+      python3 -c "\
+import urllib.request, os; \
+url='https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt'; \
+dst='/opt/models/yolov8n.pt'; \
+print('[build] Downloading YOLOv8n weights...'); \
+urllib.request.urlretrieve(url, dst); \
+print(f'[build] Saved {os.path.getsize(dst)/1e6:.1f} MB to {dst}'); \
+" ; \
+    else \
+      python3 -c "from ultralytics import YOLO; YOLO('/opt/models/yolov8n.pt')" ; \
+    fi
 
 # Standalone resource monitor (no colcon build needed — uses rclpy directly)
 COPY scripts/resource_monitor.py /opt/scripts/resource_monitor.py

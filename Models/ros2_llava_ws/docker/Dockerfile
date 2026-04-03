@@ -64,16 +64,15 @@ RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
     colcon build --symlink-install --packages-select llava_pkg
 
 # ── Pre-download LLaVA model during build (embedded in image) ─────────────────
-# Downloads FP16 weights (~14GB). At runtime, bitsandbytes quantizes to 4-bit.
-# This ensures zero network dependency at deploy time (factory / edge scenario).
-RUN mkdir -p /opt/huggingface_cache && \
+# Uses huggingface_hub.snapshot_download (no torch import needed) so the build
+# works under QEMU where CUDA libraries are absent.  At runtime on Jetson,
+# transformers loads the cached weights with bitsandbytes 4-bit quantization.
+RUN python3 -m pip install --no-cache-dir huggingface_hub && \
+    mkdir -p /opt/huggingface_cache && \
     python3 -c "\
-from transformers import AutoProcessor, LlavaForConditionalGeneration; \
-import torch; \
-print('[build] Downloading LLaVA processor...'); \
-AutoProcessor.from_pretrained('llava-hf/llava-1.5-7b-hf', cache_dir='/opt/huggingface_cache'); \
-print('[build] Downloading LLaVA model weights (FP16)...'); \
-LlavaForConditionalGeneration.from_pretrained('llava-hf/llava-1.5-7b-hf', cache_dir='/opt/huggingface_cache', torch_dtype=torch.float16, low_cpu_mem_usage=True); \
+from huggingface_hub import snapshot_download; \
+print('[build] Downloading LLaVA model files...'); \
+snapshot_download('llava-hf/llava-1.5-7b-hf', cache_dir='/opt/huggingface_cache'); \
 print('[build] LLaVA model cached successfully.'); \
 "
 

@@ -58,24 +58,35 @@ RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
     source /opt/base_ws/install/setup.bash && \
     colcon build --symlink-install --packages-select yolo_detector_pkg llava_pkg voxtral_pkg
 
+# Pre-download YOLO model (arm64: direct download to avoid torch/CUDA import)
 RUN mkdir -p /opt/models && \
-    python3 -c "from ultralytics import YOLO; YOLO('/opt/models/yolov8n.pt')"
+    ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "arm64" ]; then \
+      python3 -c "\
+import urllib.request, os; \
+url='https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt'; \
+dst='/opt/models/yolov8n.pt'; \
+print('[build] Downloading YOLOv8n weights...'); \
+urllib.request.urlretrieve(url, dst); \
+print(f'[build] Saved {os.path.getsize(dst)/1e6:.1f} MB to {dst}'); \
+" ; \
+    else \
+      python3 -c "from ultralytics import YOLO; YOLO('/opt/models/yolov8n.pt')" ; \
+    fi
 
 # Cache directories for transformers/huggingface models
 ENV TRANSFORMERS_CACHE=/opt/huggingface_cache
 ENV HF_HOME=/opt/huggingface_cache
 
-# Pre-download LLaVA model during build (FP16 weights ~14GB).
-# At runtime, bitsandbytes quantizes to 4-bit (~4GB VRAM).
-# Zero network dependency at deploy time (factory / edge scenario).
-RUN mkdir -p /opt/huggingface_cache && \
+# Pre-download LLaVA model during build.
+# Uses huggingface_hub.snapshot_download (no torch import) so the build works
+# under QEMU where CUDA libraries are absent.
+RUN python3 -m pip install --no-cache-dir huggingface_hub && \
+    mkdir -p /opt/huggingface_cache && \
     python3 -c "\
-from transformers import AutoProcessor, LlavaForConditionalGeneration; \
-import torch; \
-print('[build] Downloading LLaVA processor...'); \
-AutoProcessor.from_pretrained('llava-hf/llava-1.5-7b-hf', cache_dir='/opt/huggingface_cache'); \
-print('[build] Downloading LLaVA model weights (FP16)...'); \
-LlavaForConditionalGeneration.from_pretrained('llava-hf/llava-1.5-7b-hf', cache_dir='/opt/huggingface_cache', torch_dtype=torch.float16, low_cpu_mem_usage=True); \
+from huggingface_hub import snapshot_download; \
+print('[build] Downloading LLaVA model files...'); \
+snapshot_download('llava-hf/llava-1.5-7b-hf', cache_dir='/opt/huggingface_cache'); \
 print('[build] LLaVA model cached successfully.'); \
 "
 
