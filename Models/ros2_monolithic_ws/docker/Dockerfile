@@ -1,10 +1,44 @@
 ARG ROS_DISTRO=humble
 ARG TORCH_VARIANT=auto
+ARG TARGETARCH
 
-# --- Multi-stage: grab CUDA 12.6 runtime libs for arm64 (Jetson) ---
-FROM nvcr.io/nvidia/cuda:12.6.3-runtime-ubuntu22.04 AS cuda-libs
+# --- Multi-stage: platform-specific CUDA libraries ---
+# arm64 (Jetson): L4T JetPack image has Jetson-native CUDA, cuDNN, cuBLAS etc.
+#   Generic SBSA (server ARM) libs do NOT work on Jetson's integrated Tegra GPU.
+# amd64: generic CUDA devel image for datacenter / desktop GPUs.
+
+FROM nvcr.io/nvidia/l4t-jetpack:r36.4.0 AS cuda-libs-arm64
+COPY Models/cusparselt_stub.c /tmp/cusparselt_stub.c
+RUN mkdir -p /cuda-export && \
+    cp -a /usr/local/cuda/lib64/*.so* /cuda-export/ 2>/dev/null || true && \
+    cp -a /usr/local/cuda/extras/CUPTI/lib64/*.so* /cuda-export/ 2>/dev/null || true && \
+    find /usr/lib/aarch64-linux-gnu -name "libcudnn*.so*" -exec cp -a {} /cuda-export/ \; 2>/dev/null || true && \
+    find /usr/lib/aarch64-linux-gnu -name "libnccl*.so*" -exec cp -a {} /cuda-export/ \; 2>/dev/null || true && \
+    find /usr/lib/aarch64-linux-gnu -name "libcusparseLt*.so*" -exec cp -a {} /cuda-export/ \; 2>/dev/null || true && \
+    # cuSPARSELt: not in JetPack repos — build stub from source if not found \
+    if [ ! -f /cuda-export/libcusparseLt.so.0 ]; then \
+      echo "Building libcusparseLt stub (not in JetPack)..." && \
+      gcc -shared -o /cuda-export/libcusparseLt.so.0 /tmp/cusparselt_stub.c \
+          -Wl,-soname,libcusparseLt.so.0 ; \
+    fi
+
+FROM nvcr.io/nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04 AS cuda-libs-amd64
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libcusparselt0 2>/dev/null || true && \
+    rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /cuda-export && \
+    cp -a /usr/local/cuda/lib64/*.so* /cuda-export/ 2>/dev/null || true && \
+    cp -a /usr/local/cuda/extras/CUPTI/lib64/*.so* /cuda-export/ 2>/dev/null || true && \
+    find /usr/lib -name "libcudnn*.so*" -exec cp -a {} /cuda-export/ \; 2>/dev/null || true && \
+    find /usr/lib -name "libnccl*.so*" -exec cp -a {} /cuda-export/ \; 2>/dev/null || true && \
+    find /usr/lib -name "libcusparseLt*.so*" -exec cp -a {} /cuda-export/ \; 2>/dev/null || true
+
+FROM cuda-libs-${TARGETARCH} AS cuda-libs
 
 FROM ros:${ROS_DISTRO}-ros-base
+
+# Torchvision Jetson patch script (fixes CUDA 13 vs 12.6 incompatibility)
+COPY Models/patch_torchvision_jetson.py /tmp/patch_torchvision_jetson.py
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV ROS_DISTRO=${ROS_DISTRO}
@@ -22,7 +56,7 @@ RUN for attempt in 1 2 3; do \
       apt-get update && \
       apt-get install -y --no-install-recommends \
         python3-pip python3-colcon-common-extensions \
-        python3-opencv libgl1 libglib2.0-0 \
+        python3-opencv libgl1 libglib2.0-0 libopenblas0 \
         ros-${ROS_DISTRO}-cv-bridge \
         ros-${ROS_DISTRO}-vision-msgs \
         ros-${ROS_DISTRO}-image-transport \
@@ -33,15 +67,15 @@ RUN for attempt in 1 2 3; do \
            apt-get install -f -y || true; sleep 2; }; \
     done && rm -rf /var/lib/apt/lists/*
 
-# Copy CUDA 12.6 runtime libs from NVIDIA image (needed on Jetson where the
-# nvidia runtime mounts only the driver, not the CUDA toolkit)
-COPY --from=cuda-libs /usr/local/cuda/lib64/ /usr/local/cuda/lib64/
+# Copy CUDA 12.6 + cuDNN 9 runtime libs from NVIDIA image (needed on Jetson
+# where the nvidia runtime mounts only the driver, not the CUDA toolkit)
+COPY --from=cuda-libs /cuda-export/ /usr/local/cuda/lib64/
 
 # YOLO + LLaVA Python dependencies (installed BEFORE PyTorch so they don't overwrite the NVIDIA wheel)
 RUN python3 -m pip install --no-cache-dir --upgrade pip && \
     python3 -m pip install --no-cache-dir \
       ultralytics==8.3.2 \
-      "transformers>=4.48,<5" \
+      "transformers>=4.48,<4.49" \
       "accelerate>=0.34" \
       bitsandbytes \
       Pillow \
@@ -52,10 +86,15 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip && \
 #   amd64: standard CUDA 12.1 wheels from PyTorch
 RUN ARCH=$(dpkg --print-architecture) && \
     if [ "$ARCH" = "arm64" ]; then \
+      # 1. Install NVIDIA Jetson torch wheel
       python3 -m pip install --no-cache-dir --force-reinstall --no-deps \
         "https://developer.download.nvidia.com/compute/redist/jp/v61/pytorch/torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl" && \
-      python3 -m pip install --no-cache-dir --force-reinstall --no-deps torchvision && \
-      # Remove pip-installed CUDA 13 stubs (x86 only, conflict with Jetson CUDA 12.6)
+      # 2. Install torchvision binary + patch for Jetson CUDA 12.6 compatibility
+      #    PyPI binary needs libcudart.so.13 (CUDA 13) but Jetson has CUDA 12.6.
+      #    Patch disables _meta_registrations and adds pure-PyTorch NMS fallback.
+      python3 -m pip install --no-cache-dir --force-reinstall --no-deps "torchvision==0.20.0" && \
+      python3 /tmp/patch_torchvision_jetson.py && \
+      # 3. Remove pip nvidia packages (not available on arm64 anyway)
       pip uninstall -y $(pip list 2>/dev/null | grep -i 'nvidia-cu' | awk '{print $1}' | tr '\n' ' ') 2>/dev/null || true ; \
     else \
       python3 -m pip install --no-cache-dir \
@@ -65,7 +104,7 @@ RUN ARCH=$(dpkg --print-architecture) && \
 
 # CUDA library paths — on Jetson the nvidia-cdi runtime mounts host CUDA libs;
 # on amd64 the pip nvidia-cu* packages provide them.
-ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/lib/aarch64-linux-gnu:/usr/lib/aarch64-linux-gnu/nvidia:${LD_LIBRARY_PATH}
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/lib/aarch64-linux-gnu:/usr/lib/aarch64-linux-gnu/nvidia
 
 WORKDIR /opt/ros2_monolithic_ws
 COPY Models/ros2_cam_ws/src/camera_driver_pkg     src/camera_driver_pkg

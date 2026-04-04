@@ -26,9 +26,11 @@ build() {
 }
 
 build "ros2-camera" "Models/ros2_cam_ws/docker/Dockerfile" "Models/ros2_cam_ws"
-build "ros2-yolo" "Models/ros2_yolo_ws/docker/Dockerfile" "Models/ros2_yolo_ws"
+build "ros2-yolo" "Models/ros2_yolo_ws/docker/Dockerfile" "."
+build "ros2-llava" "Models/ros2_llava_ws/docker/Dockerfile" "."
 build "ros2-monolithic" "Models/ros2_monolithic_ws/docker/Dockerfile" "."
 build "ros2-overlay" "Models/ros2_overlay_ws/docker/Dockerfile" "."
+build "ros2-voxtral" "Models/ros2_voxtral_ws/docker/Dockerfile" "Models/ros2_voxtral_ws"
 
 echo "[done] Built images with prefix '${REGISTRY_PREFIX}', tag '${TAG}' and TORCH_VARIANT='${TORCH_VARIANT}'."
 echo "If needed, push them to your registry before running Helm experiments."

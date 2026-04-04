@@ -216,7 +216,6 @@ spec:
             {{- with .Values.resources }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-          {{- if or .Values.cyclonedds.enabled (and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode)) }}
           volumeMounts:
             {{- if and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode) }}
             - name: video-device
@@ -227,7 +226,11 @@ spec:
               mountPath: /etc/cyclonedds
               readOnly: true
             {{- end }}
-          {{- end }}
+            {{- if .Values.gpu.enabled }}
+            - name: sys-devices-platform
+              mountPath: /sys/devices/platform
+              readOnly: true
+            {{- end }}
           startupProbe:
             exec:
               command:
@@ -249,7 +252,6 @@ spec:
             periodSeconds: 20
             timeoutSeconds: 10
             failureThreshold: 3
-      {{- if or .Values.cyclonedds.enabled (and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode)) }}
       volumes:
         {{- if and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode) }}
         - name: video-device
@@ -265,4 +267,9 @@ spec:
               - key: cyclonedds.xml
                 path: cyclonedds.xml
         {{- end }}
-      {{- end }}
+        {{- if .Values.gpu.enabled }}
+        - name: sys-devices-platform
+          hostPath:
+            path: /sys/devices/platform
+            type: Directory
+        {{- end }}

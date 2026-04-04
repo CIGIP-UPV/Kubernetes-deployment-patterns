@@ -111,9 +111,13 @@ class LlavaNode(Node):
             self.get_logger().info(
                 f'[LLaVA] GPU: {torch.cuda.get_device_name(0)} | '
                 f'CUDA {torch.version.cuda} | '
-                f'VRAM {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB')
+                f'VRAM {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB')
         else:
             self.get_logger().warn('[LLaVA] CUDA not available — model will run on CPU (slow!)')
+
+        if cuda_ok:
+            torch.backends.cudnn.benchmark = True
+            self.get_logger().info('[LLaVA] cuDNN benchmark mode enabled')
 
         self._dtype = torch.float16
         kwargs = dict(
@@ -123,7 +127,13 @@ class LlavaNode(Node):
             low_cpu_mem_usage=True,
         )
 
-        if self.get_parameter('load_in_4bit').value:
+        # Jetson: bitsandbytes CUDA kernels are compiled for datacenter GPUs
+        # and fail on Jetson (Error named symbol not found).  With 64 GB VRAM
+        # LLaVA-1.5-7B fits comfortably in FP16 (~14 GB), so skip 4-bit.
+        import platform
+        is_jetson = (platform.machine() == 'aarch64' and cuda_ok)
+
+        if self.get_parameter('load_in_4bit').value and not is_jetson:
             try:
                 from transformers import BitsAndBytesConfig
                 kwargs['quantization_config'] = BitsAndBytesConfig(
@@ -134,6 +144,10 @@ class LlavaNode(Node):
                 self.get_logger().info('[LLaVA] Using 4-bit quantization (bitsandbytes).')
             except Exception as e:
                 self.get_logger().warn(f'[LLaVA] bitsandbytes unavailable ({e}), using FP16.')
+        elif is_jetson:
+            self.get_logger().info(
+                '[LLaVA] Jetson detected — skipping bitsandbytes, using FP16 '
+                f'({torch.cuda.get_device_properties(0).total_memory / 1e9:.0f} GB VRAM available).')
 
         self._processor = AutoProcessor.from_pretrained(model_id, cache_dir=cache_dir)
         self._model     = LlavaForConditionalGeneration.from_pretrained(model_id, **kwargs)

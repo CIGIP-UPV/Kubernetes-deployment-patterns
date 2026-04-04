@@ -61,7 +61,10 @@ class YoloDetector(Node):
             self.get_logger().info(
                 f'[YOLO] GPU: {torch.cuda.get_device_name(0)} | '
                 f'CUDA {torch.version.cuda} | '
-                f'VRAM {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB')
+                f'VRAM {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB')
+            # Enable cuDNN benchmark mode for best conv algorithm selection
+            torch.backends.cudnn.benchmark = True
+            self.get_logger().info('[YOLO] cuDNN benchmark mode enabled')
         else:
             self.get_logger().warn('[YOLO] CUDA not available — model will run on CPU (slow!)')
 

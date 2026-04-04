@@ -46,16 +46,27 @@ class ResourceMonitor(Node):
             self._gpu_method = 'tegrastats'
         else:
             # Fallback: Jetson sysfs GPU load file
-            # Typical paths:
-            #   /sys/devices/platform/gpu.0/load          (Jetson Orin / Xavier)
-            #   /sys/devices/platform/17000000.ga10b/load  (Jetson Orin device-tree)
-            #   /sys/devices/gpu.0/load                   (older Jetsons)
+            # JetPack 6 / L4T R36 (Orin) device-tree paths vary:
+            #   /sys/devices/platform/gpu.0/load
+            #   /sys/devices/platform/17000000.ga10b/load
+            #   /sys/devices/platform/bus@0/17000000.ga10b/load  (nested bus)
+            #   /sys/devices/gpu.0/load                          (older Jetsons)
+            # Also try devfreq load nodes:
+            #   /sys/devices/platform/17000000.ga10b/devfreq/17000000.ga10b/load
             candidates = (
                 glob.glob('/sys/devices/platform/*/load') +
+                glob.glob('/sys/devices/platform/bus@*/*/load') +
+                glob.glob('/sys/devices/platform/*/devfreq/*/load') +
+                glob.glob('/sys/devices/platform/bus@*/*/devfreq/*/load') +
                 glob.glob('/sys/devices/platform/gpu.*/load') +
                 glob.glob('/sys/devices/gpu.*/load')
             )
-            for path in candidates:
+            # Filter: only paths that contain 'gpu' or 'ga10b' (Orin GPU)
+            gpu_candidates = [p for p in candidates
+                              if 'gpu' in p.lower() or 'ga10b' in p]
+            # If no gpu-specific matches, try all candidates
+            search_list = gpu_candidates if gpu_candidates else candidates
+            for path in search_list:
                 try:
                     val = open(path).read().strip()
                     # The file returns 0-1000 (per-mille) on Jetson
@@ -65,6 +76,11 @@ class ResourceMonitor(Node):
                         break
                 except Exception:
                     continue
+            # Log all scanned paths for debugging
+            if not self._gpu_method:
+                self.get_logger().warn(
+                    f'sysfs GPU scan found {len(candidates)} candidates: '
+                    + ', '.join(candidates[:10]) if candidates else 'none')
 
         if self._gpu_method:
             self.pub_gpu = self.create_publisher(Float32, '/node/gpu_percent', 10)

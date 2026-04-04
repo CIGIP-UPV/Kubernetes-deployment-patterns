@@ -203,10 +203,20 @@ spec:
               mountPath: /etc/cyclonedds
               readOnly: true
             {{- end }}
+            {{- if .Values.gpu.enabled }}
+            - name: sys-devices-platform
+              mountPath: /sys/devices/platform
+              readOnly: true
+            {{- end }}
           {{- else }}
           volumeMounts:
             - name: app-code
               mountPath: /app
+            {{- if .Values.gpu.enabled }}
+            - name: sys-devices-platform
+              mountPath: /sys/devices/platform
+              readOnly: true
+            {{- end }}
           {{- end }}
           livenessProbe:
             httpGet:
@@ -214,7 +224,6 @@ spec:
               port: http-api
             initialDelaySeconds: 20
             periodSeconds: 10
-      {{- if or .Values.cyclonedds.enabled (and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode)) }}
       volumes:
         - name: app-code
           configMap:
@@ -233,9 +242,9 @@ spec:
               - key: cyclonedds.xml
                 path: cyclonedds.xml
         {{- end }}
-      {{- else }}
-      volumes:
-        - name: app-code
-          configMap:
-            name: {{ include "dynamic-loader.fullname" . }}-code
-      {{- end }}
+        {{- if .Values.gpu.enabled }}
+        - name: sys-devices-platform
+          hostPath:
+            path: /sys/devices/platform
+            type: Directory
+        {{- end }}
