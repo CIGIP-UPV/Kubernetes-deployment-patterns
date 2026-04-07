@@ -201,7 +201,7 @@ jobs:
       - name: Build and push ros2-yolo
         uses: docker/build-push-action@v6
         with:
-          context: Models/ros2_yolo_ws
+          context: .
           file: Models/ros2_yolo_ws/docker/Dockerfile
           platforms: ${{ env.BUILD_PLATFORM }}
           push: true
@@ -242,7 +242,7 @@ jobs:
       - name: Build and push ros2-llava
         uses: docker/build-push-action@v6
         with:
-          context: Models/ros2_llava_ws
+          context: .
           file: Models/ros2_llava_ws/docker/Dockerfile
           platforms: ${{ env.BUILD_PLATFORM }}
           push: true
