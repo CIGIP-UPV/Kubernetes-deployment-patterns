@@ -53,6 +53,9 @@ SHELL ["/bin/bash", "-lc"]
 RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
     colcon build --symlink-install --packages-select voxtral_pkg
 
+# Resource monitor (CPU/GPU metrics publisher)
+COPY scripts/resource_monitor.py /opt/scripts/resource_monitor.py
+
 # ── Entrypoint ────────────────────────────────────────────────────────────────
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

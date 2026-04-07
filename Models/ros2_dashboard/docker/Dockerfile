@@ -33,6 +33,6 @@ RUN mkdir -p /opt/dashboard-lib /dashboard && \
 EXPOSE 8080 9090
 
 # Default entrypoint: sourced ROS env
-COPY entrypoint.sh /entrypoint.sh
+COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]

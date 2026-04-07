@@ -77,7 +77,7 @@ data:
                 (
                     "set -e; "
                     "source /opt/ros/humble/setup.bash; "
-                    "if [ -f /opt/ros_ws/install/setup.bash ]; then source /opt/ros_ws/install/setup.bash; fi; "
+                    "if [ -f /opt/ros2_monolithic_ws/install/setup.bash ]; then source /opt/ros2_monolithic_ws/install/setup.bash; elif [ -f /opt/ros_ws/install/setup.bash ]; then source /opt/ros_ws/install/setup.bash; fi; "
                     "ros2 run yolo_detector_pkg yolo_detector --ros-args "
                     f"-p model_path:={MODEL_PATH} "
                     f"-p conf:={YOLO_CONF} "
@@ -121,7 +121,7 @@ data:
                 (
                     "set -e; "
                     "source /opt/ros/humble/setup.bash; "
-                    "if [ -f /opt/ros_ws/install/setup.bash ]; then source /opt/ros_ws/install/setup.bash; fi; "
+                    "if [ -f /opt/ros2_monolithic_ws/install/setup.bash ]; then source /opt/ros2_monolithic_ws/install/setup.bash; elif [ -f /opt/ros_ws/install/setup.bash ]; then source /opt/ros_ws/install/setup.bash; fi; "
                     "ros2 run llava_pkg llava_node --ros-args "
                     f"-p model_id:={LLAVA_MODEL_ID} "
                     f"-p image_topic:={IMAGE_TOPIC} "
@@ -161,7 +161,7 @@ data:
                 (
                     "set -e; "
                     "source /opt/ros/humble/setup.bash; "
-                    "if [ -f /opt/ros_ws/install/setup.bash ]; then source /opt/ros_ws/install/setup.bash; fi; "
+                    "if [ -f /opt/ros2_monolithic_ws/install/setup.bash ]; then source /opt/ros2_monolithic_ws/install/setup.bash; elif [ -f /opt/ros_ws/install/setup.bash ]; then source /opt/ros_ws/install/setup.bash; fi; "
                     "ros2 run voxtral_pkg voxtral_node --ros-args "
                     f"-p audio_mode:={VOXTRAL_AUDIO_MODE} "
                     f"-p model_id:={VOXTRAL_MODEL_ID} "

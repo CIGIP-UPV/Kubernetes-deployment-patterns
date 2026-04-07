@@ -93,6 +93,10 @@ RUN ARCH=$(dpkg --print-architecture) && \
         --index-url https://download.pytorch.org/whl/cu121 ; \
     fi
 
+# Jetson fix: patch transformers generate() to skip FSDP check (not available on Jetson)
+RUN sed -i 's/synced_gpus = (is_deepspeed_zero3_enabled() or is_fsdp_managed_module(self)) and dist.get_world_size() > 1/synced_gpus = False/' \
+    /usr/local/lib/python3.10/dist-packages/transformers/generation/utils.py
+
 ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/lib/aarch64-linux-gnu:/usr/lib/aarch64-linux-gnu/nvidia
 
 # ── ROS 2 workspace ───────────────────────────────────────────────────────────

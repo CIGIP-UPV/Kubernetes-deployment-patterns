@@ -6,7 +6,7 @@ images:
     tag: latest
     pullPolicy: Always
   dynamicHost:
-    repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-yolo
+    repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-monolithic
     tag: latest
     pullPolicy: Always
 

@@ -102,6 +102,12 @@ RUN ARCH=$(dpkg --print-architecture) && \
         --index-url https://download.pytorch.org/whl/cu121 ; \
     fi
 
+# Jetson fix: transformers 4.48 calls is_fsdp_managed_module() in generate(),
+# which cascades into torch.distributed.fsdp — not available on Jetson.
+# Patch synced_gpus to False (only needed for multi-GPU distributed training).
+RUN sed -i 's/synced_gpus = (is_deepspeed_zero3_enabled() or is_fsdp_managed_module(self)) and dist.get_world_size() > 1/synced_gpus = False/' \
+    /usr/local/lib/python3.10/dist-packages/transformers/generation/utils.py
+
 # CUDA library paths — on Jetson the nvidia-cdi runtime mounts host CUDA libs;
 # on amd64 the pip nvidia-cu* packages provide them.
 ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/lib/aarch64-linux-gnu:/usr/lib/aarch64-linux-gnu/nvidia

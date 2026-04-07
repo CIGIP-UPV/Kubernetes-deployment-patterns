@@ -1,3 +1,113 @@
+import platform as _platform
+import sys as _sys
+import types as _types
+
+# ── Jetson PyTorch distributed stub ──────────────────────────────────────
+# The NVIDIA Jetson PyTorch wheel is built without distributed support, so
+# torch._C._distributed_c10d does not exist.  transformers calls
+# torch.distributed internally during generate(), which triggers the import
+# and crashes.  We inject a minimal stub *before* anything imports torch so
+# the import chain never breaks.
+if _platform.machine() == 'aarch64':
+    # ── Permissive metaclass (defined first, used everywhere) ────────
+    # Every dummy class created with this metaclass will return another
+    # permissive dummy for ANY attribute access (e.g. ProcessGroup.BackendType).
+    class _PermissiveMeta(type):
+        def __getattr__(cls, name):
+            # __members__ is used by enum introspection (e.g.
+            # ReduceOp.RedOpType.__members__.items()) — must return a
+            # real dict so .items() is iterable.
+            if name == '__members__':
+                return {}
+            return _PermissiveMeta(name, (), {'__module__': cls.__module__})
+        def __instancecheck__(cls, instance):
+            return True
+        def __call__(cls, *a, **kw):
+            return object.__new__(cls)
+
+    # ── 1. torch._C._distributed_c10d — permissive stub ──────────────
+    # The Jetson PyTorch wheel lacks distributed support.  When
+    # torch.distributed.__init__.py does:
+    #   from torch._C._distributed_c10d import ProcessGroup, Store, ...
+    # these classes MUST already use _PermissiveMeta so that any code
+    # that caches them gets the permissive behavior (e.g. ProcessGroup.BackendType).
+    class _PermissiveModule(_types.ModuleType):
+        def __getattr__(self, name):
+            if name.startswith('__') and name.endswith('__'):
+                raise AttributeError(name)
+            return _PermissiveMeta(name, (), {'__module__': self.__name__})
+
+    _stub = _PermissiveModule('torch._C._distributed_c10d')
+    _sys.modules['torch._C._distributed_c10d'] = _stub
+
+    # ── 2. torch.distributed — ensure importable ─────────────────────
+    try:
+        import torch.distributed  # noqa: F401
+    except ImportError:
+        _dist = _types.ModuleType('torch.distributed')
+        _dist.is_available = lambda: False
+        _dist.is_initialized = lambda: False
+        _sys.modules['torch.distributed'] = _dist
+
+    # Safety net: torch.distributed.__init__.py may not import all names
+    # from _distributed_c10d (varies by wheel build).  Fill in any gaps.
+    _dist_mod = _sys.modules.get('torch.distributed')
+    if _dist_mod is not None:
+        for _name in ('Store', 'FileStore', 'TCPStore', 'HashStore',
+                       'PrefixStore', 'ProcessGroup', 'Work', 'ReduceOp',
+                       'Backend'):
+            if not hasattr(_dist_mod, _name):
+                setattr(_dist_mod, _name, _PermissiveMeta(
+                    _name, (), {'__module__': 'torch.distributed'}))
+
+    # ── 2b. Mock fake_pg — prevent fsdp cascade at runtime ────────────
+    # When generate() triggers import of torch.distributed.fsdp, it
+    # cascades into fake_pg.py which needs full distributed support.
+    # Mocking fake_pg cuts this chain cleanly.
+    _fake_pg = _types.ModuleType('torch.testing._internal.distributed.fake_pg')
+    _fake_pg.FakeProcessGroup = type('FakeProcessGroup', (), {})
+    _fake_pg.FakeStore = type('FakeStore', (), {})
+    _sys.modules['torch.testing._internal.distributed.fake_pg'] = _fake_pg
+
+    # ── 3. torch._C attribute — for "from torch._C import ..." syntax ─
+    try:
+        import torch._C as _torch_C
+        if not hasattr(_torch_C, '_distributed_c10d'):
+            _torch_C._distributed_c10d = _stub
+    except Exception:
+        pass
+
+    # ── 4. Mock torch._dynamo — THE KEY FIX ──────────────────────────
+    # torch._dynamo is the torch.compile() / Triton compiler frontend.
+    # It is NOT supported on aarch64 (no Triton backend).
+    #
+    # Multiple torchvision entry points import torch._dynamo:
+    #   - ops/roi_align.py → torch._dynamo.utils.is_compile_supported
+    #   - tv_tensors/__init__.py → @torch.compiler.disable → import torch._dynamo
+    #   - (and potentially more)
+    #
+    # Each one cascades into:
+    #   torch._dynamo → torch.distributed.fsdp → fake_pg.py
+    #   → torch._C._distributed_c10d (missing symbols)
+    #   → torch.distributed.Store/Backend/ProcessGroup (missing)
+    #
+    # Instead of patching each entry point, we mock torch._dynamo itself.
+    # This is safe because torch.compile() cannot work on Jetson anyway.
+    if 'torch._dynamo' not in _sys.modules:
+        _dynamo = _types.ModuleType('torch._dynamo')
+        _dynamo.is_compiling = lambda: False
+        _dynamo.assume_constant_result = lambda fn: fn
+        # disable() is used as a decorator: @torch.compiler.disable
+        def _mock_disable(fn=None, recursive=True):
+            if fn is not None:
+                return fn
+            return lambda f: f
+        _dynamo.disable = _mock_disable
+        _dynamo.utils = _types.ModuleType('torch._dynamo.utils')
+        _dynamo.utils.is_compile_supported = lambda device_type="": False
+        _sys.modules['torch._dynamo'] = _dynamo
+        _sys.modules['torch._dynamo.utils'] = _dynamo.utils
+
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
@@ -120,18 +230,23 @@ class LlavaNode(Node):
             self.get_logger().info('[LLaVA] cuDNN benchmark mode enabled')
 
         self._dtype = torch.float16
-        kwargs = dict(
-            cache_dir=cache_dir,
-            torch_dtype=self._dtype,
-            device_map='auto',
-            low_cpu_mem_usage=True,
-        )
 
         # Jetson: bitsandbytes CUDA kernels are compiled for datacenter GPUs
         # and fail on Jetson (Error named symbol not found).  With 64 GB VRAM
         # LLaVA-1.5-7B fits comfortably in FP16 (~14 GB), so skip 4-bit.
+        # Also: Jetson PyTorch wheel lacks torch._C._distributed_c10d,
+        # so device_map='auto' (which uses accelerate dispatch hooks) crashes
+        # at inference time.  Load to CUDA manually instead.
         import platform
         is_jetson = (platform.machine() == 'aarch64' and cuda_ok)
+
+        kwargs = dict(
+            cache_dir=cache_dir,
+            torch_dtype=self._dtype,
+            low_cpu_mem_usage=True,
+        )
+        if not is_jetson:
+            kwargs['device_map'] = 'auto'
 
         if self.get_parameter('load_in_4bit').value and not is_jetson:
             try:
@@ -151,6 +266,9 @@ class LlavaNode(Node):
 
         self._processor = AutoProcessor.from_pretrained(model_id, cache_dir=cache_dir)
         self._model     = LlavaForConditionalGeneration.from_pretrained(model_id, **kwargs)
+        if is_jetson:
+            self._model = self._model.to('cuda')
+            self.get_logger().info('[LLaVA] Model moved to CUDA (Jetson direct placement).')
         self._model.eval()
 
     # ── Callbacks ─────────────────────────────────────────────────────
@@ -216,11 +334,12 @@ class LlavaNode(Node):
             # LLaVA chat template
             prompt_text = f'USER: <image>\n{question}\nASSISTANT:'
 
-            inputs = self._processor(
+            batch = self._processor(
                 text=prompt_text,
                 images=self.current_frame,
                 return_tensors='pt'
-            ).to(self._model.device)
+            )
+            inputs = {k: v.to(self._model.device) for k, v in batch.items()}
 
             t_inf_start = time.time()
             with torch.inference_mode():

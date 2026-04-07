@@ -1,3 +1,42 @@
+import platform as _platform
+
+# ── Jetson torchvision NMS fix ────────────────────────────────────────
+# torchvision 0.20.0 PyPI binary links against CUDA 13 (libcudart.so.13),
+# but Jetson JetPack 6.1 has CUDA 12.6.  The C extension (_C.so) cannot load,
+# so _assert_has_ops() raises RuntimeError before NMS is even called.
+# We monkey-patch torchvision.ops.nms with a pure-PyTorch fallback.
+if _platform.machine() == 'aarch64':
+    try:
+        import torch as _torch
+        import torchvision.ops as _tv_ops
+
+        def _jetson_nms(boxes, scores, iou_threshold):
+            """Pure-PyTorch NMS fallback for Jetson (torchvision C ops unavailable)."""
+            if boxes.numel() == 0:
+                return _torch.empty((0,), dtype=_torch.int64, device=boxes.device)
+            x1, y1, x2, y2 = boxes[:, 0], boxes[:, 1], boxes[:, 2], boxes[:, 3]
+            areas = (x2 - x1) * (y2 - y1)
+            order = scores.argsort(descending=True)
+            keep = []
+            while order.numel() > 0:
+                i = order[0].item()
+                keep.append(i)
+                if order.numel() == 1:
+                    break
+                xx1 = _torch.max(x1[i], x1[order[1:]])
+                yy1 = _torch.max(y1[i], y1[order[1:]])
+                xx2 = _torch.min(x2[i], x2[order[1:]])
+                yy2 = _torch.min(y2[i], y2[order[1:]])
+                inter = _torch.clamp(xx2 - xx1, min=0) * _torch.clamp(yy2 - yy1, min=0)
+                iou = inter / (areas[i] + areas[order[1:]] - inter)
+                order = order[1:][iou <= iou_threshold]
+            return _torch.tensor(keep, dtype=_torch.int64, device=boxes.device)
+
+        _tv_ops.nms = _jetson_nms
+        _tv_ops.boxes.nms = _jetson_nms
+    except Exception:
+        pass
+
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
