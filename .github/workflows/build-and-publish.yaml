@@ -406,7 +406,7 @@ jobs:
       - name: Build and push ros2-dashboard
         uses: docker/build-push-action@v6
         with:
-          context: Models/ros2_dashboard/docker
+          context: Models/ros2_dashboard
           file: Models/ros2_dashboard/docker/Dockerfile
           platforms: ${{ env.BUILD_PLATFORM }}
           push: true
