@@ -41,10 +41,20 @@ class ResourceMonitor(Node):
         self._gpu_sysfs_path = None
 
         if shutil.which('nvidia-smi') is not None:
-            self._gpu_method = 'nvidia-smi'
-        elif shutil.which('tegrastats') is not None or os.path.exists('/usr/bin/tegrastats'):
+            # Verify nvidia-smi can report utilization (Jetson returns [N/A])
+            try:
+                _test = subprocess.check_output(
+                    ['nvidia-smi', '--query-gpu=utilization.gpu',
+                     '--format=csv,noheader,nounits'],
+                    timeout=2, stderr=subprocess.DEVNULL
+                ).decode().strip()
+                float(_test.split('\n')[0])  # raises if [N/A]
+                self._gpu_method = 'nvidia-smi'
+            except Exception:
+                self._gpu_method = None  # fall through to sysfs
+        if self._gpu_method is None and (shutil.which('tegrastats') is not None or os.path.exists('/usr/bin/tegrastats')):
             self._gpu_method = 'tegrastats'
-        else:
+        if self._gpu_method is None:
             # Fallback: Jetson sysfs GPU load file
             # JetPack 6 / L4T R36 (Orin) device-tree paths vary:
             #   /sys/devices/platform/gpu.0/load

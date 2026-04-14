@@ -1,18 +1,18 @@
 images:
   camera:
-    repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-camera
+    repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-camera
     tag: latest
     pullPolicy: Always
   yolo:
-    repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-yolo
+    repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-yolo
     tag: latest
     pullPolicy: Always
   llava:
-    repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-llava
+    repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-llava
     tag: latest
     pullPolicy: Always
   voxtral:
-    repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-voxtral
+    repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-voxtral
     tag: latest
     pullPolicy: Always
 
@@ -118,7 +118,7 @@ cyclonedds:
 dashboard:
   enabled: true
   image:
-    repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard
+    repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-dashboard
     tag: latest
     pullPolicy: Always
   nodeHostname: ""  # Pin to cloud node (e.g., worker1-kb2)

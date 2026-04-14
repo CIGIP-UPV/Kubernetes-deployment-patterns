@@ -178,6 +178,7 @@ class LlavaNode(Node):
         self.is_processing = False
         self.last_yolo_trigger = 0.0
         self._yolo_interval = float(self.get_parameter('yolo_trigger_interval_s').value)
+        self._pending_manual_prompt: str | None = None  # manual triggers queue
 
         # ── QoS ──────────────────────────────────────────────────────
         sensor_qos = QoSProfile(depth=1)
@@ -310,8 +311,13 @@ class LlavaNode(Node):
         self._run_inference(prompt)
 
     def _trigger_cb(self, msg: String):
-        """Manual / Voxtral trigger — runs LLaVA with the given question."""
+        """Manual / Voxtral trigger — runs LLaVA with the given question.
+        If currently processing, queue the prompt so it runs next."""
         if not msg.data.strip():
+            return
+        if self.is_processing:
+            self._pending_manual_prompt = msg.data.strip()
+            self.get_logger().info('[LLaVA] Manual prompt queued (inference in progress).')
             return
         self._run_inference(msg.data.strip())
 
@@ -376,6 +382,12 @@ class LlavaNode(Node):
             self.get_logger().error(f'[LLaVA] Inference error: {e}')
         finally:
             self.is_processing = False
+            # Process queued manual prompt (priority over YOLO auto-triggers)
+            if self._pending_manual_prompt:
+                prompt = self._pending_manual_prompt
+                self._pending_manual_prompt = None
+                self.get_logger().info('[LLaVA] Processing queued manual prompt...')
+                self._run_inference(prompt)
 
 
 def main(args=None):

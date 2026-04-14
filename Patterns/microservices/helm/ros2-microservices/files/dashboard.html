@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -163,7 +163,7 @@
   }
 
   /* ── Detection List ── */
-  .det-list { max-height: 160px; overflow-y: auto; margin-top: 14px; }
+  .det-list { height: 105px; overflow-y: auto; margin-top: 14px; }
   .det-item {
     display: flex; align-items: center; gap: 10px;
     padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 13px;
@@ -267,7 +267,7 @@
   <div class="nav-label">Kubernetes Deployment Patterns</div>
   <div class="status">
     <span class="dot connecting" id="statusDot"></span>
-    <span id="statusText">CONECTANDO</span>
+    <span id="statusText">CONNECTING</span>
     <span class="conn-url" id="headerUrl"></span>
   </div>
 </header>
@@ -278,7 +278,7 @@
     <canvas id="videoCanvas"></canvas>
     <div class="waiting-overlay" id="waitingOverlay">
       <div class="waiting-icon"></div>
-      <div class="waiting-text" id="waitingText">Conectando con rosbridge...</div>
+      <div class="waiting-text" id="waitingText">Connecting to rosbridge...</div>
       <div class="waiting-sub" id="waitingSub"></div>
     </div>
     <div class="video-overlay" id="videoOverlay" style="display:none">
@@ -299,23 +299,23 @@
       <div class="metrics-grid">
         <div class="metric">
           <div class="value" id="metLatency">--</div>
-          <div class="label">Latencia (ms)</div>
+          <div class="label">Latency (ms)</div>
         </div>
         <div class="metric">
           <div class="value" id="metInference">--</div>
-          <div class="label">Inferencia (ms)</div>
+          <div class="label">Inference (ms)</div>
         </div>
         <div class="metric">
           <div class="value" id="metDetections">0</div>
-          <div class="label">Detecciones</div>
+          <div class="label">Detections</div>
         </div>
         <div class="metric">
           <div class="value" id="metPersons">0</div>
-          <div class="label">Personas</div>
+          <div class="label">Persons</div>
         </div>
       </div>
       <div class="det-list" id="detList">
-        <div class="det-empty">Sin detecciones en este frame</div>
+        <div class="det-empty">No detections in this frame</div>
       </div>
     </div>
 
@@ -325,11 +325,11 @@
       <div class="metrics-grid">
         <div class="metric">
           <div class="value" id="llavaLatency">--</div>
-          <div class="label">Latencia (ms)</div>
+          <div class="label">Latency (ms)</div>
         </div>
         <div class="metric">
           <div class="value" id="llavaInference">--</div>
-          <div class="label">Inferencia (ms)</div>
+          <div class="label">Inference (ms)</div>
         </div>
       </div>
       <div class="llava-response" id="llavaResponse">Awaiting visual analysis...</div>
@@ -361,7 +361,7 @@
   <div class="row-3">
     <!-- Node Resources -->
     <div class="card">
-      <h3>Recursos del Nodo</h3>
+      <h3>Node Resources</h3>
       <div class="resource-bar">
         <div class="bar-header"><span>CPU</span><span id="cpuVal">--</span></div>
         <div class="bar-track"><div class="bar-fill cpu" id="cpuBar" style="width:0%"></div></div>
@@ -378,7 +378,7 @@
 
     <!-- Benchmark Metrics -->
     <div class="card">
-      <h3>M&eacute;tricas de Benchmark</h3>
+      <h3>Benchmark Metrics</h3>
       <div class="bench-row"><span class="key">T_inf (avg)</span><span class="val" id="bmInfAvg">--</span></div>
       <div class="bench-row"><span class="key">f_FPS</span><span class="val" id="bmFps">--</span></div>
       <div class="bench-row"><span class="key">J_inf (jitter)</span><span class="val" id="bmJitter">--</span></div>
@@ -390,13 +390,13 @@
 
     <!-- Configuration -->
     <div class="card">
-      <h3>Configuraci&oacute;n</h3>
-      <div class="config-row"><span class="key">Patr&oacute;n</span><span class="val" id="cfgPattern">--</span></div>
+      <h3>Configuration</h3>
+      <div class="config-row"><span class="key">Pattern</span><span class="val" id="cfgPattern">--</span></div>
       <div class="config-row"><span class="key">Namespace</span><span class="val" id="cfgNamespace">--</span></div>
-      <div class="config-row"><span class="key">Nodo edge</span><span class="val" id="cfgNode">--</span></div>
+      <div class="config-row"><span class="key">Edge Node</span><span class="val" id="cfgNode">--</span></div>
       <div class="config-row"><span class="key">ROS Domain</span><span class="val" id="cfgDomain">--</span></div>
-      <div class="config-row"><span class="key">Modelo YOLO</span><span class="val" id="cfgModel">--</span></div>
-      <div class="config-row"><span class="key">Confianza</span><span class="val" id="cfgConf">--</span></div>
+      <div class="config-row"><span class="key">YOLO Model</span><span class="val" id="cfgModel">--</span></div>
+      <div class="config-row"><span class="key">Confidence</span><span class="val" id="cfgConf">--</span></div>
       <div class="config-row"><span class="key">Rosbridge</span><span class="val" id="cfgRosbridge">--</span></div>
     </div>
   </div>
@@ -518,16 +518,16 @@ function setConnectionState(state) {
     isConnected = true;
   } else if (state === 'connecting') {
     dot.className = 'dot connecting';
-    statusTxt.textContent = 'CONECTANDO';
+    statusTxt.textContent = 'CONNECTING';
     overlay.classList.remove('hidden', 'disconnected');
-    waitTxt.textContent = 'Conectando con rosbridge...';
+    waitTxt.textContent = 'Connecting to rosbridge...';
     isConnected = false;
   } else {
     dot.className = 'dot off';
-    statusTxt.textContent = 'DESCONECTADO';
+    statusTxt.textContent = 'DISCONNECTED';
     overlay.classList.remove('hidden');
     overlay.classList.add('disconnected');
-    waitTxt.textContent = 'Conexión perdida — reintentando...';
+    waitTxt.textContent = 'Connection lost — retrying...';
     isConnected = false;
     hasReceivedImage = false;
     document.getElementById('videoOverlay').style.display = 'none';
@@ -604,7 +604,7 @@ function subscribeToTopics() {
       document.getElementById('metDetections').textContent = detItems.length;
       document.getElementById('metPersons').textContent = personCount;
       if (detItems.length === 0) {
-        document.getElementById('detList').innerHTML = '<div class="det-empty">Sin detecciones en este frame</div>';
+        document.getElementById('detList').innerHTML = '<div class="det-empty">No detections in this frame</div>';
       } else {
         document.getElementById('detList').innerHTML = detItems.map(d => `
           <div class="det-item">
@@ -761,7 +761,7 @@ setInterval(() => {
   }
   // Show "Sin datos" if GPU topic never published after 10s
   if (!gpuDataReceived && Date.now() - startTime.getTime() > 10000) {
-    document.getElementById('gpuVal').textContent = 'Sin datos';
+    document.getElementById('gpuVal').textContent = 'No data';
   }
 }, 2000);
 

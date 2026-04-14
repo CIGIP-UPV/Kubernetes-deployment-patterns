@@ -2,7 +2,7 @@ apiVersion: v2
 name: dynamic-loader
 description: Dynamic loading ROS 2 pattern with camera service and runtime-loadable YOLO, LLaVA, and Voxtral modules via FastAPI
 type: application
-version: 5.5.0
+version: 5.6.0
 appVersion: humble
 keywords:
   - ros2
