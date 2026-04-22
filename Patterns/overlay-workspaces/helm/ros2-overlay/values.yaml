@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-overlay
+  repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-overlay
   tag: latest
   pullPolicy: Always
 
@@ -83,7 +83,7 @@ cyclonedds:
 dashboard:
   enabled: true
   image:
-    repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-dashboard
+    repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard
     tag: latest
     pullPolicy: Always
   nodeHostname: ""  # Pin to cloud node (e.g., worker1-kb2)

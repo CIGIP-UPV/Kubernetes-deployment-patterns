@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-# Default registry is GitHub Container Registry (ghcr.io)
-REGISTRY_PREFIX=${1:-ghcr.io/cigip-upv/kubernetes-deployment-patterns}
+# Default registry is GitLab Container Registry (CIGIP-UPV)
+REGISTRY_PREFIX=${1:-gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes}
 TAG=${2:-latest}
 TORCH_VARIANT=${TORCH_VARIANT:-cpu}
 BUILD_PLATFORM=${BUILD_PLATFORM:-}
