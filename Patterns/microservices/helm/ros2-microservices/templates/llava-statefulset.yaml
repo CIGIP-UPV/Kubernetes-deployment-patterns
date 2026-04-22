@@ -140,10 +140,10 @@ spec:
                 - /bin/bash
                 - -c
                 - |
-                  source /opt/ros/humble/setup.bash && ros2 node list | grep -q "/llava_node"
+                  pgrep -f llava_node >/dev/null
             initialDelaySeconds: 90
             periodSeconds: 10
-            timeoutSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 18
           livenessProbe:
             exec:
@@ -151,9 +151,9 @@ spec:
                 - /bin/bash
                 - -c
                 - |
-                  source /opt/ros/humble/setup.bash && ros2 node list | grep -q "/llava_node"
+                  pgrep -f llava_node >/dev/null
             periodSeconds: 20
-            timeoutSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 3
       {{- if or .Values.cyclonedds.enabled .Values.gpu.enabled }}
       volumes:

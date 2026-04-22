@@ -246,10 +246,10 @@ spec:
                 - /bin/bash
                 - -c
                 - |
-                  source /opt/ros/humble/setup.bash && ros2 node list | grep -q "/camera_driver" && ros2 node list | grep -q "/yolo_detector"
+                  pgrep -f camera_driver >/dev/null && pgrep -f yolo_detector >/dev/null
             initialDelaySeconds: 30
             periodSeconds: 10
-            timeoutSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 18
           livenessProbe:
             exec:
@@ -257,9 +257,9 @@ spec:
                 - /bin/bash
                 - -c
                 - |
-                  source /opt/ros/humble/setup.bash && ros2 node list | grep -q "/camera_driver" && ros2 node list | grep -q "/yolo_detector"
+                  pgrep -f camera_driver >/dev/null && pgrep -f yolo_detector >/dev/null
             periodSeconds: 20
-            timeoutSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 3
       volumes:
         {{- if and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode) }}

@@ -125,10 +125,10 @@ spec:
                 - /bin/bash
                 - -c
                 - |
-                  source /opt/ros/humble/setup.bash && ros2 node list | grep -q "/voxtral_node"
+                  pgrep -f voxtral_node >/dev/null
             initialDelaySeconds: 15
             periodSeconds: 10
-            timeoutSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 18
           livenessProbe:
             exec:
@@ -136,9 +136,9 @@ spec:
                 - /bin/bash
                 - -c
                 - |
-                  source /opt/ros/humble/setup.bash && ros2 node list | grep -q "/voxtral_node"
+                  pgrep -f voxtral_node >/dev/null
             periodSeconds: 20
-            timeoutSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 3
       {{- if or .Values.cyclonedds.enabled (and .Values.voxtral.gpu.enabled .Values.gpu.enabled) }}
       volumes:

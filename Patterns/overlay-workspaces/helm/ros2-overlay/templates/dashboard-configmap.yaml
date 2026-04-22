@@ -8,5 +8,5 @@ metadata:
     component: dashboard
 data:
   index.html: |
-{{ .Files.Get "files/dashboard.html" | indent 4 }}
+{{ .Files.Get "files/dashboard.html" | replace "__PATTERN__" (.Values.dashboard.pattern | default "overlay-workspaces") | indent 4 }}
 {{- end }}

@@ -494,7 +494,7 @@ const rosbridgePort = params.get('rosbridge_port') ||
     ? String(parseInt(window.location.port) + 1)
     : '9090');
 
-const cfgPattern       = params.get('pattern')    || 'monolithic';
+const cfgPattern       = params.get('pattern')    || '__PATTERN__';
 const cfgNamespace     = params.get('namespace')   || 'ros2exp';
 const cfgNodeName      = params.get('node')        || 'edgenode01';
 const cfgDomainId      = params.get('domain_id')   || '42';

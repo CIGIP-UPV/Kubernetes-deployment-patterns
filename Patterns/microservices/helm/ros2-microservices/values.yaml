@@ -131,6 +131,7 @@ cyclonedds:
 # ── Dashboard (cloud-side observability) ──
 dashboard:
   enabled: true
+  pattern: microservices  # rendered into dashboard.html via Helm replace of __PATTERN__
   image:
     repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard
     tag: latest

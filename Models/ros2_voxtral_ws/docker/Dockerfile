@@ -70,11 +70,15 @@ RUN for attempt in 1 2 3; do \
 COPY --from=cuda-libs /cuda-export/ /usr/local/cuda/lib64/
 
 # ── HuggingFace + audio deps (installed BEFORE PyTorch so pip doesn't overwrite the NVIDIA wheel)
+#   NOTE: Voxtral (VoxtralForConditionalGeneration / VoxtralProcessor) landed in transformers 4.54.
+#         LLaVA is NOT in this image, so we don't need the 4.48 pin that the shared images use.
+#   NOTE: numpy<2 is required because the Jetson PyTorch wheel (2.5.0a0 nv24.08) was compiled
+#         against NumPy 1.x ABI; NumPy 2.x triggers "_ARRAY_API not found" and may crash C ext.
 RUN python3 -m pip install --no-cache-dir --upgrade pip && \
     python3 -m pip install --no-cache-dir \
-      "transformers>=4.48,<4.49" \
+      "transformers>=4.54,<4.56" \
       "accelerate>=0.34" \
-      numpy \
+      "numpy<2" \
       sounddevice \
       librosa \
       soundfile \
@@ -97,9 +101,31 @@ RUN ARCH=$(dpkg --print-architecture) && \
         --index-url https://download.pytorch.org/whl/cu121 ; \
     fi
 
-# Jetson fix: patch transformers generate() to skip FSDP check (not available on Jetson)
-RUN sed -i 's/synced_gpus = (is_deepspeed_zero3_enabled() or is_fsdp_managed_module(self)) and dist.get_world_size() > 1/synced_gpus = False/' \
-    /usr/local/lib/python3.10/dist-packages/transformers/generation/utils.py
+# Jetson fix: patch transformers.generate() to skip FSDP / DeepSpeed check
+#   The exact line differs between transformers 4.48 and 4.54+. We match broadly
+#   (any synced_gpus assignment that references is_fsdp_managed_module or
+#   is_deepspeed_zero3_enabled) and force the value to False. Build fails if no
+#   matching line is found — that way a transformers bump that removes/renames
+#   the check is caught immediately instead of crashing at runtime.
+RUN python3 - <<'PY'
+import re, sys
+path = '/usr/local/lib/python3.10/dist-packages/transformers/generation/utils.py'
+src = open(path).read()
+pattern = re.compile(
+    r'^([ \t]+)synced_gpus\s*=\s*[^\n]*(?:is_fsdp_managed_module|is_deepspeed_zero3_enabled)[^\n]*$',
+    re.MULTILINE,
+)
+new_src, n = pattern.subn(r'\1synced_gpus = False  # patched for Jetson (no torch.distributed)', src)
+if n == 0:
+    print('[patch] ERROR: could not find synced_gpus assignment with FSDP/DeepSpeed check.')
+    print('[patch] Dumping surrounding context for debugging:')
+    for i, line in enumerate(src.splitlines(), 1):
+        if 'synced_gpus' in line:
+            print(f'  {i}: {line}')
+    sys.exit(1)
+open(path, 'w').write(new_src)
+print(f'[patch] synced_gpus patched in {n} location(s).')
+PY
 
 ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/lib/aarch64-linux-gnu:/usr/lib/aarch64-linux-gnu/nvidia
 
