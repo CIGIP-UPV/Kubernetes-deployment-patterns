@@ -62,6 +62,7 @@ RUN for attempt in 1 2 3; do \
         ros-${ROS_DISTRO}-image-transport \
         ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
         v4l-utils \
+        libasound2 portaudio19-dev libsndfile1 \
       && break \
       || { echo "[apt] Attempt $attempt failed (QEMU?), retrying..."; \
            apt-get install -f -y || true; sleep 2; }; \
@@ -71,7 +72,7 @@ RUN for attempt in 1 2 3; do \
 # where the nvidia runtime mounts only the driver, not the CUDA toolkit)
 COPY --from=cuda-libs /cuda-export/ /usr/local/cuda/lib64/
 
-# YOLO + LLaVA Python dependencies (installed BEFORE PyTorch so they don't overwrite the NVIDIA wheel)
+# YOLO + LLaVA + Voxtral Python dependencies (installed BEFORE PyTorch so they don't overwrite the NVIDIA wheel)
 RUN python3 -m pip install --no-cache-dir --upgrade pip && \
     python3 -m pip install --no-cache-dir \
       ultralytics==8.3.2 \
@@ -79,7 +80,11 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip && \
       "accelerate>=0.34" \
       bitsandbytes \
       Pillow \
-      numpy
+      numpy \
+      sounddevice \
+      librosa \
+      soundfile \
+      mistral-common
 
 # PyTorch — architecture-aware installation (MUST run AFTER deps to prevent pip overwrite)
 #   arm64 (Jetson AGX Orin / JetPack 6.1, CUDA 12.6): NVIDIA pre-built wheel
@@ -94,11 +99,14 @@ RUN ARCH=$(dpkg --print-architecture) && \
       #    Patch disables _meta_registrations and adds pure-PyTorch NMS fallback.
       python3 -m pip install --no-cache-dir --force-reinstall --no-deps "torchvision==0.20.0" && \
       python3 /tmp/patch_torchvision_jetson.py && \
+      # 2b. torchaudio (needed by Voxtral) — best-effort on Jetson; harmless if the
+      #     prebuilt wheel is missing since voxtral falls back to text-sim then.
+      python3 -m pip install --no-cache-dir --force-reinstall --no-deps "torchaudio==2.5.0" || true && \
       # 3. Remove pip nvidia packages (not available on arm64 anyway)
       pip uninstall -y $(pip list 2>/dev/null | grep -i 'nvidia-cu' | awk '{print $1}' | tr '\n' ' ') 2>/dev/null || true ; \
     else \
       python3 -m pip install --no-cache-dir \
-        torch==2.4.1+cu121 torchvision==0.19.1+cu121 \
+        torch==2.4.1+cu121 torchvision==0.19.1+cu121 torchaudio==2.4.1+cu121 \
         --index-url https://download.pytorch.org/whl/cu121 ; \
     fi
 

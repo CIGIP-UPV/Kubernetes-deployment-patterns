@@ -51,7 +51,7 @@ llava:
 
 voxtral:
   enabled: true
-  audioMode: false  # Phase 1: text simulation; Phase 2: set true + mount mic device
+  audioMode: true  # Audio + GPU inference enabled (FP16 on Jetson)
   modelId: mistralai/Voxtral-Mini-4B-Realtime-2602
   autoLoad: false
 

@@ -54,6 +54,7 @@ RUN for attempt in 1 2 3; do \
         ros-${ROS_DISTRO}-image-transport \
         ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
         v4l-utils \
+        libasound2 portaudio19-dev libsndfile1 \
       && break \
       || { echo "[apt] Attempt $attempt failed (QEMU?), retrying..."; \
            apt-get install -f -y || true; sleep 2; }; \
@@ -68,7 +69,8 @@ COPY --from=cuda-libs /cuda-export/ /usr/local/cuda/lib64/
 # Python dependencies (installed BEFORE PyTorch so they don't overwrite the NVIDIA wheel)
 RUN python3 -m pip install --no-cache-dir --upgrade pip && \
     python3 -m pip install --no-cache-dir \
-      ultralytics==8.3.2 numpy "transformers>=4.48,<4.49" "accelerate>=0.34" bitsandbytes Pillow
+      ultralytics==8.3.2 numpy "transformers>=4.48,<4.49" "accelerate>=0.34" bitsandbytes Pillow \
+      sounddevice librosa soundfile mistral-common
 
 # PyTorch — architecture-aware installation (MUST run AFTER deps to prevent pip overwrite)
 #   arm64 (Jetson AGX Orin / JetPack 6.1, CUDA 12.6): NVIDIA pre-built wheel
@@ -79,10 +81,13 @@ RUN ARCH=$(dpkg --print-architecture) && \
         "https://developer.download.nvidia.com/compute/redist/jp/v61/pytorch/torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl" && \
       python3 -m pip install --no-cache-dir --force-reinstall --no-deps "torchvision==0.20.0" && \
       python3 /tmp/patch_torchvision_jetson.py && \
+      # torchaudio (needed by Voxtral) — best-effort on Jetson; harmless if the
+      # prebuilt wheel is missing since voxtral falls back to text-sim then.
+      python3 -m pip install --no-cache-dir --force-reinstall --no-deps "torchaudio==2.5.0" || true && \
       pip uninstall -y $(pip list 2>/dev/null | grep -i 'nvidia-cu' | awk '{print $1}' | tr '\n' ' ') 2>/dev/null || true ; \
     else \
       python3 -m pip install --no-cache-dir \
-        torch==2.4.1+cu121 torchvision==0.19.1+cu121 \
+        torch==2.4.1+cu121 torchvision==0.19.1+cu121 torchaudio==2.4.1+cu121 \
         --index-url https://download.pytorch.org/whl/cu121 ; \
     fi
 

@@ -32,6 +32,9 @@ spec:
       {{- else if .Values.voxtral.nodeSelector }}
       nodeSelector:
         {{- toYaml .Values.voxtral.nodeSelector | nindent 8 }}
+      {{- else if .Values.voxtral.nodeArch }}
+      nodeSelector:
+        kubernetes.io/arch: {{ .Values.voxtral.nodeArch }}
       {{- end }}
       {{- if .Values.voxtral.affinity }}
       affinity:

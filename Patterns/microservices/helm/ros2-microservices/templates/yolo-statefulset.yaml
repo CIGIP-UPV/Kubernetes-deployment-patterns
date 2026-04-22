@@ -32,6 +32,9 @@ spec:
       {{- else if .Values.yolo.nodeSelector }}
       nodeSelector:
         {{- toYaml .Values.yolo.nodeSelector | nindent 8 }}
+      {{- else if .Values.yolo.nodeArch }}
+      nodeSelector:
+        kubernetes.io/arch: {{ .Values.yolo.nodeArch }}
       {{- end }}
       {{- if .Values.yolo.affinity }}
       affinity:

@@ -32,6 +32,9 @@ spec:
       {{- else if .Values.camera.nodeSelector }}
       nodeSelector:
         {{- toYaml .Values.camera.nodeSelector | nindent 8 }}
+      {{- else if .Values.camera.nodeArch }}
+      nodeSelector:
+        kubernetes.io/arch: {{ .Values.camera.nodeArch }}
       {{- end }}
       {{- if .Values.camera.affinity }}
       affinity:

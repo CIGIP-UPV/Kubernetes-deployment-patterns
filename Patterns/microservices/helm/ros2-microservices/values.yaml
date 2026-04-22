@@ -27,6 +27,8 @@ camera:
   enabled: true
   nodeHostname: ""
   nodeSelector: {}
+  # Pin to edge (Jetson) by architecture. Used only if nodeHostname/nodeSelector are empty.
+  nodeArch: "arm64"
   tolerations: []
   affinity: {}
   device: /dev/video0
@@ -42,6 +44,8 @@ yolo:
   enabled: true
   nodeHostname: ""
   nodeSelector: {}
+  # Pin to edge (Jetson) — YOLO needs GPU, only available on arm64 edge node.
+  nodeArch: "arm64"
   tolerations: []
   affinity: {}
   modelPath: /opt/models/yolov8n.pt
@@ -55,6 +59,8 @@ llava:
   enabled: true
   nodeHostname: ""
   nodeSelector: {}
+  # Pin to edge (Jetson) — LLaVA needs GPU, only available on arm64 edge node.
+  nodeArch: "arm64"
   tolerations: []
   affinity: {}
   modelId: llava-hf/llava-1.5-7b-hf
@@ -68,16 +74,19 @@ voxtral:
   enabled: true
   nodeHostname: ""
   nodeSelector: {}
+  # Pin to edge (Jetson) — voxtral lives on the edge alongside the other robot
+  # nodes. Even in Phase 1 (no GPU), keep it on arm64 to avoid stranding on
+  # cloud nodes that don't have the nvidia runtime registered.
+  nodeArch: "arm64"
   tolerations: []
   affinity: {}
-  audioMode: false  # Phase 1: text simulation; Phase 2: set true + mount mic device
+  audioMode: true  # Audio + GPU inference enabled (FP16 on Jetson)
   modelId: mistralai/Voxtral-Mini-4B-Realtime-2602
   resources: {}
-  # Voxtral does not need GPU in Phase 1 (text-only simulation).
-  # Disable nvidia runtime so the pod can be scheduled on CPU-only nodes
-  # like kb2 (amd64) where the nvidia container runtime is not installed.
+  # Voxtral runs on the Jetson edge node with GPU acceleration (FP16).
+  # The pod uses the nvidia runtime and is pinned to arm64 via nodeArch above.
   gpu:
-    enabled: false
+    enabled: true
 
 topics:
   image: /camera/image_raw

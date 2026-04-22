@@ -59,7 +59,6 @@ questions:
     default: "0"
     required: true
     options:
-      - "40"
       - "0"
       - "10"
       - "20"
@@ -83,7 +82,7 @@ questions:
     label: "Camera Device"
     description: "Path del dispositivo de cámara (e.g. /dev/video0, /dev/video1)"
     type: string
-    default: "/dev/video0"
+    default: "/dev/video1"
     group: "Camera"
 
   - variable: camera.syntheticMode
@@ -116,63 +115,9 @@ questions:
 
   - variable: yolo.filterClasses
     label: "Filter Detection Classes"
-    description: "COCO class IDs to detect (empty = all 80 classes). Examples: '0' = person only, '0,16,17' = person+dog+cat"
+    description: "COCO class IDs to detect (empty = all 80 classes). Examples: '0' = person only, '0,56,60' = person+chair+screen"
     type: string
-    default: ""
-    group: "Experiment"
-
-  # ── Benchmark Probe ──────────────────────────────────────────────
-  - variable: benchmark.enabled
-    label: "Run Benchmark Probe"
-    description: "Launch a Job that collects latency, inference time and FPS metrics after deployment"
-    type: boolean
-    default: false
-    group: "Benchmark"
-
-  - variable: benchmark.durationSeconds
-    label: "Probe Duration (seconds)"
-    description: "How long the benchmark probe listens for ROS 2 metrics"
-    type: enum
-    default: 120
-    show_if: "benchmark.enabled=true"
-    options:
-      - 60
-      - 120
-      - 180
-      - 300
-    group: "Benchmark"
-
-  - variable: benchmark.initialWaitSeconds
-    label: "Initial Wait (seconds)"
-    description: "Seconds to wait for the main app to start before probing"
-    type: enum
-    default: 60
-    show_if: "benchmark.enabled=true"
-    options:
-      - 30
-      - 60
-      - 90
-      - 120
-    group: "Benchmark"
-
-  - variable: benchmark.httpPort
-    label: "Results HTTP Port"
-    description: "Port for the HTTP file server to download benchmark results (summary.json, latency.csv, inference.csv)"
-    type: int
-    default: 9999
-    show_if: "benchmark.enabled=true"
-    group: "Benchmark"
-
-  - variable: yolo.conf
-    label: "YOLO Confidence Threshold"
-    description: "Minimum confidence for object detection"
-    type: enum
-    default: 0.25
-    options:
-      - 0.10
-      - 0.25
-      - 0.50
-      - 0.75
+    default: "0,56,60"
     group: "Experiment"
 
 
@@ -256,7 +201,7 @@ questions:
     label: "YOLO Trigger Interval (s)"
     description: "Minimum seconds between YOLO-triggered LLaVA inferences (GPU throttle)"
     type: enum
-    default: 8
+    default: 30
     show_if: "llava.enabled=true&&llava.triggerOnYolo=true"
     options:
       - 5
@@ -302,26 +247,3 @@ questions:
     show_if: "voxtral.enabled=true"
     group: "Voxtral — Interacción por Voz"
 
-  # ── GPU Configuration ────────────────────────────────────────────
-  - variable: gpu.enabled
-    label: "Enable GPU"
-    description: "Expose NVIDIA GPU to model containers (Jetson AGX Orin). Sets NVIDIA_VISIBLE_DEVICES and NVIDIA_DRIVER_CAPABILITIES env vars."
-    type: boolean
-    default: true
-    group: "GPU"
-
-  - variable: gpu.runtimeClassName
-    label: "Runtime Class"
-    description: "Kubernetes runtimeClassName for NVIDIA container runtime."
-    type: string
-    default: "nvidia"
-    show_if: "gpu.enabled=true"
-    group: "GPU"
-
-  - variable: gpu.requestGpuResource
-    label: "Request nvidia.com/gpu Resource"
-    description: "Request nvidia.com/gpu in pod resource limits. Disable for microservices (multiple pods share one Jetson GPU). Enable only with GPU time-slicing."
-    type: boolean
-    default: false
-    show_if: "gpu.enabled=true"
-    group: "GPU"

@@ -209,6 +209,41 @@
   }
   .voxtral-input-row button:hover { background: var(--cigip-red-dark); }
 
+  /* ── Voxtral Mic Button & TTS ── */
+  .mic-btn {
+    width: 44px; height: 44px; flex-shrink: 0;
+    border-radius: 50%; border: 1px solid var(--border);
+    background: #F8F8FA; font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+  }
+  .mic-btn:hover { background: #EEEEF2; border-color: var(--border-strong); }
+  .mic-btn.recording {
+    background: var(--cigip-red); color: #fff; border-color: var(--cigip-red-dark);
+    box-shadow: 0 0 0 4px rgba(155,27,48,0.18);
+    animation: rec-pulse 1.2s infinite;
+  }
+  .mic-btn.processing {
+    background: var(--warn-bg); border-color: var(--warn); color: var(--warn);
+    animation: rec-pulse 0.8s infinite;
+  }
+  @keyframes rec-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+  .mic-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .tts-toggle {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: var(--text-secondary); cursor: pointer;
+    padding: 0 10px; user-select: none;
+  }
+  .tts-toggle input[type="checkbox"] { accent-color: var(--cigip-red); cursor: pointer; }
+
+  .voxtral-status {
+    margin-top: 8px; font-size: 11px; color: var(--muted);
+    font-family: 'JetBrains Mono', monospace; min-height: 14px;
+  }
+  .voxtral-status.active { color: var(--cigip-red); font-weight: 600; }
+  .voxtral-status.error { color: var(--error); }
+
   /* ── Resource Bars ── */
   .resource-bar { margin-bottom: 10px; }
   .resource-bar:last-child { margin-bottom: 0; }
@@ -351,9 +386,15 @@
         </div>
       </div>
       <div class="voxtral-input-row">
-        <input type="text" id="voxtralInput" placeholder="Enter a command to send to /voice/command...">
+        <button id="voxtralMic" class="mic-btn idle" title="Click to start/stop recording">&#x1F3A4;</button>
+        <input type="text" id="voxtralInput" placeholder="Type or press the mic to speak...">
         <button id="voxtralSend">Send</button>
+        <label class="tts-toggle" title="Read responses aloud (browser text-to-speech)">
+          <input type="checkbox" id="voxtralTts" checked>
+          <span>&#x1F50A; Speak</span>
+        </label>
       </div>
+      <div class="voxtral-status" id="voxtralStatus">Press the mic button to speak, or type a command.</div>
     </div>
   </div>
 
@@ -444,6 +485,8 @@ const llavaInferenceTopic = params.get('llava_inference')    || '/llava/metrics_
 const voiceCommandTopic   = params.get('voice_command')     || '/voice/command';
 const voiceResponseTopic  = params.get('voice_response')    || '/voice/response';
 const voiceTranscriptTopic= params.get('voice_transcript')  || '/voice/transcript';
+const voiceAudioChunkTopic= params.get('voice_audio_chunk') || '/voice/audio_chunk';
+const VOXTRAL_SAMPLE_RATE = 16000;
 
 // Auto-detect rosbridge WebSocket port
 const rosbridgePort = params.get('rosbridge_port') ||
@@ -645,6 +688,9 @@ function subscribeToTopics() {
       const el = document.getElementById('voxtralResponse');
       el.textContent = msg.data;
       el.classList.remove('placeholder');
+      // Fire browser text-to-speech so the operator hears the answer.
+      speakResponse(msg.data);
+      setStatus('Response received.');
     });
 
   // ── Voxtral Transcript ──
@@ -654,6 +700,7 @@ function subscribeToTopics() {
       const el = document.getElementById('voxtralCommand');
       el.textContent = msg.data;
       el.classList.remove('placeholder');
+      setStatus('Heard: "' + msg.data + '"');
     });
 
   // ── CPU ──
@@ -773,6 +820,260 @@ setInterval(() => {
   const s = String(elapsed % 60).padStart(2, '0');
   document.getElementById('uptimeDisplay').textContent = `Dashboard uptime: ${h}:${m}:${s}`;
 }, 1000);
+
+// ═══════════════════════════════════════════════════════════════════
+//  VOXTRAL — Microphone capture + text-to-speech (browser side)
+// ═══════════════════════════════════════════════════════════════════
+//
+//  Flow:
+//    [MacBook mic] → getUserMedia → AudioContext (ScriptProcessor)
+//      → Float32 buffer → downsample to 16 kHz → Int16 LE
+//      → ROSLIB.Topic publish(/voice/audio_chunk, Int16MultiArray)
+//      → [Voxtral node in cluster transcribes on GPU]
+//      → /voice/transcript → /llava/trigger → /llava/response
+//      → /voice/response → speechSynthesis.speak() (this file)
+//
+//  Notes:
+//    - AudioContext sampleRate hint is honored by Chrome/Firefox but NOT
+//      Safari — so we always resample in JS after capture.
+//    - ScriptProcessor is deprecated but universally supported. We avoid
+//      AudioWorklet because it needs a separate module file (not trivial
+//      to ship via Helm ConfigMap).
+//    - Int16 PCM at 16 kHz gives ~32 KB/s, about 100 KB for a 3s clip.
+//      Rosbridge serializes Int16MultiArray.data as a JSON int array;
+//      in practice LAN WebSocket handles ~500 KB frames comfortably.
+
+let audioStream = null;
+let audioCtx = null;
+let audioSource = null;
+let audioProcessor = null;
+let audioBuffer = [];       // Array<Float32Array>, appended as chunks arrive
+let audioCtxSampleRate = 0; // actual rate the browser gave us
+let isRecording = false;
+let ttsEnabled = true;
+let cachedTtsVoice = null;
+let recordStartTs = 0;
+
+const MIN_RECORDING_S = 0.5;   // shorter clips = probably accidental tap
+const MAX_RECORDING_S = 15.0;  // cap to avoid runaway chunks
+
+function setStatus(text, cls) {
+  const el = document.getElementById('voxtralStatus');
+  if (!el) return;
+  el.textContent = text || '';
+  el.classList.remove('active', 'error');
+  if (cls) el.classList.add(cls);
+}
+
+function updateMicUI(state) {
+  const btn = document.getElementById('voxtralMic');
+  if (!btn) return;
+  btn.classList.remove('idle', 'recording', 'processing');
+  btn.classList.add(state);
+  if (state === 'recording')      btn.innerHTML = '&#x23FA;';   // ⏺ stop
+  else if (state === 'processing') btn.innerHTML = '&#x23F3;';  // ⏳
+  else                             btn.innerHTML = '&#x1F3A4;'; // 🎤
+}
+
+async function startRecording() {
+  if (isRecording) return;
+  if (!ros || !isConnected) {
+    setStatus('Not connected to rosbridge yet.', 'error');
+    return;
+  }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    setStatus('Browser does not support microphone capture.', 'error');
+    return;
+  }
+  try {
+    audioStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        channelCount: 1,
+        sampleRate: VOXTRAL_SAMPLE_RATE,
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    });
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new Ctx({ sampleRate: VOXTRAL_SAMPLE_RATE });
+    audioCtxSampleRate = audioCtx.sampleRate; // what we really got
+    audioSource = audioCtx.createMediaStreamSource(audioStream);
+    audioProcessor = audioCtx.createScriptProcessor(4096, 1, 1);
+
+    audioBuffer = [];
+    audioProcessor.onaudioprocess = function(e) {
+      if (!isRecording) return;
+      // Copy because the underlying buffer is reused by the browser.
+      audioBuffer.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+    };
+    audioSource.connect(audioProcessor);
+    audioProcessor.connect(audioCtx.destination);
+
+    isRecording = true;
+    recordStartTs = Date.now();
+    updateMicUI('recording');
+    setStatus('Recording… press again to stop.', 'active');
+
+    // Safety cap: auto-stop after MAX_RECORDING_S.
+    setTimeout(function() {
+      if (isRecording && (Date.now() - recordStartTs) / 1000 >= MAX_RECORDING_S) {
+        setStatus('Max recording length reached — sending.', 'active');
+        stopRecording();
+      }
+    }, MAX_RECORDING_S * 1000 + 50);
+  } catch (err) {
+    console.error('[voxtral] Mic error:', err);
+    setStatus('Microphone denied or unavailable: ' + err.message, 'error');
+    updateMicUI('idle');
+  }
+}
+
+async function stopRecording() {
+  if (!isRecording) return;
+  isRecording = false;
+  updateMicUI('processing');
+
+  try {
+    if (audioProcessor) { audioProcessor.disconnect(); audioProcessor.onaudioprocess = null; }
+    if (audioSource)    { audioSource.disconnect(); }
+    if (audioStream)    { audioStream.getTracks().forEach(function(t){ t.stop(); }); }
+    if (audioCtx && audioCtx.state !== 'closed') await audioCtx.close();
+  } catch (e) {
+    console.warn('[voxtral] Teardown warning:', e);
+  }
+
+  // Concatenate all Float32 chunks recorded during the session.
+  let totalLen = 0;
+  for (const c of audioBuffer) totalLen += c.length;
+  if (totalLen === 0) {
+    setStatus('No audio captured.', 'error');
+    updateMicUI('idle');
+    return;
+  }
+  const combined = new Float32Array(totalLen);
+  let off = 0;
+  for (const c of audioBuffer) { combined.set(c, off); off += c.length; }
+  audioBuffer = [];
+
+  const rawSeconds = combined.length / audioCtxSampleRate;
+  if (rawSeconds < MIN_RECORDING_S) {
+    setStatus('Recording too short (' + rawSeconds.toFixed(2) + 's). Hold the mic longer.', 'error');
+    updateMicUI('idle');
+    return;
+  }
+
+  // Downsample to 16 kHz if the browser gave us something else (Safari → 44.1 kHz).
+  const target = VOXTRAL_SAMPLE_RATE;
+  const src = audioCtxSampleRate;
+  let resampled;
+  if (Math.abs(src - target) < 1) {
+    resampled = combined;
+  } else {
+    resampled = linearResample(combined, src, target);
+  }
+
+  // Float32 [-1, 1] → Int16 little-endian.
+  const int16 = new Int16Array(resampled.length);
+  for (let i = 0; i < resampled.length; i++) {
+    const s = Math.max(-1, Math.min(1, resampled[i]));
+    int16[i] = s < 0 ? Math.round(s * 0x8000) : Math.round(s * 0x7FFF);
+  }
+
+  publishAudioChunk(int16, rawSeconds);
+  updateMicUI('idle');
+}
+
+function linearResample(input, fromRate, toRate) {
+  const ratio = fromRate / toRate;
+  const outLen = Math.floor(input.length / ratio);
+  const out = new Float32Array(outLen);
+  for (let i = 0; i < outLen; i++) {
+    const srcIdx = i * ratio;
+    const low = Math.floor(srcIdx);
+    const high = Math.min(low + 1, input.length - 1);
+    const frac = srcIdx - low;
+    out[i] = input[low] * (1 - frac) + input[high] * frac;
+  }
+  return out;
+}
+
+function publishAudioChunk(int16Array, durationS) {
+  if (!ros || !isConnected) {
+    setStatus('Lost connection — cannot send audio.', 'error');
+    return;
+  }
+  try {
+    const topic = new ROSLIB.Topic({
+      ros,
+      name: voiceAudioChunkTopic,
+      messageType: 'std_msgs/msg/Int16MultiArray'
+    });
+    // rosbridge expects plain JS arrays for int16[]; TypedArrays are
+    // not serialized to JSON the way we need, so convert once here.
+    const dataArr = new Array(int16Array.length);
+    for (let i = 0; i < int16Array.length; i++) dataArr[i] = int16Array[i];
+
+    const msg = new ROSLIB.Message({
+      layout: { dim: [], data_offset: 0 },
+      data: dataArr
+    });
+    topic.publish(msg);
+
+    const kb = (int16Array.length * 2 / 1024).toFixed(1);
+    console.log(
+      '[voxtral] Published audio chunk: ' + int16Array.length + ' samples, ' +
+      durationS.toFixed(2) + 's, ' + kb + ' KB raw'
+    );
+    setStatus('Sent ' + durationS.toFixed(1) + 's of audio. Transcribing…', 'active');
+  } catch (err) {
+    console.error('[voxtral] publishAudioChunk error:', err);
+    setStatus('Failed to publish audio: ' + err.message, 'error');
+  }
+}
+
+function toggleRecording() {
+  if (isRecording) stopRecording();
+  else startRecording();
+}
+
+// Load Spanish voice once the browser has voices ready.
+function refreshTtsVoice() {
+  if (!window.speechSynthesis) return;
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices || voices.length === 0) return;
+  cachedTtsVoice =
+    voices.find(function(v){ return v.lang && v.lang.toLowerCase().startsWith('es'); }) ||
+    voices.find(function(v){ return v.default; }) ||
+    voices[0];
+}
+if (window.speechSynthesis) {
+  refreshTtsVoice();
+  window.speechSynthesis.onvoiceschanged = refreshTtsVoice;
+}
+
+function speakResponse(text) {
+  if (!ttsEnabled || !window.speechSynthesis || !text) return;
+  try {
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    if (cachedTtsVoice) { utter.voice = cachedTtsVoice; utter.lang = cachedTtsVoice.lang; }
+    else                { utter.lang = 'es-ES'; }
+    utter.rate = 1.05;
+    utter.pitch = 1.0;
+    window.speechSynthesis.speak(utter);
+  } catch (e) {
+    console.warn('[voxtral] TTS error:', e);
+  }
+}
+
+// Wire up UI.
+document.getElementById('voxtralMic').addEventListener('click', toggleRecording);
+document.getElementById('voxtralTts').addEventListener('change', function(e) {
+  ttsEnabled = e.target.checked;
+  if (!ttsEnabled && window.speechSynthesis) window.speechSynthesis.cancel();
+  setStatus(ttsEnabled ? 'Text-to-speech enabled.' : 'Text-to-speech muted.');
+});
 
 // ── Start ──
 initRosConnection();
