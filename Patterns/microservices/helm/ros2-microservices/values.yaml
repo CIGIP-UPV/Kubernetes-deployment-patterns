@@ -73,6 +73,11 @@ voxtral:
   audioMode: false  # Phase 1: text simulation; Phase 2: set true + mount mic device
   modelId: mistralai/Voxtral-Mini-4B-Realtime-2602
   resources: {}
+  # Voxtral does not need GPU in Phase 1 (text-only simulation).
+  # Disable nvidia runtime so the pod can be scheduled on CPU-only nodes
+  # like kb2 (amd64) where the nvidia container runtime is not installed.
+  gpu:
+    enabled: false
 
 topics:
   image: /camera/image_raw
@@ -122,6 +127,10 @@ dashboard:
     tag: latest
     pullPolicy: Always
   nodeHostname: ""  # Pin to cloud node (e.g., worker1-kb2)
+  # Architecture selector when nodeHostname is empty. Use amd64 for kb2,
+  # arm64 for edgenode01. Avoids scheduling an amd64 image on arm64 node
+  # (or vice-versa), which causes "exec format error".
+  nodeArch: "amd64"
   resources: {}
   service:
     type: NodePort

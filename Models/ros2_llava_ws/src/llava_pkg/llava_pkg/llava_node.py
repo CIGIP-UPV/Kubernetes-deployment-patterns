@@ -343,7 +343,8 @@ class LlavaNode(Node):
             batch = self._processor(
                 text=prompt_text,
                 images=self.current_frame,
-                return_tensors='pt'
+                return_tensors='pt',
+                padding=True
             )
             inputs = {k: v.to(self._model.device) for k, v in batch.items()}
 

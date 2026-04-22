@@ -28,6 +28,9 @@ spec:
       {{- if .Values.dashboard.nodeHostname }}
       nodeSelector:
         kubernetes.io/hostname: {{ .Values.dashboard.nodeHostname }}
+      {{- else if .Values.dashboard.nodeArch }}
+      nodeSelector:
+        kubernetes.io/arch: {{ .Values.dashboard.nodeArch }}
       {{- end }}
       # Wait for DDS peer DNS to be resolvable before starting rosbridge.
       # CycloneDDS only resolves peer addresses once at startup.
