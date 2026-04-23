@@ -84,7 +84,24 @@ if _platform.machine() == 'aarch64':
         pass
 
     if 'torch._dynamo' not in _sys.modules:
-        _dynamo = _types.ModuleType('torch._dynamo')
+        # Pass-through callable: works both as `fn = dynamo.decorator(fn)`
+        # (returns its argument unchanged) and as a plain no-op function.
+        def _dynamo_passthrough(*args, **kwargs):
+            if len(args) == 1 and callable(args[0]) and not kwargs:
+                return args[0]
+            return _dynamo_passthrough
+
+        class _DynamoModule(_types.ModuleType):
+            """Permissive stub for torch._dynamo. Any attribute access
+            returns a pass-through decorator/function, which covers
+            allow_in_graph, mark_dynamic, mark_static, skip_frame, etc.
+            as transformers adds new decorators across releases."""
+            def __getattr__(self, name):
+                if name.startswith('__') and name.endswith('__'):
+                    raise AttributeError(name)
+                return _dynamo_passthrough
+
+        _dynamo = _DynamoModule('torch._dynamo')
         _dynamo.is_compiling = lambda: False
         _dynamo.assume_constant_result = lambda fn: fn
         def _mock_disable(fn=None, recursive=True):
@@ -92,16 +109,21 @@ if _platform.machine() == 'aarch64':
                 return fn
             return lambda f: f
         _dynamo.disable = _mock_disable
-        _dynamo.utils = _types.ModuleType('torch._dynamo.utils')
-        _dynamo.utils.is_compile_supported = lambda device_type="": False
+
+        _dynamo_utils = _DynamoModule('torch._dynamo.utils')
+        _dynamo_utils.is_compile_supported = lambda device_type="": False
+
         _sys.modules['torch._dynamo'] = _dynamo
-        _sys.modules['torch._dynamo.utils'] = _dynamo.utils
+        _sys.modules['torch._dynamo.utils'] = _dynamo_utils
 
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String, Float32, Int16MultiArray
 import time
 import threading
+import os
+import tempfile
+import traceback
 
 
 # Keywords that indicate the operator wants visual scene analysis
@@ -131,7 +153,7 @@ class VoxtralNode(Node):
 
         # ── Parameters ────────────────────────────────────────────────
         self.declare_parameter('audio_mode',          False)
-        self.declare_parameter('model_id',            'mistralai/Voxtral-Mini-4B-Realtime-2602')
+        self.declare_parameter('model_id',            'mistralai/Voxtral-Mini-3B-2507')
         self.declare_parameter('command_topic',       '/voice/command')
         self.declare_parameter('transcript_topic',    '/voice/transcript')
         self.declare_parameter('response_topic',      '/voice/response')
@@ -198,13 +220,31 @@ class VoxtralNode(Node):
     def _init_audio_mode(self):
         """Load Voxtral model and start microphone capture."""
         model_id  = self.get_parameter('model_id').value
+        # Stash on self so the audio callbacks can pass model_id to
+        # VoxtralProcessor.apply_transcrition_request(...).
+        self._model_id = model_id
         cache_dir = self.get_parameter('hf_cache_dir').value
 
         self.get_logger().info(f'[Voxtral] Loading model {model_id} ...')
         try:
             import platform
             import torch
-            from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq
+            # Import via submodule paths to bypass transformers' _LazyModule.
+            # The torch.distributed stubs above (PermissiveMeta) interfere with
+            # transformers 4.55's top-level lazy attribute resolution, so
+            # `from transformers import AutoProcessor` fails even though the
+            # class exists. Submodule imports work because they skip the lazy
+            # dispatch entirely.
+            #
+            # We also bypass AutoProcessor itself: Voxtral's processor uses
+            # mistral_common tokenizer + Whisper feature extractor, which isn't
+            # reliably resolved by AutoProcessor.from_pretrained (it returns
+            # "Unrecognized processing class"). VoxtralProcessor loads directly.
+            #
+            # Voxtral is a multimodal LLM with audio input
+            # (VoxtralForConditionalGeneration), not a Seq2Seq speech model.
+            from transformers.models.voxtral.processing_voxtral import VoxtralProcessor
+            from transformers.models.voxtral.modeling_voxtral import VoxtralForConditionalGeneration
 
             # ── GPU diagnostic ───────────────────────────────────────
             cuda_ok = torch.cuda.is_available()
@@ -230,17 +270,24 @@ class VoxtralNode(Node):
             #   - use FP16 directly; 64 GB unified memory is plenty for a <8B model.
             # On non-Jetson (amd64 dev):
             #   - let accelerate do its thing with device_map='auto' + FP16.
-            self._processor = AutoProcessor.from_pretrained(model_id, cache_dir=cache_dir)
+            self._processor = VoxtralProcessor.from_pretrained(model_id, cache_dir=cache_dir)
 
             if is_jetson:
-                self._model = AutoModelForSpeechSeq2Seq.from_pretrained(
+                # attn_implementation="eager" — the Jetson PyTorch wheel
+                # (2.5.0a0 nv24.08) predates the `enable_gqa` kwarg added in
+                # torch 2.6. transformers 4.55's SDPA path passes it, causing
+                # TypeError at inference. "eager" uses the naive attention
+                # implementation (no SDPA/FA2), slightly slower but compatible.
+                self._model = VoxtralForConditionalGeneration.from_pretrained(
                     model_id,
                     cache_dir=cache_dir,
                     torch_dtype=torch.float16,
                     low_cpu_mem_usage=True,
+                    attn_implementation="eager",
                 )
                 self._model = self._model.to('cuda')
-                self.get_logger().info('[Voxtral] Model moved to CUDA (Jetson direct placement, FP16).')
+                self.get_logger().info(
+                    '[Voxtral] Model moved to CUDA (Jetson direct placement, FP16, eager attn).')
             else:
                 kwargs = dict(
                     cache_dir=cache_dir,
@@ -249,7 +296,7 @@ class VoxtralNode(Node):
                 )
                 if cuda_ok:
                     kwargs['device_map'] = 'auto'
-                self._model = AutoModelForSpeechSeq2Seq.from_pretrained(model_id, **kwargs)
+                self._model = VoxtralForConditionalGeneration.from_pretrained(model_id, **kwargs)
 
             self._model.eval()
             self._model_ready = True
@@ -292,19 +339,44 @@ class VoxtralNode(Node):
                 sd.wait()
                 audio_np = audio.squeeze()
 
-                inputs = self._processor(
-                    audio_np, sampling_rate=SAMPLE_RATE, return_tensors='pt'
-                )
-                # Move to GPU. On Jetson the model lives on cuda:0, on amd64
-                # with device_map='auto' the model.device attribute still
-                # reports cuda:0.
-                inputs = {k: (v.to(self._model.device) if hasattr(v, 'to') else v)
-                          for k, v in inputs.items()}
+                # Voxtral transcription API (mistral-common processor).
+                # See _audio_chunk_cb for rationale — apply_transcrition_request
+                # is the entry point that ships with transformers 4.55; some
+                # newer versions also expose apply_transcription_request.
+                _apply = (getattr(self._processor, 'apply_transcription_request', None)
+                          or getattr(self._processor, 'apply_transcrition_request'))
+                import soundfile as sf
+                with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
+                    tmp_wav = tmp.name
+                try:
+                    sf.write(tmp_wav, audio_np, SAMPLE_RATE,
+                             format='WAV', subtype='PCM_16')
+                    inputs = _apply(
+                        language='en',
+                        audio=tmp_wav,
+                        model_id=self._model_id,
+                    )
+                finally:
+                    try:
+                        os.unlink(tmp_wav)
+                    except OSError:
+                        pass
+                if hasattr(inputs, 'to'):
+                    inputs = inputs.to(self._model.device)
+                else:
+                    inputs = {k: (v.to(self._model.device) if hasattr(v, 'to') else v)
+                              for k, v in inputs.items()}
+                prompt_len = inputs['input_ids'].shape[1] if isinstance(inputs, dict) \
+                             else inputs.input_ids.shape[1]
 
                 with torch.inference_mode():
-                    ids = self._model.generate(**inputs, max_new_tokens=128)
+                    ids = self._model.generate(
+                        **(inputs if isinstance(inputs, dict) else dict(inputs)),
+                        max_new_tokens=128,
+                    )
 
-                text = self._processor.batch_decode(ids, skip_special_tokens=True)[0].strip()
+                text = self._processor.batch_decode(
+                    ids[:, prompt_len:], skip_special_tokens=True)[0].strip()
 
                 if text:
                     self.get_logger().info(f'[Voxtral] Transcript: {text}')
@@ -317,6 +389,8 @@ class VoxtralNode(Node):
                 '[Voxtral] sounddevice not installed. Install it to enable audio mode.')
         except Exception as e:
             self.get_logger().error(f'[Voxtral] Mic loop error: {e}')
+            self.get_logger().error(
+                '[Voxtral] Traceback:\n' + traceback.format_exc())
 
     # ── Browser audio callback (captured from dashboard via rosbridge) ─
     def _audio_chunk_cb(self, msg: Int16MultiArray):
@@ -348,19 +422,54 @@ class VoxtralNode(Node):
                 f'[Voxtral] Browser audio chunk: {samples.size} samples ({duration_s:.2f} s).')
 
             t_start = time.time()
-            inputs = self._processor(
-                audio_np,
-                sampling_rate=self._audio_sample_rate,
-                return_tensors='pt',
-            )
-            inputs = {k: (v.to(self._model.device) if hasattr(v, 'to') else v)
-                      for k, v in inputs.items()}
+            # Voxtral uses a mistral-common processor, not a Whisper-style one.
+            # The supported transcription entry point is
+            # `apply_transcrition_request` (note the typo in the method name —
+            # that's how Mistral shipped it and HF transformers 4.55 kept it).
+            # Some transformers versions may expose the corrected name as well.
+            _apply = (getattr(self._processor, 'apply_transcription_request', None)
+                      or getattr(self._processor, 'apply_transcrition_request'))
+            # Write the audio to a temporary WAV file and pass the path — that's
+            # the path documented in the Voxtral model card and is the most
+            # stable contract. Passing np.ndarray directly hits a NoneType/len()
+            # bug in mistral-common's audio handling in some 4.55 releases.
+            import soundfile as sf
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
+                tmp_wav = tmp.name
+            try:
+                sf.write(tmp_wav, audio_np, self._audio_sample_rate,
+                         format='WAV', subtype='PCM_16')
+                inputs = _apply(
+                    language='en',
+                    audio=tmp_wav,
+                    model_id=self._model_id,
+                )
+            finally:
+                try:
+                    os.unlink(tmp_wav)
+                except OSError:
+                    pass
+            # Move every tensor to the model device (also handles BatchFeature).
+            if hasattr(inputs, 'to'):
+                inputs = inputs.to(self._model.device)
+            else:
+                inputs = {k: (v.to(self._model.device) if hasattr(v, 'to') else v)
+                          for k, v in inputs.items()}
+
+            # Remember the prompt length so we can strip it from the output.
+            prompt_len = inputs['input_ids'].shape[1] if isinstance(inputs, dict) \
+                         else inputs.input_ids.shape[1]
 
             with torch.inference_mode():
-                ids = self._model.generate(**inputs, max_new_tokens=128)
+                ids = self._model.generate(
+                    **(inputs if isinstance(inputs, dict) else dict(inputs)),
+                    max_new_tokens=128,
+                )
 
+            # Slice off the prompt tokens — Voxtral emits [prompt..., response...]
+            # and we only want the response text.
             transcript = self._processor.batch_decode(
-                ids, skip_special_tokens=True)[0].strip()
+                ids[:, prompt_len:], skip_special_tokens=True)[0].strip()
             inf_ms = (time.time() - t_start) * 1000.0
 
             if not transcript:
@@ -380,6 +489,8 @@ class VoxtralNode(Node):
 
         except Exception as e:
             self.get_logger().error(f'[Voxtral] _audio_chunk_cb error: {e}')
+            self.get_logger().error(
+                '[Voxtral] Traceback:\n' + traceback.format_exc())
 
     # ── Text simulation callbacks ──────────────────────────────────────
 

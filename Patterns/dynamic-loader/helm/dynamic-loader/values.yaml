@@ -52,7 +52,9 @@ llava:
 voxtral:
   enabled: true
   audioMode: true  # Audio + GPU inference enabled (FP16 on Jetson)
-  modelId: mistralai/Voxtral-Mini-4B-Realtime-2602
+  # Voxtral-Mini-3B-2507 is the HF-transformers-compatible Voxtral model.
+  # The 4B-Realtime-2602 variant is vLLM-only (no preprocessor_config.json).
+  modelId: mistralai/Voxtral-Mini-3B-2507
   autoLoad: false
 
 topics:
@@ -88,6 +90,13 @@ service:
   port: 5000
   targetPort: 5000
 
+# ── Persistent HuggingFace cache (edge node) ──
+hfCache:
+  enabled: true
+  hostPath: /var/lib/ros2exp/hf_cache
+  mountPath: /opt/huggingface_cache
+  type: DirectoryOrCreate
+
 # ── CycloneDDS Unicast (cloud-edge communication) ──
 cyclonedds:
   enabled: true
@@ -98,6 +107,9 @@ cyclonedds:
 dashboard:
   enabled: true
   pattern: dynamic-loader  # rendered into dashboard.html via Helm replace of __PATTERN__
+  # Seconds to wait in the init container after main pod DNS resolves, so
+  # FastAPI + camera + (optionally YOLO/LLaVA/Voxtral) have time to start.
+  peerReadyGraceSeconds: 45
   image:
     repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard
     tag: latest

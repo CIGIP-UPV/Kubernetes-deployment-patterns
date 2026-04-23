@@ -46,7 +46,9 @@ llava:
 voxtral:
   enabled: true
   audioMode: true  # Audio + GPU inference enabled (FP16 on Jetson)
-  modelId: mistralai/Voxtral-Mini-4B-Realtime-2602
+  # Voxtral-Mini-3B-2507 is the HF-transformers-compatible Voxtral model.
+  # The 4B-Realtime-2602 variant is vLLM-only (no preprocessor_config.json).
+  modelId: mistralai/Voxtral-Mini-3B-2507
 
 topics:
   image: /camera/image_raw
@@ -74,6 +76,16 @@ gpu:
 
 resources: {}
 
+# ── Persistent HuggingFace cache (edge node) ──
+# Keeps the downloaded LLaVA / Voxtral weights on the host so pods don't have
+# to re-download them every rollout. Pointed at a writable directory on the
+# edge node's filesystem. Disable to fall back to an ephemeral emptyDir.
+hfCache:
+  enabled: true
+  hostPath: /var/lib/ros2exp/hf_cache   # edgenode01 filesystem
+  mountPath: /opt/huggingface_cache     # matches hf_cache_dir param in *_node.py
+  type: DirectoryOrCreate
+
 # ── CycloneDDS Unicast (cloud-edge communication) ──
 cyclonedds:
   enabled: true
@@ -84,6 +96,10 @@ cyclonedds:
 dashboard:
   enabled: true
   pattern: monolithic  # rendered into dashboard.html via Helm `replace` of __PATTERN__
+  # Seconds to wait in the init container after the main pod DNS resolves,
+  # before rosbridge starts. Monolithic loads everything in one pod, so this
+  # is the time for LLaVA + Voxtral to finish transformers/torch/CUDA imports.
+  peerReadyGraceSeconds: 60
   image:
     repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard
     tag: latest

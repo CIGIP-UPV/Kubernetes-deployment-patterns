@@ -45,9 +45,12 @@ ENV ROS_DISTRO=${ROS_DISTRO}
 ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 ENV ROS_DOMAIN_ID=42
 
-# HuggingFace model cache (model loaded at runtime when audio mode is enabled)
+# HuggingFace model cache — Voxtral weights are BAKED INTO THE IMAGE below
+# (no runtime download required). Cache paths must match for both build and
+# runtime so `from_pretrained(cache_dir=...)` finds the local snapshot.
 ENV TRANSFORMERS_CACHE=/opt/huggingface_cache
 ENV HF_HOME=/opt/huggingface_cache
+ENV HF_HUB_CACHE=/opt/huggingface_cache
 
 # Default: text simulation. Set to true via Helm values to enable audio+GPU inference.
 ENV VOXTRAL_AUDIO_MODE=false
@@ -136,6 +139,39 @@ COPY Models/ros2_voxtral_ws/src/voxtral_pkg src/voxtral_pkg
 SHELL ["/bin/bash", "-lc"]
 RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
     colcon build --symlink-install --packages-select voxtral_pkg
+
+# ── Pre-download Voxtral model during build (embedded in image) ───────────────
+# Voxtral-Mini-3B-2507 is a GATED Mistral model: you must accept the license on
+# HuggingFace and provide your token at build time via a BuildKit secret:
+#
+#   export HF_TOKEN=hf_xxxxxxxxxxxxxxxxx
+#   DOCKER_BUILDKIT=1 docker buildx build \
+#     --secret id=hf_token,env=HF_TOKEN \
+#     --build-arg TORCH_VARIANT=auto \
+#     --platform linux/arm64 \
+#     -t $REG/ros2-voxtral:latest \
+#     -f Models/ros2_voxtral_ws/docker/Dockerfile \
+#     --provenance=false --load .
+#
+# Uses huggingface_hub.snapshot_download (no torch import) so the build runs
+# fine under QEMU where CUDA libraries are absent. After this step the pod
+# starts fully offline — see HF_HUB_OFFLINE=1 below.
+RUN --mount=type=secret,id=hf_token,required=true \
+    python3 -m pip install --no-cache-dir huggingface_hub && \
+    mkdir -p /opt/huggingface_cache && \
+    HF_TOKEN="$(cat /run/secrets/hf_token)" HF_HUB_DISABLE_XET=1 python3 -c "\
+import os; \
+from huggingface_hub import snapshot_download; \
+print('[build] Downloading Voxtral-Mini-3B-2507 (gated)...'); \
+snapshot_download('mistralai/Voxtral-Mini-3B-2507', \
+                  cache_dir='/opt/huggingface_cache', \
+                  token=os.environ['HF_TOKEN']); \
+print('[build] Voxtral model cached in image successfully.'); \
+"
+
+# Model is now embedded — forbid any runtime connection to HuggingFace Hub.
+ENV HF_HUB_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1
 
 # ── Resource monitor (CPU/GPU metrics publisher) ──────────────────────────────
 COPY Models/ros2_voxtral_ws/scripts/resource_monitor.py /opt/scripts/resource_monitor.py

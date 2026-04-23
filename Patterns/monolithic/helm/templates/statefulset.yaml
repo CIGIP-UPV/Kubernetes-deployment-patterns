@@ -145,6 +145,14 @@ spec:
             - name: CYCLONEDDS_URI
               value: "file:///etc/cyclonedds/cyclonedds.xml"
             {{- end }}
+            {{- if .Values.hfCache.enabled }}
+            - name: HF_HOME
+              value: {{ .Values.hfCache.mountPath | quote }}
+            - name: TRANSFORMERS_CACHE
+              value: {{ .Values.hfCache.mountPath | quote }}
+            - name: HF_HUB_CACHE
+              value: {{ .Values.hfCache.mountPath | quote }}
+            {{- end }}
           command: ["/bin/bash", "-lc"]
           args:
             - |
@@ -240,6 +248,10 @@ spec:
               mountPath: /sys/devices/platform
               readOnly: true
             {{- end }}
+            {{- if .Values.hfCache.enabled }}
+            - name: hf-cache
+              mountPath: {{ .Values.hfCache.mountPath }}
+            {{- end }}
           startupProbe:
             exec:
               command:
@@ -281,4 +293,10 @@ spec:
           hostPath:
             path: /sys/devices/platform
             type: Directory
+        {{- end }}
+        {{- if .Values.hfCache.enabled }}
+        - name: hf-cache
+          hostPath:
+            path: {{ .Values.hfCache.hostPath }}
+            type: {{ .Values.hfCache.type | default "DirectoryOrCreate" }}
         {{- end }}

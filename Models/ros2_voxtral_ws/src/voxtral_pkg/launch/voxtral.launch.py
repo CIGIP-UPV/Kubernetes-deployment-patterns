@@ -12,7 +12,7 @@ def generate_launch_description():
             output='screen',
             parameters=[{
                 'audio_mode':           os.environ.get('VOXTRAL_AUDIO_MODE', 'false').lower() == 'true',
-                'model_id':             os.environ.get('VOXTRAL_MODEL_ID',   'mistralai/Voxtral-Mini-4B-Realtime-2602'),
+                'model_id':             os.environ.get('VOXTRAL_MODEL_ID',   'mistralai/Voxtral-Mini-3B-2507'),
                 'command_topic':        os.environ.get('VOICE_COMMAND_TOPIC',        '/voice/command'),
                 'transcript_topic':     os.environ.get('VOICE_TRANSCRIPT_TOPIC',     '/voice/transcript'),
                 'response_topic':       os.environ.get('VOICE_RESPONSE_TOPIC',       '/voice/response'),

@@ -29,9 +29,12 @@ spec:
       nodeSelector:
         kubernetes.io/hostname: {{ .Values.dashboard.nodeHostname }}
       {{- end }}
-      # Wait for the main StatefulSet pod DNS to be resolvable before
-      # starting rosbridge. CycloneDDS only resolves peer addresses once
-      # at startup — if DNS fails, it never retries.
+      # Dashboard is the last pod to start. We wait for:
+      #   1. DNS of the main monolithic pod-0 (CycloneDDS resolves peers once
+      #      at startup — if DNS fails, it never retries).
+      #   2. A grace period for all internal nodes (camera, YOLO, LLaVA,
+      #      Voxtral) to finish their heavy imports (transformers, torch,
+      #      CUDA) and start publishing.
       initContainers:
         - name: wait-for-peers
           image: busybox:1.36
@@ -45,7 +48,10 @@ spec:
                 echo "[init] $PEER not resolvable yet, retrying in 3s..."
                 sleep 3
               done
-              echo "[init] Peer resolved: $PEER -> $(nslookup "$PEER" | grep -A1 'Name:' | tail -1)"
+              echo "[init] Peer resolved: $PEER"
+              GRACE={{ .Values.dashboard.peerReadyGraceSeconds | default 60 }}
+              echo "[init] Waiting ${GRACE}s for camera/YOLO/LLaVA/Voxtral to finish loading models and start publishing"
+              sleep "$GRACE"
               echo "[init] Ready to start rosbridge"
       containers:
         - name: dashboard

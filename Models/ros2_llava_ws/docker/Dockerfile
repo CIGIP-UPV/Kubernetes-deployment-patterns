@@ -45,9 +45,12 @@ ENV ROS_DISTRO=${ROS_DISTRO}
 ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 ENV ROS_DOMAIN_ID=42
 
-# HuggingFace model cache — model is pre-downloaded during build
+# HuggingFace model cache — LLaVA weights are BAKED INTO THE IMAGE below.
+# Cache paths must match at build and runtime so from_pretrained(cache_dir=...)
+# finds the local snapshot; HF_HUB_OFFLINE at the end blocks any network call.
 ENV TRANSFORMERS_CACHE=/opt/huggingface_cache
 ENV HF_HOME=/opt/huggingface_cache
+ENV HF_HUB_CACHE=/opt/huggingface_cache
 
 # ── System dependencies ──────────────────────────────────────────────────────
 RUN for attempt in 1 2 3; do \
@@ -119,6 +122,10 @@ print('[build] Downloading LLaVA model files...'); \
 snapshot_download('llava-hf/llava-1.5-7b-hf', cache_dir='/opt/huggingface_cache'); \
 print('[build] LLaVA model cached successfully.'); \
 "
+
+# Model is embedded — forbid runtime connections to HuggingFace Hub.
+ENV HF_HUB_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1
 
 # ── Resource monitor ──────────────────────────────────────────────────────────
 COPY Models/ros2_llava_ws/scripts/resource_monitor.py /opt/scripts/resource_monitor.py

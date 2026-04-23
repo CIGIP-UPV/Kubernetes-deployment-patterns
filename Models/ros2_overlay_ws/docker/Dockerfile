@@ -130,9 +130,12 @@ print(f'[build] Saved {os.path.getsize(dst)/1e6:.1f} MB to {dst}'); \
       python3 -c "from ultralytics import YOLO; YOLO('/opt/models/yolov8n.pt')" ; \
     fi
 
-# Cache directories for transformers/huggingface models
+# Cache directories for transformers/huggingface models — LLaVA and Voxtral
+# are BAKED INTO THE IMAGE below, so cache_dir must match at runtime and the
+# HF_HUB_OFFLINE flag below blocks any accidental network call.
 ENV TRANSFORMERS_CACHE=/opt/huggingface_cache
 ENV HF_HOME=/opt/huggingface_cache
+ENV HF_HUB_CACHE=/opt/huggingface_cache
 
 # Pre-download LLaVA model during build.
 # Uses huggingface_hub.snapshot_download (no torch import) so the build works
@@ -145,6 +148,29 @@ print('[build] Downloading LLaVA model files...'); \
 snapshot_download('llava-hf/llava-1.5-7b-hf', cache_dir='/opt/huggingface_cache'); \
 print('[build] LLaVA model cached successfully.'); \
 "
+
+# Pre-download Voxtral-Mini-3B-2507 (gated). Requires HF_TOKEN via BuildKit:
+#   DOCKER_BUILDKIT=1 docker buildx build \
+#     --secret id=hf_token,env=HF_TOKEN \
+#     --build-arg TORCH_VARIANT=auto --platform linux/arm64 \
+#     -t $REG/ros2-overlay:latest \
+#     -f Models/ros2_overlay_ws/docker/Dockerfile \
+#     --provenance=false --load .
+RUN --mount=type=secret,id=hf_token,required=true \
+    mkdir -p /opt/huggingface_cache && \
+    HF_TOKEN="$(cat /run/secrets/hf_token)" HF_HUB_DISABLE_XET=1 python3 -c "\
+import os; \
+from huggingface_hub import snapshot_download; \
+print('[build] Downloading Voxtral-Mini-3B-2507 (gated)...'); \
+snapshot_download('mistralai/Voxtral-Mini-3B-2507', \
+                  cache_dir='/opt/huggingface_cache', \
+                  token=os.environ['HF_TOKEN']); \
+print('[build] Voxtral model cached in image successfully.'); \
+"
+
+# Both models are embedded — forbid runtime connections to HuggingFace Hub.
+ENV HF_HUB_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1
 
 # Standalone resource monitor (no colcon build needed — uses rclpy directly)
 COPY Models/ros2_monolithic_ws/scripts/resource_monitor.py /opt/scripts/resource_monitor.py

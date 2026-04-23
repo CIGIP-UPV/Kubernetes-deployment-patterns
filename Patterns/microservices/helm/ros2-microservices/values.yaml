@@ -81,7 +81,9 @@ voxtral:
   tolerations: []
   affinity: {}
   audioMode: true  # Audio + GPU inference enabled (FP16 on Jetson)
-  modelId: mistralai/Voxtral-Mini-4B-Realtime-2602
+  # Voxtral-Mini-3B-2507 is the HF-transformers-compatible Voxtral model.
+  # The 4B-Realtime-2602 variant is vLLM-only (no preprocessor_config.json).
+  modelId: mistralai/Voxtral-Mini-3B-2507
   resources: {}
   # Voxtral runs on the Jetson edge node with GPU acceleration (FP16).
   # The pod uses the nvidia runtime and is pinned to arm64 via nodeArch above.
@@ -122,6 +124,19 @@ gpu:
   requestGpuResource: false
   count: 1
 
+# ── Persistent HuggingFace cache (edge node) ──
+# Keeps the downloaded LLaVA / Voxtral weights on the host so pods don't have
+# to re-download them every rollout. Pointed at a writable directory on the
+# edge node's filesystem. Disable to fall back to an ephemeral emptyDir (pod
+# local, lost on restart).
+hfCache:
+  enabled: true
+  hostPath: /var/lib/ros2exp/hf_cache   # edgenode01 filesystem
+  mountPath: /opt/huggingface_cache     # matches hf_cache_dir param in *_node.py
+  # "DirectoryOrCreate" lets kubelet create the dir on first use (mode 0755,
+  # owned by root:root — the containers run as root so this is fine).
+  type: DirectoryOrCreate
+
 # ── CycloneDDS Unicast (cloud-edge communication) ──
 cyclonedds:
   enabled: true
@@ -132,6 +147,11 @@ cyclonedds:
 dashboard:
   enabled: true
   pattern: microservices  # rendered into dashboard.html via Helm replace of __PATTERN__
+  # Seconds to wait in the init container after all peer DNS records resolve,
+  # before rosbridge starts. Gives the LLaVA/Voxtral/YOLO nodes time to finish
+  # heavy imports and start publishing so rosbridge doesn't miss the first
+  # latched messages.
+  peerReadyGraceSeconds: 30
   image:
     repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard
     tag: latest

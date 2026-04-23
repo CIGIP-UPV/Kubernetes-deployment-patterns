@@ -17,7 +17,7 @@ setup(
     zip_safe=True,
     maintainer='CIGIP-UPV',
     maintainer_email='lmoya.upv@gmail.com',
-    description='Voxtral-Mini-4B voice interaction ROS 2 node',
+    description='Voxtral-Mini-3B voice interaction ROS 2 node',
     license='MIT',
     tests_require=['pytest'],
     entry_points={

@@ -168,6 +168,14 @@ spec:
             - name: NVIDIA_DRIVER_CAPABILITIES
               value: {{ .Values.gpu.driverCapabilities | default "compute,utility" | quote }}
             {{- end }}
+            {{- if .Values.hfCache.enabled }}
+            - name: HF_HOME
+              value: {{ .Values.hfCache.mountPath | quote }}
+            - name: TRANSFORMERS_CACHE
+              value: {{ .Values.hfCache.mountPath | quote }}
+            - name: HF_HUB_CACHE
+              value: {{ .Values.hfCache.mountPath | quote }}
+            {{- end }}
           command: ["/bin/bash", "-lc"]
           args:
             - |
@@ -197,7 +205,6 @@ spec:
             {{- with .Values.resources.dynamicHost }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-          {{- if or .Values.cyclonedds.enabled (and (ne .Values.dynamic.apiPort "") true) }}
           volumeMounts:
             - name: app-code
               mountPath: /app
@@ -211,16 +218,10 @@ spec:
               mountPath: /sys/devices/platform
               readOnly: true
             {{- end }}
-          {{- else }}
-          volumeMounts:
-            - name: app-code
-              mountPath: /app
-            {{- if .Values.gpu.enabled }}
-            - name: sys-devices-platform
-              mountPath: /sys/devices/platform
-              readOnly: true
+            {{- if .Values.hfCache.enabled }}
+            - name: hf-cache
+              mountPath: {{ .Values.hfCache.mountPath }}
             {{- end }}
-          {{- end }}
           livenessProbe:
             httpGet:
               path: /health
@@ -250,4 +251,10 @@ spec:
           hostPath:
             path: /sys/devices/platform
             type: Directory
+        {{- end }}
+        {{- if .Values.hfCache.enabled }}
+        - name: hf-cache
+          hostPath:
+            path: {{ .Values.hfCache.hostPath }}
+            type: {{ .Values.hfCache.type | default "DirectoryOrCreate" }}
         {{- end }}

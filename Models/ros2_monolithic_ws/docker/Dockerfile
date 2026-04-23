@@ -46,9 +46,12 @@ ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 ENV ROS_DOMAIN_ID=42
 ENV YOLO_VERBOSE=False
 
-# HuggingFace cache (LLaVA model downloaded at runtime → cached in PVC)
+# HuggingFace cache — LLaVA and Voxtral weights are BAKED INTO THE IMAGE below.
+# Cache paths must match for build and runtime so from_pretrained(cache_dir=...)
+# finds the local snapshot; HF_HUB_OFFLINE at the end blocks any network call.
 ENV TRANSFORMERS_CACHE=/opt/huggingface_cache
 ENV HF_HOME=/opt/huggingface_cache
+ENV HF_HUB_CACHE=/opt/huggingface_cache
 
 # Retry logic: QEMU arm64 emulation may segfault on libc-bin post-install
 RUN for attempt in 1 2 3; do \
@@ -160,6 +163,29 @@ print('[build] Downloading LLaVA model files...'); \
 snapshot_download('llava-hf/llava-1.5-7b-hf', cache_dir='/opt/huggingface_cache'); \
 print('[build] LLaVA model cached successfully.'); \
 "
+
+# Pre-download Voxtral-Mini-3B-2507 (gated). Requires HF_TOKEN via BuildKit:
+#   DOCKER_BUILDKIT=1 docker buildx build \
+#     --secret id=hf_token,env=HF_TOKEN \
+#     --build-arg TORCH_VARIANT=auto --platform linux/arm64 \
+#     -t $REG/ros2-monolithic:latest \
+#     -f Models/ros2_monolithic_ws/docker/Dockerfile \
+#     --provenance=false --load .
+RUN --mount=type=secret,id=hf_token,required=true \
+    mkdir -p /opt/huggingface_cache && \
+    HF_TOKEN="$(cat /run/secrets/hf_token)" HF_HUB_DISABLE_XET=1 python3 -c "\
+import os; \
+from huggingface_hub import snapshot_download; \
+print('[build] Downloading Voxtral-Mini-3B-2507 (gated)...'); \
+snapshot_download('mistralai/Voxtral-Mini-3B-2507', \
+                  cache_dir='/opt/huggingface_cache', \
+                  token=os.environ['HF_TOKEN']); \
+print('[build] Voxtral model cached in image successfully.'); \
+"
+
+# Both models are embedded — forbid runtime connections to HuggingFace Hub.
+ENV HF_HUB_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1
 
 # Standalone resource monitor
 COPY Models/ros2_monolithic_ws/scripts/resource_monitor.py /opt/scripts/resource_monitor.py

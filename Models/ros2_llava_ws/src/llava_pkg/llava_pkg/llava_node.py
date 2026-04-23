@@ -266,7 +266,32 @@ class LlavaNode(Node):
                 f'({torch.cuda.get_device_properties(0).total_memory / 1e9:.0f} GB VRAM available).')
 
         self._processor = AutoProcessor.from_pretrained(model_id, cache_dir=cache_dir)
+
+        # LLaVA-1.5's LLaMA tokenizer ships without a pad_token. Even with
+        # `padding=True`, the processor fails with "Unable to create tensor,
+        # you should probably activate padding". The standard HF fix is to
+        # alias pad_token to eos_token before any tokenization happens.
+        tok = getattr(self._processor, 'tokenizer', None)
+        if tok is not None and tok.pad_token is None:
+            tok.pad_token = tok.eos_token
+            self.get_logger().info(
+                '[LLaVA] Set tokenizer.pad_token = eos_token (LLaMA has no pad by default).')
+
+        # transformers >=4.47 warns (and in 4.55 errors) if LlavaProcessor
+        # doesn't have patch_size / vision_feature_select_strategy set on the
+        # processor itself. Pull them from the model config below if missing.
+
         self._model     = LlavaForConditionalGeneration.from_pretrained(model_id, **kwargs)
+
+        # Backfill processor attrs from the model config (defensive)
+        try:
+            if getattr(self._processor, 'patch_size', None) is None:
+                self._processor.patch_size = self._model.config.vision_config.patch_size
+            if getattr(self._processor, 'vision_feature_select_strategy', None) is None:
+                self._processor.vision_feature_select_strategy = \
+                    getattr(self._model.config, 'vision_feature_select_strategy', 'default')
+        except Exception as e:
+            self.get_logger().debug(f'[LLaVA] Processor backfill skipped: {e}')
         if is_jetson:
             self._model = self._model.to('cuda')
             self.get_logger().info('[LLaVA] Model moved to CUDA (Jetson direct placement).')

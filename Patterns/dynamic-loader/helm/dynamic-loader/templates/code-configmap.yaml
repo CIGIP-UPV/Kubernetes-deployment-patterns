@@ -44,7 +44,7 @@ data:
     # Voxtral config
     VOXTRAL_ENABLED = os.getenv("VOXTRAL_ENABLED", "false").lower() == "true"
     VOXTRAL_AUDIO_MODE = os.getenv("VOXTRAL_AUDIO_MODE", "false").lower() == "true"
-    VOXTRAL_MODEL_ID = os.getenv("VOXTRAL_MODEL_ID", "mistralai/Voxtral-Mini-4B-Realtime-2602")
+    VOXTRAL_MODEL_ID = os.getenv("VOXTRAL_MODEL_ID", "mistralai/Voxtral-Mini-3B-2507")
     VOXTRAL_AUTO_LOAD = os.getenv("VOXTRAL_AUTO_LOAD", "false").lower() == "true"
     VOICE_COMMAND_TOPIC = os.getenv("VOICE_COMMAND_TOPIC", "/voice/command")
     VOICE_TRANSCRIPT_TOPIC = os.getenv("VOICE_TRANSCRIPT_TOPIC", "/voice/transcript")

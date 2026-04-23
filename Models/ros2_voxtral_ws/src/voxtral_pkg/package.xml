@@ -3,7 +3,7 @@
 <package format="3">
   <name>voxtral_pkg</name>
   <version>1.0.0</version>
-  <description>ROS 2 node for Voxtral-Mini-4B voice interaction (human-robot interaction)</description>
+  <description>ROS 2 node for Voxtral-Mini-3B voice interaction (human-robot interaction)</description>
   <maintainer email="lmoya.upv@gmail.com">CIGIP-UPV</maintainer>
   <license>MIT</license>
 

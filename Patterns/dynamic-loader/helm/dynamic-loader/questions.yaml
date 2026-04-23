@@ -200,7 +200,7 @@ questions:
   # ── Voxtral — Voice Interaction ──────────────────────────────────
   - variable: voxtral.enabled
     label: "Enable Voxtral"
-    description: "Enable Voxtral-Mini-4B for human-robot voice interaction (load manually via API)"
+    description: "Enable Voxtral-Mini-3B for human-robot voice interaction (load manually via API)"
     type: boolean
     default: true
     group: "Voxtral — Interacción por Voz"
