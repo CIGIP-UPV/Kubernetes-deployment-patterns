@@ -90,9 +90,11 @@ service:
   port: 5000
   targetPort: 5000
 
-# ── Persistent HuggingFace cache (edge node) ──
+# ── HuggingFace cache (DISABLED — models baked into image) ──
+# dynamicHost reuses the ros2-monolithic image which has LLaVA and Voxtral
+# weights baked in. Mounting a hostPath here would hide that in-image cache.
 hfCache:
-  enabled: true
+  enabled: false
   hostPath: /var/lib/ros2exp/hf_cache
   mountPath: /opt/huggingface_cache
   type: DirectoryOrCreate

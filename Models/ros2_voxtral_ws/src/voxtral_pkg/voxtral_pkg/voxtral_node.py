@@ -270,7 +270,14 @@ class VoxtralNode(Node):
             #   - use FP16 directly; 64 GB unified memory is plenty for a <8B model.
             # On non-Jetson (amd64 dev):
             #   - let accelerate do its thing with device_map='auto' + FP16.
-            self._processor = VoxtralProcessor.from_pretrained(model_id, cache_dir=cache_dir)
+            # local_files_only=True — the model was baked into the image at
+            # /opt/huggingface_cache during the build with snapshot_download.
+            # Without this flag, transformers tries to validate revisions
+            # against the Hub even with HF_HUB_OFFLINE=1 set, and fails with
+            # "Cannot reach .../api/models/.../tree/main: offline mode is
+            # enabled" instead of using the local cache.
+            self._processor = VoxtralProcessor.from_pretrained(
+                model_id, cache_dir=cache_dir, local_files_only=True)
 
             if is_jetson:
                 # attn_implementation="eager" — the Jetson PyTorch wheel
@@ -284,6 +291,7 @@ class VoxtralNode(Node):
                     torch_dtype=torch.float16,
                     low_cpu_mem_usage=True,
                     attn_implementation="eager",
+                    local_files_only=True,
                 )
                 self._model = self._model.to('cuda')
                 self.get_logger().info(
@@ -293,6 +301,7 @@ class VoxtralNode(Node):
                     cache_dir=cache_dir,
                     torch_dtype=torch.float16 if cuda_ok else torch.float32,
                     low_cpu_mem_usage=True,
+                    local_files_only=True,
                 )
                 if cuda_ok:
                     kwargs['device_map'] = 'auto'

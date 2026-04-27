@@ -241,10 +241,15 @@ class LlavaNode(Node):
         import platform
         is_jetson = (platform.machine() == 'aarch64' and cuda_ok)
 
+        # local_files_only=True — model is baked into the image at
+        # /opt/huggingface_cache during build; without this flag transformers
+        # tries to validate revisions against the Hub and aborts with
+        # "offline mode is enabled" instead of using the local cache.
         kwargs = dict(
             cache_dir=cache_dir,
             torch_dtype=self._dtype,
             low_cpu_mem_usage=True,
+            local_files_only=True,
         )
         if not is_jetson:
             kwargs['device_map'] = 'auto'
@@ -265,7 +270,8 @@ class LlavaNode(Node):
                 '[LLaVA] Jetson detected — skipping bitsandbytes, using FP16 '
                 f'({torch.cuda.get_device_properties(0).total_memory / 1e9:.0f} GB VRAM available).')
 
-        self._processor = AutoProcessor.from_pretrained(model_id, cache_dir=cache_dir)
+        self._processor = AutoProcessor.from_pretrained(
+            model_id, cache_dir=cache_dir, local_files_only=True)
 
         # LLaVA-1.5's LLaMA tokenizer ships without a pad_token. Even with
         # `padding=True`, the processor fails with "Unable to create tensor,
@@ -291,7 +297,7 @@ class LlavaNode(Node):
                 self._processor.vision_feature_select_strategy = \
                     getattr(self._model.config, 'vision_feature_select_strategy', 'default')
         except Exception as e:
-            self.get_logger().debug(f'[LLaVA] Processor backfill skipped: {e}')
+            self.get_logger().warn(f'[LLaVA] Processor backfill skipped: {e}')
         if is_jetson:
             self._model = self._model.to('cuda')
             self.get_logger().info('[LLaVA] Model moved to CUDA (Jetson direct placement).')
@@ -365,6 +371,36 @@ class LlavaNode(Node):
             # LLaVA chat template
             prompt_text = f'USER: <image>\n{question}\nASSISTANT:'
 
+            # ── Defensive guard: re-apply processor state right before the call.
+            # transformers 4.48 LlavaProcessor occasionally needs patch_size /
+            # vision_feature_select_strategy set ON THE PROCESSOR INSTANCE for
+            # the <image> token to be expanded correctly during __call__. If
+            # they're missing, the resulting BatchEncoding has mismatched
+            # shapes and the cryptic "Unable to create tensor, you should
+            # probably activate padding" error surfaces from the tokenizer.
+            tok = getattr(self._processor, 'tokenizer', None)
+            if tok is not None and tok.pad_token is None:
+                tok.pad_token = tok.eos_token
+            if getattr(self._processor, 'patch_size', None) is None:
+                try:
+                    self._processor.patch_size = self._model.config.vision_config.patch_size
+                except Exception:
+                    self._processor.patch_size = 14  # LLaVA-1.5 default
+            if getattr(self._processor, 'vision_feature_select_strategy', None) is None:
+                self._processor.vision_feature_select_strategy = getattr(
+                    self._model.config, 'vision_feature_select_strategy', 'default')
+
+            # One-time diagnostic log of the actual runtime state.
+            if not getattr(self, '_inference_state_logged', False):
+                self.get_logger().info(
+                    f'[LLaVA] Processor state @ first inference: '
+                    f'pad_token={tok.pad_token!r}, '
+                    f'patch_size={self._processor.patch_size}, '
+                    f'vfss={self._processor.vision_feature_select_strategy}, '
+                    f'image_token_index={getattr(self._model.config, "image_token_index", None)}'
+                )
+                self._inference_state_logged = True
+
             batch = self._processor(
                 text=prompt_text,
                 images=self.current_frame,
@@ -405,7 +441,11 @@ class LlavaNode(Node):
             )
 
         except Exception as e:
-            self.get_logger().error(f'[LLaVA] Inference error: {e}')
+            import traceback
+            self.get_logger().error(
+                f'[LLaVA] Inference error: {type(e).__name__}: {e}\n'
+                f'{traceback.format_exc()}'
+            )
         finally:
             self.is_processing = False
             # Process queued manual prompt (priority over YOLO auto-triggers)

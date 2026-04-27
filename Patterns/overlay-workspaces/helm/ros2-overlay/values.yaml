@@ -75,9 +75,13 @@ gpu:
 
 resources: {}
 
-# ── Persistent HuggingFace cache (edge node) ──
+# ── HuggingFace cache (DISABLED — models baked into image) ──
+# LLaVA and Voxtral weights are baked into the Docker image at build time.
+# Mounting a hostPath here would hide the in-image cache and break
+# `from_pretrained(local_files_only=True)`. Re-enable only to override with
+# weights stored on the edge node (must populate hostPath manually).
 hfCache:
-  enabled: true
+  enabled: false
   hostPath: /var/lib/ros2exp/hf_cache
   mountPath: /opt/huggingface_cache
   type: DirectoryOrCreate

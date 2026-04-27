@@ -75,13 +75,17 @@ COPY --from=cuda-libs /cuda-export/ /usr/local/cuda/lib64/
 # ── HuggingFace + audio deps (installed BEFORE PyTorch so pip doesn't overwrite the NVIDIA wheel)
 #   NOTE: Voxtral (VoxtralForConditionalGeneration / VoxtralProcessor) landed in transformers 4.54.
 #         LLaVA is NOT in this image, so we don't need the 4.48 pin that the shared images use.
-#   NOTE: numpy<2 is required because the Jetson PyTorch wheel (2.5.0a0 nv24.08) was compiled
-#         against NumPy 1.x ABI; NumPy 2.x triggers "_ARRAY_API not found" and may crash C ext.
+#   NOTE: numpy must be in the 1.23-1.26 range. The Jetson PyTorch wheel
+#         (2.5.0a0 nv24.08) is compiled against NumPy C-API 0x10 (NumPy 1.23-1.26,
+#         NOT NumPy 2.0+ which is API 0x12). The ros:humble base ships NumPy 1.21
+#         (API 0xe) — too old. NumPy 2.x — too new ("_ARRAY_API not found"). Both
+#         break torch.from_numpy() and transformers disguises it as a misleading
+#         "activate padding" error in BatchFeature.convert_to_tensors.
 RUN python3 -m pip install --no-cache-dir --upgrade pip && \
-    python3 -m pip install --no-cache-dir \
+    python3 -m pip install --no-cache-dir --upgrade \
       "transformers>=4.54,<4.56" \
       "accelerate>=0.34" \
-      "numpy<2" \
+      "numpy>=1.23,<2" \
       sounddevice \
       librosa \
       soundfile \

@@ -76,12 +76,14 @@ gpu:
 
 resources: {}
 
-# ── Persistent HuggingFace cache (edge node) ──
-# Keeps the downloaded LLaVA / Voxtral weights on the host so pods don't have
-# to re-download them every rollout. Pointed at a writable directory on the
-# edge node's filesystem. Disable to fall back to an ephemeral emptyDir.
+# ── HuggingFace cache (DISABLED — models baked into image) ──
+# LLaVA and Voxtral weights are now BAKED INTO the Docker image at build time
+# via snapshot_download. Mounting a hostPath at /opt/huggingface_cache hides
+# the in-image cache and breaks `from_pretrained(local_files_only=True)` with
+# "No local files found". Re-enable only to override with a checkpoint stored
+# on the edge node (must populate the hostPath manually).
 hfCache:
-  enabled: true
+  enabled: false
   hostPath: /var/lib/ros2exp/hf_cache   # edgenode01 filesystem
   mountPath: /opt/huggingface_cache     # matches hf_cache_dir param in *_node.py
   type: DirectoryOrCreate

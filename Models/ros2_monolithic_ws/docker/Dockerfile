@@ -76,14 +76,19 @@ RUN for attempt in 1 2 3; do \
 COPY --from=cuda-libs /cuda-export/ /usr/local/cuda/lib64/
 
 # YOLO + LLaVA + Voxtral Python dependencies (installed BEFORE PyTorch so they don't overwrite the NVIDIA wheel)
+#   numpy must be in the 1.23-1.26 range. The Jetson PyTorch wheel (2.5.0a0 nv24.08)
+#   is compiled against NumPy C-API 0x10 (NumPy 1.23-1.26, NOT 2.x which is 0x12).
+#   The ros:humble base ships NumPy 1.21 (API 0xe) — too old. NumPy 2.x — too new
+#   ("_ARRAY_API not found"). Both break torch.from_numpy() and transformers
+#   disguises it as a misleading "activate padding" error.
 RUN python3 -m pip install --no-cache-dir --upgrade pip && \
-    python3 -m pip install --no-cache-dir \
+    python3 -m pip install --no-cache-dir --upgrade \
       ultralytics==8.3.2 \
       "transformers>=4.48,<4.49" \
       "accelerate>=0.34" \
       bitsandbytes \
       Pillow \
-      numpy \
+      "numpy>=1.23,<2" \
       sounddevice \
       librosa \
       soundfile \

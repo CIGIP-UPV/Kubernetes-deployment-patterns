@@ -67,9 +67,14 @@ COPY --from=cuda-libs /cuda-export/ /usr/local/cuda/lib64/
 #   arm64 (Jetson AGX Orin / JetPack 6.1, CUDA 12.6): NVIDIA pre-built wheel
 #   amd64: standard CUDA 12.1 wheels from PyTorch
 # Python dependencies (installed BEFORE PyTorch so they don't overwrite the NVIDIA wheel)
+#   numpy must be in the 1.23-1.26 range. Jetson PyTorch wheel 2.5.0a0 nv24.08 is
+#   built against NumPy C-API 0x10 (= NumPy 1.23-1.26, not 2.x = 0x12). The
+#   ros:humble base ships NumPy 1.21 (too old). NumPy 2.x is also incompatible
+#   ("_ARRAY_API not found"). Both break torch.from_numpy(); transformers then
+#   surfaces it as a misleading "activate padding" error.
 RUN python3 -m pip install --no-cache-dir --upgrade pip && \
-    python3 -m pip install --no-cache-dir \
-      ultralytics==8.3.2 numpy "transformers>=4.48,<4.49" "accelerate>=0.34" bitsandbytes Pillow \
+    python3 -m pip install --no-cache-dir --upgrade \
+      ultralytics==8.3.2 "numpy>=1.23,<2" "transformers>=4.48,<4.49" "accelerate>=0.34" bitsandbytes Pillow \
       sounddevice librosa soundfile mistral-common
 
 # PyTorch — architecture-aware installation (MUST run AFTER deps to prevent pip overwrite)

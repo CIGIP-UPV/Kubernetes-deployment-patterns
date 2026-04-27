@@ -72,13 +72,20 @@ RUN for attempt in 1 2 3; do \
 COPY --from=cuda-libs /cuda-export/ /usr/local/cuda/lib64/
 
 # ── HuggingFace + LLaVA deps (installed BEFORE PyTorch so they don't overwrite the NVIDIA wheel)
+#   numpy: the Jetson PyTorch wheel (2.5.0a0 nv24.08) is compiled against NumPy
+#   C-API 0x10, which corresponds to NumPy 1.23-1.26 (NOT NumPy 2.x — that's
+#   API 0x12). The ros:humble base ships NumPy 1.21 (API 0xe), too old for the
+#   wheel; NumPy 2.x is too new (raises "_ARRAY_API not found"). Both fail with
+#   "torch.from_numpy: Numpy is not available", which transformers then surfaces
+#   as a misleading "activate padding" error in BatchFeature.convert_to_tensors.
+#   Use --upgrade to overwrite the apt-installed 1.21.
 RUN python3 -m pip install --no-cache-dir --upgrade pip && \
-    python3 -m pip install --no-cache-dir \
+    python3 -m pip install --no-cache-dir --upgrade \
       "transformers>=4.48,<4.49" \
       "accelerate>=0.34" \
       bitsandbytes \
       Pillow \
-      numpy
+      "numpy>=1.23,<2"
 
 # ── PyTorch — architecture-aware installation (MUST run AFTER deps to prevent pip overwrite)
 #   arm64 (Jetson AGX Orin / JetPack 6.1, CUDA 12.6): NVIDIA pre-built wheel
