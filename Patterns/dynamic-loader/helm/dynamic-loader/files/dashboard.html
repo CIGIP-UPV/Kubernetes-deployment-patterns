@@ -672,23 +672,28 @@ function subscribeToTopics() {
       document.getElementById('llavaInference').textContent = msg.data.toFixed(0);
     });
 
-  // ── LLaVA Response ──
+  // ── LLaVA Response (mirrored into Voxtral box) ──
   new ROSLIB.Topic({ ros, name: llavaResponseTopic, messageType: 'std_msgs/msg/String' })
     .subscribe(function(msg) {
       if (!isConnected) return;
       const el = document.getElementById('llavaResponse');
       el.textContent = msg.data;
       el.classList.add('has-response');
+
+      const voxEl = document.getElementById('voxtralResponse');
+      if (voxEl) {
+        voxEl.textContent = msg.data;
+        voxEl.classList.remove('placeholder');
+      }
     });
 
-  // ── Voxtral Response ──
+  // ── Voxtral Response (back-channel) ──
   new ROSLIB.Topic({ ros, name: voiceResponseTopic, messageType: 'std_msgs/msg/String' })
     .subscribe(function(msg) {
       if (!isConnected) return;
       const el = document.getElementById('voxtralResponse');
       el.textContent = msg.data;
       el.classList.remove('placeholder');
-      // Fire browser text-to-speech so the operator hears the answer.
       speakResponse(msg.data);
       setStatus('Response received.');
     });

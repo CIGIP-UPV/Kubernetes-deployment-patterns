@@ -673,15 +673,26 @@ function subscribeToTopics() {
     });
 
   // ── LLaVA Response ──
+  // Mirrors into both the LLaVA card AND the Voxtral system-response field so
+  // the user sees the system's reply in the voice-interaction box without
+  // depending on Voxtral republishing /voice/response.
   new ROSLIB.Topic({ ros, name: llavaResponseTopic, messageType: 'std_msgs/msg/String' })
     .subscribe(function(msg) {
       if (!isConnected) return;
       const el = document.getElementById('llavaResponse');
       el.textContent = msg.data;
       el.classList.add('has-response');
+
+      const voxEl = document.getElementById('voxtralResponse');
+      if (voxEl) {
+        voxEl.textContent = msg.data;
+        voxEl.classList.remove('placeholder');
+      }
     });
 
-  // ── Voxtral Response ──
+  // ── Voxtral Response (back-channel from voxtral_node) ──
+  // Voxtral republishes LLaVA answers here. If this fires, it overrides the
+  // mirror above. If it doesn't fire, the mirror keeps the box updated.
   new ROSLIB.Topic({ ros, name: voiceResponseTopic, messageType: 'std_msgs/msg/String' })
     .subscribe(function(msg) {
       if (!isConnected) return;

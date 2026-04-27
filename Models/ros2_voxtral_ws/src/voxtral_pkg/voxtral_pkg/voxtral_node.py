@@ -270,14 +270,27 @@ class VoxtralNode(Node):
             #   - use FP16 directly; 64 GB unified memory is plenty for a <8B model.
             # On non-Jetson (amd64 dev):
             #   - let accelerate do its thing with device_map='auto' + FP16.
-            # local_files_only=True — the model was baked into the image at
-            # /opt/huggingface_cache during the build with snapshot_download.
-            # Without this flag, transformers tries to validate revisions
-            # against the Hub even with HF_HUB_OFFLINE=1 set, and fails with
-            # "Cannot reach .../api/models/.../tree/main: offline mode is
-            # enabled" instead of using the local cache.
-            self._processor = VoxtralProcessor.from_pretrained(
+            # ── Resolve local snapshot path ──────────────────────────
+            # Voxtral uses Mistral's `tekken.json` instead of the standard HF
+            # tokenizer files (`tokenizer.json`, `tokenizer_config.json`, ...).
+            # When you pass a model_id with `local_files_only=True`, the HF
+            # cache resolver insists on the standard tokenizer files and
+            # aborts with "No local files found" — even when the snapshot is
+            # complete and `mistral-common` could read tekken.json fine.
+            # Workaround: resolve the model_id to its on-disk snapshot path
+            # via `huggingface_hub.snapshot_download(local_files_only=True)`,
+            # which just returns the cached directory without touching the
+            # network, then pass that absolute path to `from_pretrained`.
+            # transformers then enters its "directory load" code path which
+            # is more lenient and lets `mistral-common` handle tekken.json.
+            from huggingface_hub import snapshot_download as _hf_snapshot
+            local_path = _hf_snapshot(
                 model_id, cache_dir=cache_dir, local_files_only=True)
+            self.get_logger().info(
+                f'[Voxtral] Resolved local snapshot: {local_path}')
+
+            self._processor = VoxtralProcessor.from_pretrained(
+                local_path, local_files_only=True)
 
             if is_jetson:
                 # attn_implementation="eager" — the Jetson PyTorch wheel
@@ -286,8 +299,7 @@ class VoxtralNode(Node):
                 # TypeError at inference. "eager" uses the naive attention
                 # implementation (no SDPA/FA2), slightly slower but compatible.
                 self._model = VoxtralForConditionalGeneration.from_pretrained(
-                    model_id,
-                    cache_dir=cache_dir,
+                    local_path,
                     torch_dtype=torch.float16,
                     low_cpu_mem_usage=True,
                     attn_implementation="eager",
@@ -298,14 +310,13 @@ class VoxtralNode(Node):
                     '[Voxtral] Model moved to CUDA (Jetson direct placement, FP16, eager attn).')
             else:
                 kwargs = dict(
-                    cache_dir=cache_dir,
                     torch_dtype=torch.float16 if cuda_ok else torch.float32,
                     low_cpu_mem_usage=True,
                     local_files_only=True,
                 )
                 if cuda_ok:
                     kwargs['device_map'] = 'auto'
-                self._model = VoxtralForConditionalGeneration.from_pretrained(model_id, **kwargs)
+                self._model = VoxtralForConditionalGeneration.from_pretrained(local_path, **kwargs)
 
             self._model.eval()
             self._model_ready = True
@@ -330,11 +341,32 @@ class VoxtralNode(Node):
         Capture audio from ALSA device and transcribe with Voxtral.
         Requires: pyaudio or sounddevice + the ALSA device mounted in the container.
         Phase 2 — implemented when microphone is confirmed working.
+
+        If /dev/snd is not mounted (typical in K8s pods without --device or hostPath
+        of /dev/snd), `sounddevice.query_devices()` returns -1 and the loop exits
+        cleanly with an INFO message. Browser audio via /voice/audio_chunk keeps
+        working — local mic is optional.
         """
         try:
             import sounddevice as sd
             import numpy as np
             import torch
+
+            # Probe for any audio device before starting the capture loop.
+            # In a containerized environment without /dev/snd mounted, this
+            # returns no devices and we exit gracefully instead of spamming
+            # the log with PortAudioError on every iteration.
+            try:
+                devices = sd.query_devices()
+                has_input = any(d.get('max_input_channels', 0) > 0 for d in devices)
+            except Exception:
+                has_input = False
+
+            if not has_input:
+                self.get_logger().info(
+                    '[Voxtral] No audio input device available (likely /dev/snd not mounted). '
+                    'Local mic disabled — browser audio via /voice/audio_chunk still works.')
+                return
 
             SAMPLE_RATE = 16000
             CHUNK_S     = 3      # seconds per chunk

@@ -164,14 +164,28 @@ RUN --mount=type=secret,id=hf_token,required=true \
     python3 -m pip install --no-cache-dir huggingface_hub && \
     mkdir -p /opt/huggingface_cache && \
     HF_TOKEN="$(cat /run/secrets/hf_token)" HF_HUB_DISABLE_XET=1 python3 -c "\
-import os; \
+import os, sys; \
 from huggingface_hub import snapshot_download; \
+tok = os.environ.get('HF_TOKEN', ''); \
+print(f'[build] HF_TOKEN length: {len(tok)} (must be > 0)'); \
+assert len(tok) > 10, '[build] FATAL: HF_TOKEN empty or too short — secret not passed correctly'; \
 print('[build] Downloading Voxtral-Mini-3B-2507 (gated)...'); \
-snapshot_download('mistralai/Voxtral-Mini-3B-2507', \
-                  cache_dir='/opt/huggingface_cache', \
-                  token=os.environ['HF_TOKEN']); \
-print('[build] Voxtral model cached in image successfully.'); \
-"
+local_dir = snapshot_download('mistralai/Voxtral-Mini-3B-2507', \
+                              cache_dir='/opt/huggingface_cache', \
+                              token=tok); \
+print(f'[build] snapshot_download returned: {local_dir}'); \
+" && \
+    # Fail-fast: verify the cache actually contains the safetensors blobs.
+    # If snapshot_download silently produced an empty tree (e.g. 401 auth),
+    # the build must abort instead of producing a broken image.
+    SIZE_KB=$(du -sk /opt/huggingface_cache/models--mistralai--Voxtral-Mini-3B-2507/ 2>/dev/null | awk '{print $1}') && \
+    echo "[build] Voxtral cache size: ${SIZE_KB} KB" && \
+    if [ -z "$SIZE_KB" ] || [ "$SIZE_KB" -lt 1000000 ]; then \
+      echo "[build] FATAL: Voxtral cache size too small (${SIZE_KB} KB < 1 GB). Token rejected or download failed." ; \
+      ls -laR /opt/huggingface_cache/models--mistralai--Voxtral-Mini-3B-2507/ ; \
+      exit 1 ; \
+    fi && \
+    echo "[build] Voxtral model verified: ${SIZE_KB} KB cached."
 
 # Model is now embedded — forbid any runtime connection to HuggingFace Hub.
 ENV HF_HUB_OFFLINE=1
