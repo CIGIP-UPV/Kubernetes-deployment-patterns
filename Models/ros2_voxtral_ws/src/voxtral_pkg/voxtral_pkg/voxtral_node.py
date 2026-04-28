@@ -148,8 +148,14 @@ class VoxtralNode(Node):
     LLaVA, and any future TTS backend.
     """
 
-    def __init__(self):
-        super().__init__('voxtral_node')
+    def __init__(self, **kwargs):
+        # **kwargs allows rclpy_components to pass node options when loaded
+        # via component_container_isolated. Note: the mic loop in this node
+        # detects /dev/snd absence at startup and exits the loop cleanly,
+        # so the node IS componentizable as long as the cluster doesn't
+        # mount /dev/snd into the host pod. Browser audio via
+        # /voice/audio_chunk works regardless.
+        super().__init__('voxtral_node', **kwargs)
 
         # ── Parameters ────────────────────────────────────────────────
         self.declare_parameter('audio_mode',          False)

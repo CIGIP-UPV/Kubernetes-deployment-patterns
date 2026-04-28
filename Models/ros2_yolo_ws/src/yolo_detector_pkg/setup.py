@@ -20,5 +20,8 @@ setup(
         'console_scripts': [
             'yolo_detector = yolo_detector_pkg.object_detection:main',
         ],
+        'rclpy_components': [
+            'yolo_detector_pkg::YoloDetector = yolo_detector_pkg.object_detection:YoloDetector',
+        ],
     },
 )

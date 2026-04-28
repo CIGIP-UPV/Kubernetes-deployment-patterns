@@ -145,8 +145,11 @@ class LlavaNode(Node):
       - /llava/metrics_inference_ms: std_msgs/Float32 — model inference time
     """
 
-    def __init__(self):
-        super().__init__('llava_node')
+    def __init__(self, **kwargs):
+        # **kwargs allows rclpy_components to pass node options when
+        # loaded via component_container_isolated. Standalone main()
+        # passes nothing, so kwargs={} and behavior is identical.
+        super().__init__('llava_node', **kwargs)
 
         # ── Parameters ──────────────────────────────────────────────
         self.declare_parameter('model_id', 'llava-hf/llava-1.5-7b-hf')

@@ -1,0 +1,204 @@
+replicaCount: 1
+
+# ── Imagenes Docker (dos: base inmutable + overlay carrier) ─────────────────
+images:
+  base:
+    # ROS 2 Humble + camera_driver + CUDA L4T. Immutable platform layer.
+    repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-base
+    tag: latest
+    pullPolicy: Always
+  overlayPack:
+    # OCI carrier with AI nodes + ML stack + model weights. Used by:
+    #   1) the pre-install Job to populate the PVC on cloud (kb2)
+    #   2) NEVER as a runtime container (it's busybox-based, not a service)
+    repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-overlay-pack
+    tag: latest
+    pullPolicy: Always
+
+imagePullSecretName: regcred
+
+# ── Versionado del overlay (subdirectorio en el PVC) ────────────────────────
+# Por defecto se usa Chart.Version (1.0.0). Cambia esto SOLO si quieres que
+# el overlay viva en un subdir distinto al de la versión del chart.
+# Ver _helpers.tpl → ros2-overlay-canonical.overlayVersion.
+# overlayVersion: ""
+
+# ── Nodos del cluster donde corren las piezas ───────────────────────────────
+# El overlay canónico es cloud-edge: el contenido vive en cloud, el runtime
+# corre en edge. Estos nombres se usan como nodeSelector.
+nodes:
+  cloud:
+    name: kb2          # Donde viven el PVC, el Job y el overlay-server (nginx)
+  edge:
+    name: edgenode01   # Donde corre el StatefulSet runtime con la GPU
+
+# ── PVC overlay-source (en kb2) ─────────────────────────────────────────────
+# Storage class K3s default (local-path). 30 GB cubre overlay-pack actual
+# (~17 GB) más espacio para una versión vieja (rollback inmediato).
+overlaySource:
+  pvcName: overlay-source
+  size: 30Gi
+  accessMode: ReadWriteOnce       # Solo un pod escribe a la vez (el Job, luego el server)
+  storageClass: local-path        # K3s default; cambia si tienes otro provisioner
+
+# ── ROS 2 ───────────────────────────────────────────────────────────────────
+ros:
+  domainId: "42"
+  rmwImplementation: rmw_cyclonedds_cpp
+  localhostOnly: "0"
+
+# ── CycloneDDS ──────────────────────────────────────────────────────────────
+cyclonedds:
+  enabled: true
+  allowMulticast: "false"
+  extraPeers: []  # Adicional al runtime pod + dashboard pod (auto-gestionados)
+
+# ── Camera driver (en base, corre dentro del runtime pod) ───────────────────
+camera:
+  enabled: true
+  device: /dev/video0
+  width: 1280
+  height: 720
+  fps: 0                          # 0 = unlimited (native rate); >0 = limit
+  frameId: camera
+  syntheticMode: false
+  mountVideoDevice: true          # Activa privileged mode para acceso a /dev/video*
+
+# ── YOLO (en overlay) ───────────────────────────────────────────────────────
+yolo:
+  enabled: true
+  modelPath: /opt/overlay/models/yolov8n.pt   # path dentro del overlay sync'd
+  conf: 0.25
+  publishDebugImage: "true"
+  publishMetrics: "true"
+  startDelaySeconds: 2
+  filterClasses: ""               # "" = all 80 COCO classes
+
+# ── LLaVA (en overlay) ──────────────────────────────────────────────────────
+llava:
+  enabled: true
+  modelId: llava-hf/llava-1.5-7b-hf
+  triggerOnYolo: true             # Auto-describe cada N segundos en YOLO detection
+  yoloTriggerIntervalS: 30.0
+  maxNewTokens: 150
+  load4bit: true                  # Ignored on Jetson (FP16 used directly)
+  startDelaySeconds: 15
+
+# ── Voxtral (en overlay) ────────────────────────────────────────────────────
+# audioMode: false porque el overlay-pack usa transformers 4.48 (LLaVA-1.5
+# constraint), incompatible con VoxtralForConditionalGeneration (4.54+).
+# Voxtral cae a TEXT_SIMULATION mode automáticamente. Ver PLAN sección 10.
+voxtral:
+  enabled: true
+  audioMode: false
+  modelId: mistralai/Voxtral-Mini-3B-2507
+
+# ── Topics (compartidos, igual que en otros patterns) ───────────────────────
+topics:
+  image: /camera/image_raw
+  detections: /detections
+  debugImage: /detections/image
+  latency: /benchmark/latency_ms
+  inference: /benchmark/inference_ms
+  llavaResponse: /llava/response
+  llavaLatency: /llava/metrics_latency_ms
+  llavaInference: /llava/metrics_inference_ms
+  llavaTrigger: /llava/trigger
+  voiceCommand: /voice/command
+  voiceTranscript: /voice/transcript
+  voiceResponse: /voice/response
+  voiceLatency: /voice/metrics_latency_ms
+
+# ── NVIDIA GPU (Jetson AGX Orin) ────────────────────────────────────────────
+gpu:
+  enabled: true
+  runtimeClassName: nvidia        # Pod-level runtimeClass (nvidia-container-runtime)
+  visibleDevices: "all"           # NVIDIA_VISIBLE_DEVICES
+  driverCapabilities: "compute,utility"
+  requestGpuResource: true        # Request nvidia.com/gpu in resource limits
+  count: 1
+
+resources: {}
+
+# ── Overlay server (nginx sidecar en kb2 que sirve el PVC vía HTTP) ─────────
+overlayServer:
+  enabled: true
+  image:
+    repository: nginx
+    tag: alpine
+    pullPolicy: IfNotPresent
+  service:
+    name: overlay-server          # FQDN: <fullname>-overlay-server.<ns>.svc.cluster.local
+    port: 80
+  resources:
+    limits:
+      memory: 256Mi
+      cpu: 500m
+    requests:
+      memory: 64Mi
+      cpu: 50m
+
+# ── Pre-install Job (carrier → PVC) ─────────────────────────────────────────
+# El Job arranca por Helm hook pre-install + pre-upgrade, copia el contenido
+# del carrier image al PVC (subdir versionado), y termina. hook-delete-policy
+# lo limpia tras éxito.
+preInstallJob:
+  resources:
+    limits:
+      memory: 512Mi
+      cpu: 1
+    requests:
+      memory: 128Mi
+      cpu: 100m
+  ttlSecondsAfterFinished: 300    # Cleanup automático tras 5 min
+
+# ── Init container del runtime pod (sync HTTP del overlay) ──────────────────
+# Descarga /opt/overlay/{overlayVersion}/* desde el overlay-server al emptyDir.
+# Timeout amplio porque puede transferir hasta ~17 GB.
+overlaySync:
+  image:
+    repository: alpine
+    tag: latest
+    pullPolicy: IfNotPresent
+  timeoutSeconds: 1800            # 30 min (margen amplio para 17 GB en LAN K3s)
+
+# ── Dashboard (cloud, kb2) ──────────────────────────────────────────────────
+dashboard:
+  enabled: true
+  pattern: overlay-canonical
+  # Grace period tras resolver DNS de los peers — da tiempo a que el runtime
+  # pod cargue los modelos y empiece a publicar antes de que rosbridge
+  # arranque y el browser abra la UI.
+  peerReadyGraceSeconds: 60
+  image:
+    repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard
+    tag: latest
+    pullPolicy: Always
+  nodeHostname: ""                # Pin opcional a un nodo cloud específico
+  resources: {}
+  service:
+    type: NodePort
+    httpNodePort: 31406
+    wsNodePort: 31407
+
+# ── Benchmark job (opcional, para mediciones del paper) ─────────────────────
+benchmark:
+  enabled: false
+  durationSeconds: 120
+  initialWaitSeconds: 60
+  httpPort: 9999
+  ttlSecondsAfterFinished: 3600
+
+# ── Security context (default permisivo para acceso a /dev/video y GPU) ─────
+securityContext:
+  runAsNonRoot: false
+  allowPrivilegeEscalation: false
+
+# ── Service genérico (deshabilitado por defecto) ────────────────────────────
+service:
+  enabled: false
+  type: ClusterIP
+  port: 8080
+
+nameOverride: ""
+fullnameOverride: ""

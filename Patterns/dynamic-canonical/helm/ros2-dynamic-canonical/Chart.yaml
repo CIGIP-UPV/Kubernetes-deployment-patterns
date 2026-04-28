@@ -1,0 +1,30 @@
+apiVersion: v2
+name: ros2-dynamic-canonical
+description: |
+  Canonical Dynamic Module Loading pattern for ROS 2 robotics on Kubernetes.
+
+  Realizes the canonical ROS 2 dynamic composition theory:
+    - A long-lived component_container_isolated process exposes
+      LoadNode / UnloadNode services.
+    - Plugins (camera, yolo, llava, voxtral) are registered via
+      `rclpy_components` entry_points and loaded INTO the container's
+      process on demand — true intra-process composition, not subprocess
+      spawning.
+    - A FastAPI orchestrator container (sibling in the same pod) calls
+      those services via HTTP API, exposing /load, /unload, /list to
+      the dashboard.
+
+  Replaces Patterns/dynamic-loader/ which used FastAPI + subprocess.Popen
+  to spawn separate `ros2 run` processes — same hot-swap UX but missing
+  the canonical composition semantics described in the paper.
+type: application
+version: 1.0.0
+appVersion: humble
+keywords:
+  - ros2
+  - dynamic-composition
+  - rclpy-components
+  - canonical
+maintainers:
+  - name: Miguel-Angel-Mateo-Casali
+    email: mmateo@cigip.upv.es

@@ -1,0 +1,101 @@
+{{- if .Values.dashboard.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "ros2-dynamic-canonical.fullname" . }}-dashboard
+  labels:
+    {{- include "ros2-dynamic-canonical.labels" . | nindent 4 }}
+    component: dashboard
+spec:
+  serviceName: {{ include "ros2-dynamic-canonical.fullname" . }}-dashboard-peers
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ include "ros2-dynamic-canonical.name" . }}-dashboard
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "ros2-dynamic-canonical.name" . }}-dashboard
+        component: dashboard
+        pattern: dynamic-canonical
+        {{- include "ros2-dynamic-canonical.labels" . | nindent 8 }}
+    spec:
+      {{- if .Values.imagePullSecretName }}
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecretName }}
+      {{- end }}
+      {{- if .Values.dashboard.nodeHostname }}
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.dashboard.nodeHostname }}
+      {{- end }}
+      initContainers:
+        - name: wait-for-peers
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              FULLNAME="{{ include "ros2-dynamic-canonical.fullname" . }}"
+              NS="{{ .Release.Namespace }}"
+              RUNTIME_PEER="${FULLNAME}-0.${FULLNAME}-peers.${NS}.svc.cluster.local"
+              echo "[init] Waiting for runtime DNS: $RUNTIME_PEER"
+              until nslookup "$RUNTIME_PEER" >/dev/null 2>&1; do
+                sleep 3
+              done
+              GRACE={{ .Values.dashboard.peerReadyGraceSeconds | default 60 }}
+              echo "[init] Runtime resolved — waiting ${GRACE}s for components + bootstrap to complete"
+              sleep "$GRACE"
+              echo "[init] Ready"
+      containers:
+        - name: dashboard
+          image: "{{ .Values.dashboard.image.repository }}:{{ .Values.dashboard.image.tag }}"
+          imagePullPolicy: {{ .Values.dashboard.image.pullPolicy }}
+          env:
+            - name: ROS_DOMAIN_ID
+              value: {{ .Values.ros.domainId | quote }}
+            - name: RMW_IMPLEMENTATION
+              value: {{ .Values.ros.rmwImplementation | quote }}
+            - name: ROS_LOCALHOST_ONLY
+              value: "0"
+            {{- if .Values.cyclonedds.enabled }}
+            - name: CYCLONEDDS_URI
+              value: "file:///etc/cyclonedds/cyclonedds.xml"
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: ws
+              containerPort: 9090
+              protocol: TCP
+          volumeMounts:
+            - name: dashboard-html
+              mountPath: /dashboard-cm
+              readOnly: true
+            {{- if .Values.cyclonedds.enabled }}
+            - name: cyclonedds
+              mountPath: /etc/cyclonedds
+              readOnly: true
+            {{- end }}
+          resources:
+            {{- toYaml .Values.dashboard.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+      volumes:
+        - name: dashboard-html
+          configMap:
+            name: {{ include "ros2-dynamic-canonical.fullname" . }}-dashboard-html
+        {{- if .Values.cyclonedds.enabled }}
+        - name: cyclonedds
+          configMap:
+            name: {{ include "ros2-dynamic-canonical.fullname" . }}-cyclonedds
+            items:
+              - key: cyclonedds.xml
+                path: cyclonedds.xml
+        {{- end }}
+{{- end }}

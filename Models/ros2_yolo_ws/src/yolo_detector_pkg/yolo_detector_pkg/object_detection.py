@@ -76,8 +76,10 @@ class YoloDetector(Node):
         (128, 255, 0),  # lime - traffic light
     ]
 
-    def __init__(self):
-        super().__init__('yolo_detector')
+    def __init__(self, **kwargs):
+        # **kwargs allows rclpy_components to pass node options (executor,
+        # context, etc.) when loading via component_container_isolated.
+        super().__init__('yolo_detector', **kwargs)
 
         self.declare_parameters('', [
             ('model_path', 'yolov8n.pt'),

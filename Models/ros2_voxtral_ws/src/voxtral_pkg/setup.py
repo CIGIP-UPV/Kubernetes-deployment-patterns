@@ -24,5 +24,8 @@ setup(
         'console_scripts': [
             'voxtral_node = voxtral_pkg.voxtral_node:main',
         ],
+        'rclpy_components': [
+            'voxtral_pkg::VoxtralNode = voxtral_pkg.voxtral_node:VoxtralNode',
+        ],
     },
 )

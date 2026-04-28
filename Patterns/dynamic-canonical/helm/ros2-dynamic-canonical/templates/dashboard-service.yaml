@@ -1,0 +1,47 @@
+{{- if .Values.dashboard.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ros2-dynamic-canonical.fullname" . }}-dashboard-peers
+  labels:
+    {{- include "ros2-dynamic-canonical.labels" . | nindent 4 }}
+    component: dashboard
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ include "ros2-dynamic-canonical.name" . }}-dashboard
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: dds
+      port: 7400
+      protocol: UDP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ros2-dynamic-canonical.fullname" . }}-dashboard-web
+  labels:
+    {{- include "ros2-dynamic-canonical.labels" . | nindent 4 }}
+    component: dashboard
+spec:
+  type: {{ .Values.dashboard.service.type | default "NodePort" }}
+  selector:
+    app: {{ include "ros2-dynamic-canonical.name" . }}-dashboard
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      {{- if .Values.dashboard.service.httpNodePort }}
+      nodePort: {{ .Values.dashboard.service.httpNodePort }}
+      {{- end }}
+      protocol: TCP
+    - name: ws
+      port: 9090
+      targetPort: 9090
+      {{- if .Values.dashboard.service.wsNodePort }}
+      nodePort: {{ .Values.dashboard.service.wsNodePort }}
+      {{- end }}
+      protocol: TCP
+{{- end }}

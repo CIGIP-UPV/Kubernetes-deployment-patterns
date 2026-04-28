@@ -1,0 +1,76 @@
+{{- if .Values.bootstrap.enabled }}
+{{- /*
+Bootstrap Job — post-install hook that triggers an initial load of the
+configured modules via the orchestrator's /load API.
+
+Without this Job, the pod would arrive with an empty component_container
+and the dashboard would show no topics until the user manually clicks
+"load" for each module. This Job makes the dynamic-canonical pattern
+usable out of the box (camera/yolo/llava/voxtral all loaded), while
+preserving the on-demand load/unload capability that the pattern
+demonstrates.
+
+The Job is OPTIONAL — disable it (bootstrap.enabled: false) if you want
+to validate the manual-load UX from the dashboard.
+*/}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "ros2-dynamic-canonical.fullname" . }}-bootstrap
+  labels:
+    {{- include "ros2-dynamic-canonical.labels" . | nindent 4 }}
+    component: bootstrap
+  annotations:
+    "helm.sh/hook": "post-install,post-upgrade"
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        {{- include "ros2-dynamic-canonical.labels" . | nindent 8 }}
+        component: bootstrap
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: bootstrap
+          image: alpine:latest
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              apk add --no-cache curl >/dev/null
+              ORCH="{{ include "ros2-dynamic-canonical.fullname" . }}-orchestrator-api.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.orchestrator.port }}"
+
+              echo "[bootstrap] Waiting ${WAIT_INITIAL}s for orchestrator to be ready..."
+              sleep "${WAIT_INITIAL}"
+
+              echo "[bootstrap] Probing http://${ORCH}/health"
+              for i in 1 2 3 4 5 6 7 8 9 10; do
+                if curl -fsS --max-time 3 "http://${ORCH}/health" > /dev/null; then
+                  echo "[bootstrap] Orchestrator ready (attempt $i)"
+                  break
+                fi
+                echo "[bootstrap] Not ready (attempt $i), retrying in 5s..."
+                sleep 5
+              done
+
+              {{- range .Values.bootstrap.modules }}
+              echo "[bootstrap] Loading module: {{ . }}"
+              curl -fsS --max-time {{ $.Values.bootstrap.totalTimeoutSeconds }} \
+                -X POST "http://${ORCH}/load" \
+                -H 'Content-Type: application/json' \
+                -d '{"module": "{{ . }}"}' \
+                && echo "" || { echo "[bootstrap] FAILED to load {{ . }}"; exit 1; }
+              {{- end }}
+
+              echo "[bootstrap] All modules loaded:"
+              curl -fsS "http://${ORCH}/list"
+              echo ""
+          env:
+            - name: WAIT_INITIAL
+              value: {{ .Values.bootstrap.waitInitialSeconds | quote }}
+{{- end }}

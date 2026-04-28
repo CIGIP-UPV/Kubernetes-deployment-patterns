@@ -24,5 +24,8 @@ setup(
         'console_scripts': [
             'llava_node = llava_pkg.llava_node:main',
         ],
+        'rclpy_components': [
+            'llava_pkg::LlavaNode = llava_pkg.llava_node:LlavaNode',
+        ],
     },
 )

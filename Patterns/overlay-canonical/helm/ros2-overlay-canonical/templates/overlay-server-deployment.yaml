@@ -1,0 +1,95 @@
+{{- if .Values.overlayServer.enabled }}
+{{- /*
+overlay-server Deployment — nginx that serves the overlay-source PVC content
+over HTTP for the runtime StatefulSet's initContainer to download.
+
+ARCHITECTURE:
+  PVC layout (populated by the pre-install Job):
+    /pvc/{version}.tar     ← one tarball per overlay version
+
+  nginx mounts the PVC at /usr/share/nginx/html/overlay/ (NOT root). The
+  default /usr/share/nginx/html/index.html from nginx:alpine stays intact,
+  so HTTP GET / returns 200 OK (good for liveness/readiness probes).
+
+  URL contract for the runtime initContainer:
+    http://<svc>.<ns>.svc.cluster.local/overlay/{version}.tar
+
+NODE PINNING:
+  nodeSelector: nodes.cloud.name (kb2). REQUIRED because the PVC was bound
+  to this node by local-path-provisioner via WaitForFirstConsumer at Job
+  time. If nginx ran on a different node, mounting the PVC would fail.
+
+ROLLING UPDATE STRATEGY:
+  Recreate, NOT RollingUpdate. The PVC is ReadWriteOnce — only one pod
+  can mount it at a time. RollingUpdate would try to start a new pod
+  before the old one terminates, the mount would fail, the deployment
+  would get stuck.
+
+PROBES:
+  HTTP GET / hits the default nginx:alpine index.html (200 OK). We do
+  NOT probe the tarball URL because we don't want kubelet downloading
+  17 GB on every health check.
+*/}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ros2-overlay-canonical.fullname" . }}-overlay-server
+  labels:
+    {{- include "ros2-overlay-canonical.labels" . | nindent 4 }}
+    component: overlay-server
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ include "ros2-overlay-canonical.name" . }}-overlay-server
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        {{- include "ros2-overlay-canonical.labels" . | nindent 8 }}
+        app: {{ include "ros2-overlay-canonical.name" . }}-overlay-server
+        component: overlay-server
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.nodes.cloud.name }}
+      {{- if .Values.imagePullSecretName }}
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecretName }}
+      {{- end }}
+      containers:
+        - name: nginx
+          image: "{{ .Values.overlayServer.image.repository }}:{{ .Values.overlayServer.image.tag }}"
+          imagePullPolicy: {{ .Values.overlayServer.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          volumeMounts:
+            - name: overlay-source
+              mountPath: /usr/share/nginx/html/overlay
+              readOnly: true
+          resources:
+            {{- toYaml .Values.overlayServer.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 1
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+      volumes:
+        - name: overlay-source
+          persistentVolumeClaim:
+            claimName: {{ include "ros2-overlay-canonical.fullname" . }}-{{ .Values.overlaySource.pvcName }}
+{{- end }}

@@ -1,0 +1,26 @@
+apiVersion: v2
+name: ros2-overlay-canonical
+description: |
+  Canonical Overlay Workspaces pattern for ROS 2 robotics on Kubernetes.
+
+  Realizes the OTA cloud-edge delivery model from the paper:
+    - ros2-base (immutable platform: ROS 2 + camera driver + CUDA)
+    - ros2-overlay-pack (mutable AI layer: ML stack + nodes + models)
+      delivered as an OCI carrier image, extracted by a Helm pre-install Job
+      to a PVC on the cloud node, and synced via HTTP from an nginx sidecar
+      to the edge node's runtime pod via initContainer.
+
+  Replaces Patterns/overlay-workspaces/ which monolithically packed both
+  layers in a single image (~22 GB) and didn't separate base from overlay.
+type: application
+version: 1.0.0
+appVersion: humble
+keywords:
+  - ros2
+  - overlay
+  - cloud-edge
+  - canonical
+  - ota
+maintainers:
+  - name: Miguel-Angel-Mateo-Casali
+    email: mmateo@cigip.upv.es

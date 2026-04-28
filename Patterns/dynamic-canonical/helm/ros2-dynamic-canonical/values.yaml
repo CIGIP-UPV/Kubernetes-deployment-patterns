@@ -1,0 +1,136 @@
+replicaCount: 1
+
+# ── Imagen única para los dos containers del pod ────────────────────────
+# component_container_isolated y orchestrator FastAPI usan la MISMA imagen,
+# solo difieren en el `command` que les pone el chart.
+image:
+  repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-component-host
+  tag: latest
+  pullPolicy: Always
+
+imagePullSecretName: regcred
+
+# ── ROS 2 ──
+ros:
+  domainId: "42"
+  rmwImplementation: rmw_cyclonedds_cpp
+  localhostOnly: "0"
+
+# ── Nodos del cluster ─────────────────────────────────────────────────
+# El pod corre en edgenode01 (necesita la GPU). El dashboard puede ir
+# en kb2 (cloud) si lo prefieres.
+nodes:
+  edge:
+    name: edgenode01
+  cloud:
+    name: kb2
+
+# ── Camera ──
+camera:
+  device: /dev/video0
+  width: 1280
+  height: 720
+  fps: 0
+  frameId: camera
+  syntheticMode: false
+  mountVideoDevice: true
+
+# ── Component container (host process) ────────────────────────────────
+componentHost:
+  # Service name exposed by component_container_isolated.
+  # Resolved by the orchestrator client via:
+  #   /ComponentManager/_container/load_node etc.
+  containerName: ComponentManager
+  resources:
+    limits:
+      memory: 32Gi
+      cpu: "8"
+    requests:
+      memory: 8Gi
+      cpu: "2"
+
+# ── Orchestrator (FastAPI sidecar) ────────────────────────────────────
+orchestrator:
+  port: 5000
+  resources:
+    limits:
+      memory: 512Mi
+      cpu: 1
+    requests:
+      memory: 64Mi
+      cpu: 100m
+
+# ── Carga inicial ──
+# Si bootstrap.enabled=true, un Job post-install dispara `POST /load` para
+# cada módulo en bootstrap.modules. Si false, el pod arranca sin componentes
+# cargados — los cargas a demanda desde el dashboard.
+bootstrap:
+  enabled: true
+  modules:
+    - camera
+    - yolo
+    - llava
+    - voxtral
+  # Espera a que el orchestrator esté listo antes de disparar /load.
+  waitInitialSeconds: 30
+  # Tiempo total disponible para cargar todos los módulos.
+  totalTimeoutSeconds: 300
+
+# ── Topics (para que sean parametrizables) ────────────────────────────
+topics:
+  image: /camera/image_raw
+  detections: /detections
+  debugImage: /detections/image
+  latency: /benchmark/latency_ms
+  inference: /benchmark/inference_ms
+  llavaResponse: /llava/response
+  llavaLatency: /llava/metrics_latency_ms
+  llavaInference: /llava/metrics_inference_ms
+  llavaTrigger: /llava/trigger
+  voiceCommand: /voice/command
+  voiceTranscript: /voice/transcript
+  voiceResponse: /voice/response
+  voiceLatency: /voice/metrics_latency_ms
+
+# ── GPU ──
+gpu:
+  enabled: true
+  runtimeClassName: nvidia
+  visibleDevices: "all"
+  driverCapabilities: "compute,utility"
+  requestGpuResource: true
+  count: 1
+
+resources: {}
+
+# ── CycloneDDS ──
+cyclonedds:
+  enabled: true
+  allowMulticast: "false"
+  extraPeers: []
+
+# ── Dashboard ──
+dashboard:
+  enabled: true
+  pattern: dynamic-canonical
+  peerReadyGraceSeconds: 60
+  image:
+    repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard
+    tag: latest
+    pullPolicy: Always
+  nodeHostname: ""
+  resources: {}
+  service:
+    type: NodePort
+    httpNodePort: 31406
+    wsNodePort: 31407
+  # Endpoint del orchestrator (HTTP, en el mismo pod runtime — accesible
+  # desde el browser vía el Service de orchestrator-api).
+  orchestratorApiNodePort: 31408   # opcional: expone el API HTTP fuera
+
+securityContext:
+  runAsNonRoot: false
+  allowPrivilegeEscalation: false
+
+nameOverride: ""
+fullnameOverride: ""

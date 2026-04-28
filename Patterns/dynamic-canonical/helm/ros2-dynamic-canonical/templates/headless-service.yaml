@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ros2-dynamic-canonical.fullname" . }}-peers
+  labels:
+    {{- include "ros2-dynamic-canonical.labels" . | nindent 4 }}
+    pattern: dynamic-canonical
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ include "ros2-dynamic-canonical.name" . }}-runtime
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: dds
+      port: 7400
+      protocol: UDP
+---
+# Internal Service for the orchestrator HTTP API (cluster-internal use,
+# e.g., the bootstrap Job and the dashboard browser).
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ros2-dynamic-canonical.fullname" . }}-orchestrator-api
+  labels:
+    {{- include "ros2-dynamic-canonical.labels" . | nindent 4 }}
+    component: orchestrator
+spec:
+  type: {{ if .Values.dashboard.orchestratorApiNodePort }}NodePort{{ else }}ClusterIP{{ end }}
+  selector:
+    app: {{ include "ros2-dynamic-canonical.name" . }}-runtime
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: api
+      port: {{ .Values.orchestrator.port }}
+      targetPort: api
+      {{- if .Values.dashboard.orchestratorApiNodePort }}
+      nodePort: {{ .Values.dashboard.orchestratorApiNodePort }}
+      {{- end }}
+      protocol: TCP
