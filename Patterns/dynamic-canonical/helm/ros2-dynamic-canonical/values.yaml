@@ -27,7 +27,7 @@ nodes:
 
 # ── Camera ──
 camera:
-  device: /dev/video0
+  device: /dev/video1                # alineado con questions.yaml (Jetson lab usa /dev/video1)
   width: 1280
   height: 720
   fps: 0

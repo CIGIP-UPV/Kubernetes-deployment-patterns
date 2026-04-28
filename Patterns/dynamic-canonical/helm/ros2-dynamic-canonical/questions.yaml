@@ -1,0 +1,211 @@
+questions:
+  # ── Docker Registry ──────────────────────────────────────────────
+  - variable: imagePullSecretName
+    label: "Image Pull Secret"
+    description: "Name of the Kubernetes secret for pulling images from the GitLab registry"
+    type: string
+    default: "regcred"
+    required: false
+    group: "Container Images"
+
+  - variable: image.tag
+    label: "Component Host Image Tag (ros2-component-host)"
+    description: "Tag of the dynamic-canonical image (used by both component_container_isolated and the orchestrator FastAPI)"
+    type: string
+    default: "latest"
+    required: true
+    group: "Container Images"
+
+  # ── Cloud-Edge Topology ──────────────────────────────────────────
+  - variable: nodes.edge.name
+    label: "Edge Node"
+    description: "Hostname of the edge node where the runtime pod (component-host + orchestrator) runs"
+    type: enum
+    default: "edgenode01"
+    required: true
+    options:
+      - "edgenode01"
+    group: "Node Placement"
+
+  - variable: nodes.cloud.name
+    label: "Cloud Node"
+    description: "Hostname of the cloud node where the dashboard runs"
+    type: enum
+    default: "kb2"
+    required: true
+    options:
+      - "kb2"
+      - "worker1-kb2"
+    group: "Node Placement"
+
+  # ── Bootstrap (initial component load) ───────────────────────────
+  - variable: bootstrap.enabled
+    label: "Enable Bootstrap Job"
+    description: "Post-install Job that triggers /load for each module in bootstrap.modules. If disabled, the pod starts with NO components loaded — you load them manually from the dashboard"
+    type: boolean
+    default: true
+    group: "Bootstrap"
+
+  - variable: bootstrap.waitInitialSeconds
+    label: "Wait Before Bootstrap (s)"
+    description: "Seconds the bootstrap Job waits before probing the orchestrator API. Increase if pull-image is slow"
+    type: enum
+    default: 30
+    show_if: "bootstrap.enabled=true"
+    options:
+      - 15
+      - 30
+      - 60
+      - 120
+    group: "Bootstrap"
+
+  - variable: bootstrap.totalTimeoutSeconds
+    label: "Bootstrap Total Timeout (s)"
+    description: "Max seconds for ALL modules to finish loading. LLaVA model load alone takes ~15s on Jetson"
+    type: enum
+    default: 300
+    show_if: "bootstrap.enabled=true"
+    options:
+      - 120
+      - 300
+      - 600
+    group: "Bootstrap"
+
+  # ── Experiment Scenario ──────────────────────────────────────────
+  - variable: ros.domainId
+    label: "ROS Domain ID"
+    description: "Isolates ROS 2 communication between experiments"
+    type: enum
+    default: "42"
+    required: true
+    options:
+      - "42"
+      - "1"
+      - "2"
+      - "3"
+    group: "Experiment"
+
+  - variable: camera.fps
+    label: "Camera FPS"
+    description: "0 = unlimited (native camera rate). For benchmarks: S1=10, S2=20, S3=30"
+    type: enum
+    default: "0"
+    required: true
+    options:
+      - "0"
+      - "10"
+      - "20"
+      - "30"
+    group: "Experiment"
+
+  # ── Camera ───────────────────────────────────────────────────────
+  - variable: camera.device
+    label: "Camera Device"
+    description: "Path to the camera device on the edge node (e.g. /dev/video0, /dev/video1)"
+    type: string
+    default: "/dev/video1"
+    group: "Camera"
+
+  - variable: camera.syntheticMode
+    label: "Camera Source"
+    description: "true = Synthetic test frames (no hardware) | false = Real camera on edge node"
+    type: boolean
+    default: false
+    group: "Camera"
+
+  # ── GPU ──────────────────────────────────────────────────────────
+  - variable: gpu.enabled
+    label: "Enable GPU"
+    description: "Request nvidia.com/gpu and use nvidia runtimeClass (required for LLaVA + Voxtral on Jetson)"
+    type: boolean
+    default: true
+    group: "GPU"
+
+  - variable: gpu.count
+    label: "GPU Count"
+    description: "Number of GPUs to request (Jetson AGX Orin has 1)"
+    type: int
+    default: 1
+    show_if: "gpu.enabled=true"
+    group: "GPU"
+
+  # ── Dashboard ────────────────────────────────────────────────────
+  - variable: dashboard.enabled
+    label: "Enable Dashboard"
+    description: "Deploy the ROS 2 dashboard for visualization and monitoring"
+    type: boolean
+    default: true
+    group: "Dashboard"
+
+  - variable: dashboard.image.tag
+    label: "Dashboard Image Tag"
+    description: "Docker image tag for the dashboard"
+    type: string
+    default: "latest"
+    show_if: "dashboard.enabled=true"
+    required: true
+    group: "Dashboard"
+
+  - variable: dashboard.nodeHostname
+    label: "Dashboard Node (Cloud)"
+    description: "Hostname of the cloud node where the dashboard runs (empty = scheduler decides)"
+    type: enum
+    default: ""
+    show_if: "dashboard.enabled=true"
+    required: false
+    options:
+      - ""
+      - "kb2"
+      - "worker1-kb2"
+    group: "Dashboard"
+
+  - variable: dashboard.peerReadyGraceSeconds
+    label: "Peer Ready Grace (s)"
+    description: "Seconds the dashboard waits AFTER runtime DNS resolves, before starting rosbridge. With bootstrap enabled, gives time for all modules to finish loading"
+    type: enum
+    default: 60
+    show_if: "dashboard.enabled=true"
+    options:
+      - 30
+      - 60
+      - 90
+      - 120
+    group: "Dashboard"
+
+  - variable: dashboard.service.type
+    label: "Dashboard Service Type"
+    description: "Kubernetes service type for dashboard access"
+    type: enum
+    default: "NodePort"
+    show_if: "dashboard.enabled=true"
+    options:
+      - "NodePort"
+      - "ClusterIP"
+    group: "Dashboard"
+
+  - variable: dashboard.service.httpNodePort
+    label: "Dashboard HTTP NodePort"
+    description: "NodePort for HTTP (leave 0 for auto-assignment)"
+    type: int
+    default: 31406
+    show_if: "dashboard.enabled=true&&dashboard.service.type=NodePort"
+    required: false
+    group: "Dashboard"
+
+  - variable: dashboard.service.wsNodePort
+    label: "Dashboard WebSocket NodePort"
+    description: "NodePort for rosbridge WebSocket (leave 0 for auto-assignment)"
+    type: int
+    default: 31407
+    show_if: "dashboard.enabled=true&&dashboard.service.type=NodePort"
+    required: false
+    group: "Dashboard"
+
+  # ── Orchestrator API (optional external NodePort) ───────────────
+  - variable: dashboard.orchestratorApiNodePort
+    label: "Orchestrator API NodePort (optional)"
+    description: "Expose the FastAPI orchestrator as a NodePort for external curl/load/unload. Leave 0 to keep it cluster-internal only"
+    type: int
+    default: 31408
+    required: false
+    group: "Dashboard"

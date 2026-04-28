@@ -56,7 +56,7 @@ cyclonedds:
 # ── Camera driver (en base, corre dentro del runtime pod) ───────────────────
 camera:
   enabled: true
-  device: /dev/video0
+  device: /dev/video1                # alineado con questions.yaml (Jetson lab usa /dev/video1)
   width: 1280
   height: 720
   fps: 0                          # 0 = unlimited (native rate); >0 = limit
@@ -72,7 +72,7 @@ yolo:
   publishDebugImage: "true"
   publishMetrics: "true"
   startDelaySeconds: 2
-  filterClasses: ""               # "" = all 80 COCO classes
+  filterClasses: "0,56,60"        # alineado con questions.yaml (person+chair+screen). "" = all 80
 
 # ── LLaVA (en overlay) ──────────────────────────────────────────────────────
 llava:
