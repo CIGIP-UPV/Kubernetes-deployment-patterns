@@ -151,10 +151,11 @@ dashboard:
   enabled: true
   pattern: microservices  # rendered into dashboard.html via Helm replace of __PATTERN__
   # Seconds to wait in the init container after all peer DNS records resolve,
-  # before rosbridge starts. Gives the LLaVA/Voxtral/YOLO nodes time to finish
-  # heavy imports and start publishing so rosbridge doesn't miss the first
-  # latched messages.
-  peerReadyGraceSeconds: 30
+  # before rosbridge starts. Dashboard MUST be the last pod to start so when
+  # the user opens the browser, all topics are already publishing. The grace
+  # period covers LLaVA model load (~15 s), Voxtral model load (~15 s), and
+  # the warm-up of YOLO inference. Bump higher if the edge node is slow.
+  peerReadyGraceSeconds: 60
   image:
     repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard
     tag: latest

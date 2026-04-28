@@ -9,6 +9,7 @@ metadata:
     component: dashboard
 spec:
   clusterIP: None
+  publishNotReadyAddresses: true   # publish DNS during init to avoid deadlocks
   selector:
     app: {{ include "dynamic-loader.name" . }}-dashboard
     app.kubernetes.io/instance: {{ .Release.Name }}

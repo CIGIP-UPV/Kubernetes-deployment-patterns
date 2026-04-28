@@ -6,6 +6,7 @@ metadata:
     {{- include "ros2-monolithic.labels" . | nindent 4 }}
 spec:
   clusterIP: None
+  publishNotReadyAddresses: true   # publish DNS during init to avoid deadlocks
   selector:
     app: {{ include "ros2-monolithic.name" . }}
     pattern: monolithic

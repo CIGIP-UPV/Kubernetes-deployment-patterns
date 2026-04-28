@@ -8,6 +8,7 @@ metadata:
     pattern: overlay-workspaces
 spec:
   clusterIP: None
+  publishNotReadyAddresses: true   # publish DNS during init to avoid deadlocks
   selector:
     app: {{ include "ros2-overlay.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}

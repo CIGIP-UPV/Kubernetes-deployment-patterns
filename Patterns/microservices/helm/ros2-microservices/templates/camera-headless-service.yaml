@@ -8,6 +8,7 @@ metadata:
     component: camera
 spec:
   clusterIP: None
+  publishNotReadyAddresses: true   # publish DNS during init to avoid deadlocks
   selector:
     app: camera
     app.kubernetes.io/instance: {{ .Release.Name }}

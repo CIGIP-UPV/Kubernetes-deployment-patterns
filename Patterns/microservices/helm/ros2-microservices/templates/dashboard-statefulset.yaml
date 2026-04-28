@@ -38,6 +38,19 @@ spec:
       #      voxtral) — CycloneDDS resolves peers once at startup.
       #   2. A grace period for each node to finish its heavy imports
       #      (transformers, torch, CUDA) and start publishing.
+      # Dashboard MUST be the last pod to start — when the user opens the
+      # browser, everything else should already be publishing. We wait for
+      # ALL four peer pods' DNS, then a generous grace period (default 60s)
+      # so heavy GPU pods (LLaVA, Voxtral) finish their transformers/torch
+      # /CUDA imports and start publishing topics.
+      #
+      # The cycle that this list previously caused (dashboard waits for
+      # llava/voxtral, llava/voxtral wait for dashboard) is broken at the
+      # service level by `publishNotReadyAddresses: true` on the headless
+      # services — DNS publishes as soon as pods have IPs (during init),
+      # not when they reach Ready. So nslookup here succeeds quickly for
+      # all peers, the actual "wait until everyone publishes" work happens
+      # in the grace period below.
       initContainers:
         - name: wait-for-peers
           image: busybox:1.36
@@ -68,8 +81,8 @@ spec:
                 done
                 echo "[init]   $PEER resolved"
               done
-              GRACE={{ .Values.dashboard.peerReadyGraceSeconds | default 30 }}
-              echo "[init] All peers resolved — waiting ${GRACE}s for nodes to finish loading models and start publishing"
+              GRACE={{ .Values.dashboard.peerReadyGraceSeconds | default 60 }}
+              echo "[init] All peer DNS resolved — waiting ${GRACE}s for nodes to finish loading models and start publishing"
               sleep "$GRACE"
               echo "[init] Ready to start rosbridge"
       containers:
