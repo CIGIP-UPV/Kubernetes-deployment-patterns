@@ -506,6 +506,9 @@ let hasReceivedImage = false;
 let framesInWindow = 0;
 let lastFpsUpdate = Date.now();
 
+// Filters out auto-trigger LLaVA descriptions from the Voxtral SYSTEM RESPONSE.
+let awaitingVoxtralResponse = false;
+
 function setConnectionState(state) {
   const dot = document.getElementById('statusDot');
   const statusTxt = document.getElementById('statusText');
@@ -630,10 +633,10 @@ function subscribeToTopics() {
     });
 
   // ── LLaVA Response ──
-  // Mirrors into both the LLaVA card AND the Voxtral system-response field so
-  // the user sees the system's reply in the voice-interaction box without
-  // depending on Voxtral republishing /voice/response (the back-channel
-  // /voice/response is also subscribed below as a secondary source).
+  // Always updates the LLaVA visual-reasoning card. Mirrors into the Voxtral
+  // SYSTEM RESPONSE field ONLY when the user has just submitted a voice/text
+  // command (awaitingVoxtralResponse=true), so the auto-trigger of LLaVA
+  // (every ~8 s on YOLO detections) doesn't overwrite the voice answer.
   new ROSLIB.Topic({ ros, name: llavaResponseTopic, messageType: 'std_msgs/msg/String' })
     .subscribe(function(msg) {
       if (!isConnected) return;
@@ -641,11 +644,13 @@ function subscribeToTopics() {
       el.textContent = msg.data;
       el.classList.add('has-response');
 
-      // Mirror into Voxtral system-response field
-      const voxEl = document.getElementById('voxtralResponse');
-      if (voxEl) {
-        voxEl.textContent = msg.data;
-        voxEl.classList.remove('placeholder');
+      if (awaitingVoxtralResponse) {
+        const voxEl = document.getElementById('voxtralResponse');
+        if (voxEl) {
+          voxEl.textContent = msg.data;
+          voxEl.classList.remove('placeholder');
+        }
+        awaitingVoxtralResponse = false;
       }
     });
 
@@ -719,6 +724,7 @@ function sendVoxtralCommand() {
   el.textContent = text;
   el.classList.remove('placeholder');
   input.value = '';
+  awaitingVoxtralResponse = true;
 }
 
 function drawLiveImage(msg) {

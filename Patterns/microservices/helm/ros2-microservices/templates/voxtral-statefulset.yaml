@@ -47,6 +47,39 @@ spec:
       {{- if and .Values.voxtral.gpu.enabled .Values.gpu.runtimeClassName }}
       runtimeClassName: {{ .Values.gpu.runtimeClassName }}
       {{- end }}
+      # ── Wait for DDS peers to be DNS-resolvable before Voxtral starts.
+      # Same rationale as in llava-statefulset.yaml: CycloneDDS resolves
+      # the unicast peer list ONCE at startup; if a peer's headless-service
+      # DNS isn't ready, that peer is permanently flagged "unknown address"
+      # and DDS never re-tries. Block on camera/yolo/dashboard DNS first.
+      initContainers:
+        - name: wait-for-peers
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              FULLNAME="{{ include "ros2-microservices.fullname" . }}"
+              NS="{{ .Release.Namespace }}"
+              PEERS=""
+              {{- if .Values.camera.enabled }}
+              PEERS="$PEERS ${FULLNAME}-camera-0.${FULLNAME}-camera-peers.${NS}.svc.cluster.local"
+              {{- end }}
+              {{- if .Values.yolo.enabled }}
+              PEERS="$PEERS ${FULLNAME}-yolo-0.${FULLNAME}-yolo-peers.${NS}.svc.cluster.local"
+              {{- end }}
+              {{- if .Values.dashboard.enabled }}
+              PEERS="$PEERS ${FULLNAME}-dashboard-0.${FULLNAME}-dashboard-peers.${NS}.svc.cluster.local"
+              {{- end }}
+              for PEER in $PEERS; do
+                echo "[init] Waiting for DDS peer DNS: $PEER"
+                until nslookup "$PEER" >/dev/null 2>&1; do
+                  echo "[init]   $PEER not resolvable yet, retrying in 3s..."
+                  sleep 3
+                done
+                echo "[init]   $PEER resolved"
+              done
+              echo "[init] All peers resolved — starting Voxtral"
       containers:
         - name: voxtral
           image: "{{ .Values.images.voxtral.repository }}:{{ .Values.images.voxtral.tag }}"

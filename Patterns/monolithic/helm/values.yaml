@@ -38,7 +38,7 @@ llava:
   enabled: true
   modelId: llava-hf/llava-1.5-7b-hf
   triggerOnYolo: false   # LLaVA only responds to manual triggers (Voxtral / /llava/trigger topic)
-  yoloTriggerIntervalS: 8.0
+  yoloTriggerIntervalS: 30.0
   maxNewTokens: 150
   load4bit: true
   startDelaySeconds: 15  # wait for YOLO to be ready first

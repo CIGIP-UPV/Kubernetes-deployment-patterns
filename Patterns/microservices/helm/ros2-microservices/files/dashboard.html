@@ -549,6 +549,13 @@ let hasReceivedImage = false;
 let framesInWindow = 0;
 let lastFpsUpdate = Date.now();
 
+// True between the moment the user submits a voice/text command and the
+// moment the next /llava/response arrives. Used to filter out the auto-
+// triggered LLaVA descriptions (one every ~8 s on YOLO detections) so the
+// SYSTEM RESPONSE field of the Voxtral card only shows the answer to the
+// user's actual question and stays put until they ask another one.
+let awaitingVoxtralResponse = false;
+
 function setConnectionState(state) {
   const dot = document.getElementById('statusDot');
   const statusTxt = document.getElementById('statusText');
@@ -673,9 +680,13 @@ function subscribeToTopics() {
     });
 
   // ── LLaVA Response ──
-  // Mirrors into both the LLaVA card AND the Voxtral system-response field so
-  // the user sees the system's reply in the voice-interaction box without
-  // depending on Voxtral republishing /voice/response.
+  // Always updates the LLaVA visual-reasoning card.
+  // ALSO mirrors into the Voxtral system-response field, BUT ONLY when the
+  // user has just submitted a voice/text command (awaitingVoxtralResponse=true).
+  // Without that filter, the auto-trigger of LLaVA (every ~8 s on YOLO
+  // detections) would overwrite the voice answer continuously. After the
+  // mirror fires once, the flag is cleared so subsequent auto-LLaVA
+  // descriptions stay confined to the LLaVA card.
   new ROSLIB.Topic({ ros, name: llavaResponseTopic, messageType: 'std_msgs/msg/String' })
     .subscribe(function(msg) {
       if (!isConnected) return;
@@ -683,10 +694,13 @@ function subscribeToTopics() {
       el.textContent = msg.data;
       el.classList.add('has-response');
 
-      const voxEl = document.getElementById('voxtralResponse');
-      if (voxEl) {
-        voxEl.textContent = msg.data;
-        voxEl.classList.remove('placeholder');
+      if (awaitingVoxtralResponse) {
+        const voxEl = document.getElementById('voxtralResponse');
+        if (voxEl) {
+          voxEl.textContent = msg.data;
+          voxEl.classList.remove('placeholder');
+        }
+        awaitingVoxtralResponse = false;
       }
     });
 
@@ -764,6 +778,8 @@ function sendVoxtralCommand() {
   el.textContent = text;
   el.classList.remove('placeholder');
   input.value = '';
+  // Capture the next /llava/response in the Voxtral card.
+  awaitingVoxtralResponse = true;
 }
 
 function drawLiveImage(msg) {
@@ -1037,6 +1053,8 @@ function publishAudioChunk(int16Array, durationS) {
       durationS.toFixed(2) + 's, ' + kb + ' KB raw'
     );
     setStatus('Sent ' + durationS.toFixed(1) + 's of audio. Transcribing…', 'active');
+    // Capture the next /llava/response in the Voxtral card.
+    awaitingVoxtralResponse = true;
   } catch (err) {
     console.error('[voxtral] publishAudioChunk error:', err);
     setStatus('Failed to publish audio: ' + err.message, 'error');

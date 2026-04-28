@@ -549,6 +549,9 @@ let hasReceivedImage = false;
 let framesInWindow = 0;
 let lastFpsUpdate = Date.now();
 
+// Filters out auto-trigger LLaVA descriptions from the Voxtral SYSTEM RESPONSE.
+let awaitingVoxtralResponse = false;
+
 function setConnectionState(state) {
   const dot = document.getElementById('statusDot');
   const statusTxt = document.getElementById('statusText');
@@ -672,7 +675,7 @@ function subscribeToTopics() {
       document.getElementById('llavaInference').textContent = msg.data.toFixed(0);
     });
 
-  // ── LLaVA Response (mirrored into Voxtral box) ──
+  // ── LLaVA Response (mirror to Voxtral only after a user command) ──
   new ROSLIB.Topic({ ros, name: llavaResponseTopic, messageType: 'std_msgs/msg/String' })
     .subscribe(function(msg) {
       if (!isConnected) return;
@@ -680,10 +683,13 @@ function subscribeToTopics() {
       el.textContent = msg.data;
       el.classList.add('has-response');
 
-      const voxEl = document.getElementById('voxtralResponse');
-      if (voxEl) {
-        voxEl.textContent = msg.data;
-        voxEl.classList.remove('placeholder');
+      if (awaitingVoxtralResponse) {
+        const voxEl = document.getElementById('voxtralResponse');
+        if (voxEl) {
+          voxEl.textContent = msg.data;
+          voxEl.classList.remove('placeholder');
+        }
+        awaitingVoxtralResponse = false;
       }
     });
 
@@ -758,6 +764,7 @@ function sendVoxtralCommand() {
   el.textContent = text;
   el.classList.remove('placeholder');
   input.value = '';
+  awaitingVoxtralResponse = true;
 }
 
 function drawLiveImage(msg) {
@@ -1031,6 +1038,7 @@ function publishAudioChunk(int16Array, durationS) {
       durationS.toFixed(2) + 's, ' + kb + ' KB raw'
     );
     setStatus('Sent ' + durationS.toFixed(1) + 's of audio. Transcribing…', 'active');
+    awaitingVoxtralResponse = true;
   } catch (err) {
     console.error('[voxtral] publishAudioChunk error:', err);
     setStatus('Failed to publish audio: ' + err.message, 'error');

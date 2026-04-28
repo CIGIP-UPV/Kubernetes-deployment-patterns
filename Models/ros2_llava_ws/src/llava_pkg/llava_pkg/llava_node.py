@@ -157,7 +157,7 @@ class LlavaNode(Node):
         self.declare_parameter('latency_topic', '/llava/metrics_latency_ms')
         self.declare_parameter('inference_topic', '/llava/metrics_inference_ms')
         self.declare_parameter('trigger_on_yolo', True)
-        self.declare_parameter('yolo_trigger_interval_s', 8.0)  # float; Helm may pass int
+        self.declare_parameter('yolo_trigger_interval_s', 30.0)  # float; Helm may pass int
         self.declare_parameter('max_new_tokens', 150)
         self.declare_parameter('load_in_4bit', True)
         self.declare_parameter('hf_cache_dir', '/opt/huggingface_cache')

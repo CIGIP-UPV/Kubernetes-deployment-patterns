@@ -42,6 +42,28 @@ spec:
       {{- if .Values.gpu.runtimeClassName }}
       runtimeClassName: {{ .Values.gpu.runtimeClassName }}
       {{- end }}
+      # ── Wait for the dashboard pod's DNS before starting. CycloneDDS
+      # resolves unicast peers ONCE at startup; if the dashboard pod isn't
+      # in DNS yet, it stays "unknown address" and rosbridge never sees
+      # topics from this overlay-runtime pod.
+      {{- if .Values.dashboard.enabled }}
+      initContainers:
+        - name: wait-for-peers
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              FULLNAME="{{ include "ros2-overlay.fullname" . }}"
+              NS="{{ .Release.Namespace }}"
+              PEER="${FULLNAME}-dashboard-0.${FULLNAME}-dashboard-peers.${NS}.svc.cluster.local"
+              echo "[init] Waiting for DDS peer DNS: $PEER"
+              until nslookup "$PEER" >/dev/null 2>&1; do
+                echo "[init]   $PEER not resolvable yet, retrying in 3s..."
+                sleep 3
+              done
+              echo "[init] $PEER resolved — starting overlay runtime"
+      {{- end }}
       containers:
         - name: overlay-runtime
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
