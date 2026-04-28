@@ -47,6 +47,9 @@ jobs:
           helm lint Patterns/microservices/helm/ros2-microservices
           helm lint Patterns/dynamic-loader/helm/dynamic-loader
           helm lint Patterns/overlay-workspaces/helm/ros2-overlay
+          # Canonical patterns (per docs/PLAN-2026-04-27)
+          helm lint Patterns/overlay-canonical/helm/ros2-overlay-canonical
+          helm lint Patterns/dynamic-canonical/helm/ros2-dynamic-canonical
 
       - name: Package charts
         run: |
@@ -55,6 +58,9 @@ jobs:
           helm package Patterns/microservices/helm/ros2-microservices -d dist/charts
           helm package Patterns/dynamic-loader/helm/dynamic-loader -d dist/charts
           helm package Patterns/overlay-workspaces/helm/ros2-overlay -d dist/charts
+          # Canonical patterns
+          helm package Patterns/overlay-canonical/helm/ros2-overlay-canonical -d dist/charts
+          helm package Patterns/dynamic-canonical/helm/ros2-dynamic-canonical -d dist/charts
 
       - name: Checkout gh-pages (merge existing index)
         run: |

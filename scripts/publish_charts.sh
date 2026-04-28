@@ -29,6 +29,9 @@ CHARTS=(
   "Patterns/microservices/helm/ros2-microservices"
   "Patterns/dynamic-loader/helm/dynamic-loader"
   "Patterns/overlay-workspaces/helm/ros2-overlay"
+  # Canonical patterns (per docs/PLAN-2026-04-27-overlay-dynamic-canonical.md)
+  "Patterns/overlay-canonical/helm/ros2-overlay-canonical"
+  "Patterns/dynamic-canonical/helm/ros2-dynamic-canonical"
 )
 
 cd "${PROJECT_ROOT}"
