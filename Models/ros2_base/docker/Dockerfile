@@ -138,6 +138,14 @@ SHELL ["/bin/bash", "-lc"]
 RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
     colcon build --symlink-install --packages-select camera_driver_pkg
 
+# ── Resource monitor (CPU/RAM/GPU/I/O/Power telemetry for the dashboard) ─────
+# Standalone script — both canonical patterns (overlay-canonical runtime and
+# dynamic-canonical component-host) launch it as a background process. It
+# publishes /node/cpu_percent, /node/memory_percent, /node/gpu_percent,
+# /node/io_read_mbs, /node/io_write_mbs, and /node/power_mw (Jetson tegrastats).
+# Same script as the one in ros2-monolithic / ros2-yolo / ros2-llava / ros2-voxtral.
+COPY Models/ros2_monolithic_ws/scripts/resource_monitor.py /opt/scripts/resource_monitor.py
+
 # ── Default shell environment ────────────────────────────────────────────────
 # Auto-source ROS 2 setup + base workspace so an interactive shell sees them.
 # The overlay (when mounted at /opt/overlay) will be sourced explicitly by

@@ -302,6 +302,10 @@ spec:
               echo "  HF_HOME=${HF_HOME}"
               echo ""
 
+              echo "[runtime] Starting resource_monitor..."
+              python3 /opt/scripts/resource_monitor.py &
+              RESMON_PID=$!
+
               echo "[runtime] Starting camera_driver..."
               ros2 run camera_driver_pkg camera_driver --ros-args \
                 -p device:=${CAMERA_DEVICE} \
@@ -361,7 +365,7 @@ spec:
               fi
 
               echo "[runtime] All nodes launched. Waiting for any to exit..."
-              wait -n ${CAMERA_PID} ${YOLO_PID} ${LLAVA_PID:-} ${VOXTRAL_PID:-}
+              wait -n ${CAMERA_PID} ${YOLO_PID} ${RESMON_PID} ${LLAVA_PID:-} ${VOXTRAL_PID:-}
               echo "[runtime] One process exited — pod will restart"
               exit 1
           resources:
@@ -384,6 +388,13 @@ spec:
             {{- if and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode) }}
             - name: video-device
               mountPath: {{ .Values.camera.device }}
+            {{- end }}
+            {{- if .Values.gpu.enabled }}
+            # Sysfs hostPath so resource_monitor.py can read Jetson GPU load
+            # (/sys/devices/platform/gpu.0/load) inside the container.
+            - name: sys-devices-platform
+              mountPath: /sys/devices/platform
+              readOnly: true
             {{- end }}
           startupProbe:
             exec:
@@ -427,4 +438,11 @@ spec:
           hostPath:
             path: {{ .Values.camera.device }}
             type: CharDevice
+        {{- end }}
+        {{- if .Values.gpu.enabled }}
+        # Jetson sysfs paths used by resource_monitor.py to read GPU load.
+        - name: sys-devices-platform
+          hostPath:
+            path: /sys/devices/platform
+            type: Directory
         {{- end }}
