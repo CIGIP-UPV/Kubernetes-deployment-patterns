@@ -421,12 +421,23 @@
     <div class="card">
       <h3>Benchmark Metrics</h3>
       <div class="bench-row"><span class="key">T_inf (avg)</span><span class="val" id="bmInfAvg">--</span></div>
-      <div class="bench-row"><span class="key">f_FPS</span><span class="val" id="bmFps">--</span></div>
+      <div class="bench-row"><span class="key">f_FPS (theor.)</span><span class="val" id="bmFps">--</span></div>
+      <div class="bench-row"><span class="key">f_FPS (pub)</span><span class="val" id="bmFpsPub">--</span></div>
+      <div class="bench-row"><span class="key">T_e2e (avg)</span><span class="val" id="bmE2eAvg">--</span></div>
+      <div class="bench-row"><span class="key">T_e2e (max)</span><span class="val" id="bmE2eMax">--</span></div>
+      <div class="bench-row"><span class="key">T_ready</span><span class="val" id="bmTReady">--</span></div>
       <div class="bench-row"><span class="key">J_inf (jitter)</span><span class="val" id="bmJitter">--</span></div>
       <div class="bench-row"><span class="key">U_CPU (avg)</span><span class="val" id="bmCpuAvg">--</span></div>
       <div class="bench-row"><span class="key">U_CPU (max)</span><span class="val" id="bmCpuMax">--</span></div>
       <div class="bench-row"><span class="key">U_GPU (avg)</span><span class="val" id="bmGpuAvg">--</span></div>
       <div class="bench-row"><span class="key">U_GPU (max)</span><span class="val" id="bmGpuMax">--</span></div>
+      <div class="bench-row"><span class="key">U_RAM (avg)</span><span class="val" id="bmRamAvg">--</span></div>
+      <div class="bench-row"><span class="key">U_RAM (max)</span><span class="val" id="bmRamMax">--</span></div>
+      <div class="bench-row"><span class="key">L_IO (read)</span><span class="val" id="bmIoRead">--</span></div>
+      <div class="bench-row"><span class="key">L_IO (write)</span><span class="val" id="bmIoWrite">--</span></div>
+      <div class="bench-row"><span class="key">P_avg</span><span class="val" id="bmPower">--</span></div>
+      <div class="bench-row"><span class="key">E_inf</span><span class="val" id="bmEnergy">--</span></div>
+      <div class="bench-row"><span class="key">η_energy</span><span class="val" id="bmEtaEnergy">--</span></div>
     </div>
 
     <!-- Configuration -->
@@ -534,9 +545,30 @@ resize();
 const bmInfSamples = [];
 const bmCpuSamples = [];
 const bmGpuSamples = [];
+const bmRamSamples = [];
+const bmIoReadSamples = [];
+const bmIoWriteSamples = [];
+const bmPowerSamples = [];
 let bmCpuMax = 0;
 let bmGpuMax = 0;
+let bmRamMax = 0;
+let bmPowerMax = 0;
 let gpuDataReceived = false;
+let ioDataReceived = false;
+let powerDataReceived = false;
+// FPS_pub: ring buffer of /detections receive timestamps over a 5s window.
+const bmDetectionTimes = [];
+const FPS_PUB_WINDOW_MS = 5000;
+// T_e2e: sliding samples of (receive_ts - header.stamp) in ms.
+const bmE2eSamples = [];
+let bmE2eMax = 0;
+// T_ready: ms from page-load to first /detections received (set once).
+const pageLoadTs = Date.now();
+let tReadyMs = null;
+// Energy accumulator: integrate P (W) × Δt (s) for E_inf and η_energy.
+let bmEnergyJoules = 0;
+let bmFramesAtPower = 0;
+let bmLastPowerTs = null;
 
 // ═══════════════════════════════════════════════════════════════════
 //  ROSBRIDGE CONNECTION
@@ -635,6 +667,37 @@ function subscribeToTopics() {
   new ROSLIB.Topic({ ros, name: detectionTopicName, messageType: 'vision_msgs/msg/Detection2DArray' })
     .subscribe(function(msg) {
       if (!isConnected) return;
+
+      // T_ready: time from dashboard load to first detections received.
+      // Captured once; we ignore subsequent messages.
+      const nowMs = Date.now();
+      if (tReadyMs === null) {
+        tReadyMs = nowMs - pageLoadTs;
+      }
+
+      // f_FPS_pub: append timestamp, drop entries older than 5s.
+      bmDetectionTimes.push(nowMs);
+      const cutoff = nowMs - FPS_PUB_WINDOW_MS;
+      while (bmDetectionTimes.length > 0 && bmDetectionTimes[0] < cutoff) {
+        bmDetectionTimes.shift();
+      }
+
+      // T_e2e: header.stamp on Detection2DArray is the camera capture time
+      // forwarded by YOLO. Compute receive-time minus stamp.
+      try {
+        const h = msg.header && msg.header.stamp;
+        if (h && (h.sec || h.nanosec)) {
+          const stampMs = h.sec * 1000 + h.nanosec / 1e6;
+          // Sanity: only count if clocks roughly aligned (< 60s drift).
+          const lag = nowMs - stampMs;
+          if (lag >= 0 && lag < 60000) {
+            bmE2eSamples.push(lag);
+            if (bmE2eSamples.length > 500) bmE2eSamples.shift();
+            if (lag > bmE2eMax) bmE2eMax = lag;
+          }
+        }
+      } catch (e) { /* header missing or malformed — ignore */ }
+
       const dets = msg.detections;
       let personCount = 0;
       const detItems = [];
@@ -736,6 +799,8 @@ function subscribeToTopics() {
       const pct = Math.min(100, Math.max(0, msg.data));
       document.getElementById('memVal').textContent = pct.toFixed(1) + ' %';
       document.getElementById('memBar').style.width = pct.toFixed(1) + '%';
+      bmRamSamples.push(pct);
+      if (pct > bmRamMax) bmRamMax = pct;
     });
 
   // ── GPU ──
@@ -748,6 +813,42 @@ function subscribeToTopics() {
       document.getElementById('gpuBar').style.width = pct.toFixed(1) + '%';
       bmGpuSamples.push(pct);
       if (pct > bmGpuMax) bmGpuMax = pct;
+    });
+
+  // ── I/O read MB/s ── (published by extended resource_monitor; "No data" otherwise)
+  new ROSLIB.Topic({ ros, name: '/node/io_read_mbs', messageType: 'std_msgs/msg/Float32' })
+    .subscribe(function(msg) {
+      if (!isConnected) return;
+      ioDataReceived = true;
+      bmIoReadSamples.push(Math.max(0, msg.data));
+    });
+
+  // ── I/O write MB/s ──
+  new ROSLIB.Topic({ ros, name: '/node/io_write_mbs', messageType: 'std_msgs/msg/Float32' })
+    .subscribe(function(msg) {
+      if (!isConnected) return;
+      ioDataReceived = true;
+      bmIoWriteSamples.push(Math.max(0, msg.data));
+    });
+
+  // ── Power (mW from tegrastats VDD_IN; convert to W in JS) ──
+  new ROSLIB.Topic({ ros, name: '/node/power_mw', messageType: 'std_msgs/msg/Float32' })
+    .subscribe(function(msg) {
+      if (!isConnected) return;
+      powerDataReceived = true;
+      const w = Math.max(0, msg.data) / 1000.0;
+      // Integrate energy: E += P × Δt since last sample.
+      const nowMs = Date.now();
+      if (bmLastPowerTs !== null) {
+        const dt = (nowMs - bmLastPowerTs) / 1000.0; // seconds
+        bmEnergyJoules += w * dt;
+        bmFramesAtPower = bmDetectionTimes.length > 0
+          ? (bmFramesAtPower + 1) // 1 power sample = ~0.5s @ 2Hz; not exact but good enough
+          : bmFramesAtPower;
+      }
+      bmLastPowerTs = nowMs;
+      bmPowerSamples.push(w);
+      if (w > bmPowerMax) bmPowerMax = w;
     });
 }
 
@@ -801,28 +902,83 @@ setInterval(() => {
 }, 1000);
 
 // ── Benchmark Metrics ──
+function avg(arr) { return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0; }
+
 setInterval(() => {
+  // T_inf, f_FPS theor., J_inf
   if (bmInfSamples.length > 0) {
-    const avg = bmInfSamples.reduce((a, b) => a + b, 0) / bmInfSamples.length;
-    document.getElementById('bmInfAvg').textContent = avg.toFixed(1) + ' ms';
-    document.getElementById('bmFps').textContent = (avg > 0 ? (1000 / avg).toFixed(1) : '0') + ' fps';
+    const a = avg(bmInfSamples);
+    document.getElementById('bmInfAvg').textContent = a.toFixed(1) + ' ms';
+    document.getElementById('bmFps').textContent = (a > 0 ? (1000 / a).toFixed(1) : '0') + ' fps';
   }
   if (bmInfSamples.length > 1) {
-    const avg = bmInfSamples.reduce((a, b) => a + b, 0) / bmInfSamples.length;
-    const variance = bmInfSamples.reduce((sum, v) => sum + (v - avg) ** 2, 0) / bmInfSamples.length;
+    const a = avg(bmInfSamples);
+    const variance = bmInfSamples.reduce((sum, v) => sum + (v - a) ** 2, 0) / bmInfSamples.length;
     document.getElementById('bmJitter').textContent = Math.sqrt(variance).toFixed(1) + ' ms';
   }
+
+  // f_FPS publication: count of /detections in 5s window.
+  const fpsPub = bmDetectionTimes.length / (FPS_PUB_WINDOW_MS / 1000);
+  document.getElementById('bmFpsPub').textContent = fpsPub.toFixed(1) + ' fps';
+
+  // T_e2e
+  if (bmE2eSamples.length > 0) {
+    document.getElementById('bmE2eAvg').textContent = avg(bmE2eSamples).toFixed(0) + ' ms';
+    document.getElementById('bmE2eMax').textContent = bmE2eMax.toFixed(0) + ' ms';
+  }
+
+  // T_ready (one-shot once first detection arrives)
+  if (tReadyMs !== null) {
+    document.getElementById('bmTReady').textContent = (tReadyMs / 1000).toFixed(2) + ' s';
+  }
+
+  // CPU / GPU avg+max
   if (bmCpuSamples.length > 0) {
-    const avg = bmCpuSamples.reduce((a, b) => a + b, 0) / bmCpuSamples.length;
-    document.getElementById('bmCpuAvg').textContent = avg.toFixed(1) + ' %';
+    document.getElementById('bmCpuAvg').textContent = avg(bmCpuSamples).toFixed(1) + ' %';
     document.getElementById('bmCpuMax').textContent = bmCpuMax.toFixed(1) + ' %';
   }
   if (bmGpuSamples.length > 0) {
-    const avg = bmGpuSamples.reduce((a, b) => a + b, 0) / bmGpuSamples.length;
-    document.getElementById('bmGpuAvg').textContent = avg.toFixed(1) + ' %';
+    document.getElementById('bmGpuAvg').textContent = avg(bmGpuSamples).toFixed(1) + ' %';
     document.getElementById('bmGpuMax').textContent = bmGpuMax.toFixed(1) + ' %';
   }
-  // Show "Sin datos" if GPU topic never published after 10s
+
+  // RAM avg+max
+  if (bmRamSamples.length > 0) {
+    document.getElementById('bmRamAvg').textContent = avg(bmRamSamples).toFixed(1) + ' %';
+    document.getElementById('bmRamMax').textContent = bmRamMax.toFixed(1) + ' %';
+  }
+
+  // I/O (avg over last samples; "No data" if topic absent)
+  if (ioDataReceived) {
+    document.getElementById('bmIoRead').textContent  = avg(bmIoReadSamples).toFixed(2)  + ' MB/s';
+    document.getElementById('bmIoWrite').textContent = avg(bmIoWriteSamples).toFixed(2) + ' MB/s';
+  } else if (Date.now() - startTime.getTime() > 10000) {
+    document.getElementById('bmIoRead').textContent  = 'No data';
+    document.getElementById('bmIoWrite').textContent = 'No data';
+  }
+
+  // Power, Energy/inference, η_energy (Jetson only via tegrastats)
+  if (powerDataReceived && bmPowerSamples.length > 0) {
+    const pAvg = avg(bmPowerSamples);
+    document.getElementById('bmPower').textContent = pAvg.toFixed(1) + ' W (max ' + bmPowerMax.toFixed(1) + ')';
+
+    // E_inf = total energy / total frames published since dashboard load.
+    const totalFrames = bmDetectionTimes.length > 0 ? bmDetectionTimes.length : 0;
+    // Better: use cumulative count. Since bmDetectionTimes is a 5s window, we approximate
+    // with elapsed × fps_pub. For paper-grade we expose Joules and let user divide.
+    document.getElementById('bmEnergy').textContent = bmEnergyJoules.toFixed(1) + ' J total';
+
+    // η_energy = f_FPS_pub / P_avg
+    if (pAvg > 0) {
+      document.getElementById('bmEtaEnergy').textContent = (fpsPub / pAvg).toFixed(2) + ' fps/W';
+    }
+  } else if (Date.now() - startTime.getTime() > 10000) {
+    document.getElementById('bmPower').textContent     = 'No data';
+    document.getElementById('bmEnergy').textContent    = 'No data';
+    document.getElementById('bmEtaEnergy').textContent = 'No data';
+  }
+
+  // Show "No data" if GPU topic never published after 10s
   if (!gpuDataReceived && Date.now() - startTime.getTime() > 10000) {
     document.getElementById('gpuVal').textContent = 'No data';
   }

@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 """
-Lightweight resource monitor — publishes CPU, memory & GPU usage as ROS 2
-Float32 topics so the web dashboard can display them.
+Lightweight resource monitor — publishes CPU, memory, GPU, I/O and Power usage
+as ROS 2 Float32 topics so the web dashboard can display them.
 
-Uses /proc/stat, /proc/meminfo (no psutil dependency).
+Uses /proc/stat, /proc/meminfo, /proc/diskstats (no psutil dependency).
 GPU detection priority:
   1. nvidia-smi  (desktop/server with NVIDIA GPU)
   2. tegrastats  (Jetson Orin/Xavier — requires binary on host or in image)
-  3. sysfs       (Jetson — reads /sys/devices/gpu.0/load or similar, works
-                  inside containers without extra mounts if running privileged)
+  3. sysfs       (Jetson — reads /sys/devices/gpu.0/load or similar)
 
 Published topics:
   /node/cpu_percent     (std_msgs/Float32)  — total CPU usage  0-100
   /node/memory_percent  (std_msgs/Float32)  — RAM usage        0-100
-  /node/gpu_percent     (std_msgs/Float32)  — GPU utilization  0-100  (if available)
+  /node/gpu_percent     (std_msgs/Float32)  — GPU utilization  0-100  (if avail)
+  /node/io_read_mbs     (std_msgs/Float32)  — disk read MB/s   (from /proc/diskstats)
+  /node/io_write_mbs    (std_msgs/Float32)  — disk write MB/s
+  /node/power_mw        (std_msgs/Float32)  — total power draw mW (Jetson tegrastats)
 """
 
 import rclpy
@@ -24,6 +26,8 @@ import shutil
 import glob
 import re
 import os
+import threading
+import time
 
 
 class ResourceMonitor(Node):
@@ -101,6 +105,33 @@ class ResourceMonitor(Node):
             self.pub_gpu = None
             self.get_logger().info(
                 'No GPU tool found (nvidia-smi / tegrastats / sysfs) — GPU metrics disabled')
+
+        # ── I/O publishers (always on; reads /proc/diskstats) ──
+        self.pub_io_read = self.create_publisher(Float32, '/node/io_read_mbs', 10)
+        self.pub_io_write = self.create_publisher(Float32, '/node/io_write_mbs', 10)
+        self._prev_io_read_sec = 0
+        self._prev_io_write_sec = 0
+        self._prev_io_ts = time.time()
+        try:
+            r, w = self._read_diskstats_total_sectors()
+            self._prev_io_read_sec, self._prev_io_write_sec = r, w
+            self.get_logger().info('I/O monitor enabled (/proc/diskstats)')
+        except Exception as e:
+            self.get_logger().warn(f'I/O monitor disabled: {e}')
+
+        # ── Power publisher (Jetson via tegrastats Popen, lazy start) ──
+        # tegrastats prints continuously; we run a background thread that reads
+        # one line at a time, parses VDD_IN power, and stores latest sample.
+        self.pub_power = None
+        self._power_mw = None
+        if shutil.which('tegrastats') is not None or os.path.exists('/usr/bin/tegrastats'):
+            self.pub_power = self.create_publisher(Float32, '/node/power_mw', 10)
+            self._power_thread_stop = threading.Event()
+            self._power_thread = threading.Thread(target=self._power_loop, daemon=True)
+            self._power_thread.start()
+            self.get_logger().info('Power monitor enabled (tegrastats)')
+        else:
+            self.get_logger().info('No tegrastats found — power metrics disabled')
 
         self._prev_idle = 0
         self._prev_total = 0
@@ -190,12 +221,101 @@ class ResourceMonitor(Node):
         except Exception:
             return 0.0
 
+    # ── I/O via /proc/diskstats ─────────────────────────────────
+    @staticmethod
+    def _read_diskstats_total_sectors():
+        """Sum read_sectors and write_sectors across all real block devices.
+        Skips loop, ram, dm-* (noisy or virtual). Returns (read_sec, write_sec).
+        Sector = 512 bytes on Linux (regardless of physical sector size).
+        """
+        read_sec = 0
+        write_sec = 0
+        with open('/proc/diskstats') as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) < 14:
+                    continue
+                dev = parts[2]
+                # Skip virtual / noisy devices.
+                if dev.startswith(('loop', 'ram', 'dm-', 'zram')):
+                    continue
+                # Skip partitions (sd[a-z][0-9], nvme0n1p1, mmcblk0p1, etc.) by
+                # heuristic: name ends with a digit AND has a parent without it.
+                # Simpler: just include majors we care about. We rely on the
+                # whole-disk lines (they include partition I/O too on most kernels).
+                # To avoid double-counting, prefer top-level devices only.
+                if dev[-1].isdigit() and not dev.startswith('nvme'):
+                    # Likely a partition (sda1, mmcblk0p1). Skip — sda already covers it.
+                    if any(dev.startswith(prefix) for prefix in ('sd', 'mmcblk', 'hd')):
+                        continue
+                try:
+                    read_sec += int(parts[5])
+                    write_sec += int(parts[9])
+                except ValueError:
+                    continue
+        return read_sec, write_sec
+
+    def _io_mbs(self):
+        """Compute MB/s read and write since last call."""
+        try:
+            r, w = self._read_diskstats_total_sectors()
+            now = time.time()
+            dt = now - self._prev_io_ts
+            if dt <= 0:
+                return 0.0, 0.0
+            dr = max(0, r - self._prev_io_read_sec)
+            dw = max(0, w - self._prev_io_write_sec)
+            self._prev_io_read_sec = r
+            self._prev_io_write_sec = w
+            self._prev_io_ts = now
+            # 512 bytes/sector → MB/s = sectors * 512 / (1024*1024) / dt
+            mb_per_sector = 512.0 / (1024.0 * 1024.0)
+            return (dr * mb_per_sector) / dt, (dw * mb_per_sector) / dt
+        except Exception:
+            return 0.0, 0.0
+
+    # ── Power via tegrastats background thread ──────────────────
+    def _power_loop(self):
+        """Spawn tegrastats and parse VDD_IN power for total board draw.
+        Sample tegrastats output line:
+          RAM 5348/15876MB ... VDD_IN 5350mW/5350mW ... GR3D_FREQ 78%@1300 ...
+        Some Jetsons publish multiple power rails (VDD_CPU_CV, VDD_SOC, etc.);
+        VDD_IN is the total board power.
+        """
+        try:
+            proc = subprocess.Popen(
+                ['tegrastats', '--interval', '1000'],
+                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True
+            )
+            pat_vdd_in = re.compile(r'VDD_IN\s+(\d+)mW')
+            pat_pom_5v = re.compile(r'POM_5V_IN\s+(\d+)/')  # older Jetsons
+            while not self._power_thread_stop.is_set():
+                line = proc.stdout.readline()
+                if not line:
+                    time.sleep(0.5)
+                    continue
+                m = pat_vdd_in.search(line) or pat_pom_5v.search(line)
+                if m:
+                    self._power_mw = float(m.group(1))
+        except Exception as e:
+            try:
+                self.get_logger().warn(f'tegrastats power loop error: {e}')
+            except Exception:
+                pass
+
     # ── Timer callback ──────────────────────────────────────────
     def _tick(self):
         self.pub_cpu.publish(Float32(data=float(self._cpu_percent())))
         self.pub_mem.publish(Float32(data=float(self._mem_percent())))
         if self.pub_gpu:
             self.pub_gpu.publish(Float32(data=float(self._gpu_percent())))
+        # I/O
+        r_mbs, w_mbs = self._io_mbs()
+        self.pub_io_read.publish(Float32(data=float(r_mbs)))
+        self.pub_io_write.publish(Float32(data=float(w_mbs)))
+        # Power (only if we got a sample)
+        if self.pub_power is not None and self._power_mw is not None:
+            self.pub_power.publish(Float32(data=float(self._power_mw)))
 
 
 def main():

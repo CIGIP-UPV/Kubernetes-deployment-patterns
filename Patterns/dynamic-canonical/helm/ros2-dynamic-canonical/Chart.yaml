@@ -18,7 +18,7 @@ description: |
   to spawn separate `ros2 run` processes — same hot-swap UX but missing
   the canonical composition semantics described in the paper.
 type: application
-version: 1.0.0
+version: 1.0.1
 appVersion: humble
 keywords:
   - ros2
