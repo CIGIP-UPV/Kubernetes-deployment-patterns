@@ -37,7 +37,7 @@ yolo:
 llava:
   enabled: true
   modelId: llava-hf/llava-1.5-7b-hf
-  triggerOnYolo: false   # LLaVA only responds to manual triggers (Voxtral / /llava/trigger topic)
+  triggerOnYolo: true    # Auto-trigger on YOLO detections (parity with microservices); throttled by interval below
   yoloTriggerIntervalS: 30.0
   maxNewTokens: 150
   load4bit: true
