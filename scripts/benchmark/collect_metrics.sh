@@ -113,31 +113,41 @@ echo "[2/6] T_sched — Scheduling latency (Scheduled → Started)"
 T_SCHED_LINES=()
 T_SCHED_VALUES=()
 if [ -n "${RELEASE}" ] && command -v kubectl >/dev/null 2>&1; then
-  # Find pods belonging to the release.
-  pods=$(kubectl -n "${NAMESPACE}" get pods \
-    -l app.kubernetes.io/instance="${RELEASE}" \
-    -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || echo "")
-  if [ -z "${pods}" ]; then
-    echo "  No pods found for release ${RELEASE} in ns ${NAMESPACE}"
+  # First check kubectl can reach the cluster at all.
+  if ! kubectl get ns "${NAMESPACE}" >/dev/null 2>&1; then
+    echo "  kubectl not connected to cluster, or namespace '${NAMESPACE}' does not exist"
+    echo "  (Try: kubectl get nodes — should list edgenode01, kb2, worker1-kb2)"
   else
-    for pod in ${pods}; do
-      events=$(kubectl -n "${NAMESPACE}" describe pod "${pod}" 2>/dev/null \
-        | awk '/Scheduled|Started/{print}' || true)
-      sched_ts=$(kubectl -n "${NAMESPACE}" get pod "${pod}" \
-        -o jsonpath='{.status.conditions[?(@.type=="PodScheduled")].lastTransitionTime}' 2>/dev/null || echo "")
-      ready_ts=$(kubectl -n "${NAMESPACE}" get pod "${pod}" \
-        -o jsonpath='{.status.containerStatuses[0].state.running.startedAt}' 2>/dev/null || echo "")
-      if [ -n "${sched_ts}" ] && [ -n "${ready_ts}" ]; then
-        s=$(date -d "${sched_ts}" +%s 2>/dev/null || echo 0)
-        r=$(date -d "${ready_ts}" +%s 2>/dev/null || echo 0)
-        diff=$((r - s))
-        echo "  ${pod}: ${diff} s  (scheduled ${sched_ts} → started ${ready_ts})"
-        T_SCHED_LINES+=("${pod}|${diff}|${sched_ts}|${ready_ts}")
-        T_SCHED_VALUES+=("${diff}")
-      else
-        echo "  ${pod}: timestamps missing (may not be ready yet)"
-      fi
-    done
+    # Find pods belonging to the release. Try the standard Helm label first;
+    # if empty, list all pods so the user can see what label/release name to use.
+    pods=$(kubectl -n "${NAMESPACE}" get pods \
+      -l app.kubernetes.io/instance="${RELEASE}" \
+      -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || echo "")
+    if [ -z "${pods}" ]; then
+      echo "  No pods found for release '${RELEASE}' in ns ${NAMESPACE}"
+      echo "  Existing releases (helm list -n ${NAMESPACE}):"
+      helm list -n "${NAMESPACE}" 2>/dev/null | awk 'NR>1 {print "    "$1"  ("$NF")"}' || \
+        echo "    (helm not installed or no releases found)"
+      echo "  Existing pods + their app.kubernetes.io/instance label:"
+      kubectl -n "${NAMESPACE}" get pods -o custom-columns=NAME:.metadata.name,RELEASE:.metadata.labels.'app\.kubernetes\.io/instance' 2>/dev/null || true
+    else
+      for pod in ${pods}; do
+        sched_ts=$(kubectl -n "${NAMESPACE}" get pod "${pod}" \
+          -o jsonpath='{.status.conditions[?(@.type=="PodScheduled")].lastTransitionTime}' 2>/dev/null || echo "")
+        ready_ts=$(kubectl -n "${NAMESPACE}" get pod "${pod}" \
+          -o jsonpath='{.status.containerStatuses[0].state.running.startedAt}' 2>/dev/null || echo "")
+        if [ -n "${sched_ts}" ] && [ -n "${ready_ts}" ]; then
+          s=$(date -d "${sched_ts}" +%s 2>/dev/null || echo 0)
+          r=$(date -d "${ready_ts}" +%s 2>/dev/null || echo 0)
+          diff=$((r - s))
+          echo "  ${pod}: ${diff} s  (scheduled ${sched_ts} → started ${ready_ts})"
+          T_SCHED_LINES+=("${pod}|${diff}|${sched_ts}|${ready_ts}")
+          T_SCHED_VALUES+=("${diff}")
+        else
+          echo "  ${pod}: timestamps missing (may not be ready yet)"
+        fi
+      done
+    fi
   fi
 else
   echo "  kubectl not available or no release specified — skipping"
