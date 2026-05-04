@@ -13,7 +13,7 @@ description: |
   Replaces Patterns/overlay-workspaces/ which monolithically packed both
   layers in a single image (~22 GB) and didn't separate base from overlay.
 type: application
-version: 1.0.2
+version: 1.0.3
 appVersion: humble
 keywords:
   - ros2
@@ -21,6 +21,11 @@ keywords:
   - cloud-edge
   - canonical
   - ota
+annotations:
+  # Rancher Apps: extend default timeout (10m) to 45m. Required because
+  # overlay-canonical needs ~20-30 min cold-start: 67 GB image pull on
+  # cloud + 17 GB cp to PVC + 17 GB HTTP sync to edge emptyDir.
+  catalog.cattle.io/timeout: 45m
 maintainers:
   - name: Miguel-Angel-Mateo-Casali
     email: mmateo@cigip.upv.es

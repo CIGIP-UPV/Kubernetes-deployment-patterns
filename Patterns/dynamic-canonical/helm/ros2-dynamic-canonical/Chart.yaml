@@ -18,13 +18,18 @@ description: |
   to spawn separate `ros2 run` processes — same hot-swap UX but missing
   the canonical composition semantics described in the paper.
 type: application
-version: 1.0.2
+version: 1.0.3
 appVersion: humble
 keywords:
   - ros2
   - dynamic-composition
   - rclpy-components
   - canonical
+annotations:
+  # Rancher Apps: extend default timeout (10m) to 30m. Required because
+  # dynamic-canonical pulls a 76 GB image, then bootstrap Job loads 4
+  # ROS 2 components into the host process via /load HTTP calls.
+  catalog.cattle.io/timeout: 30m
 maintainers:
   - name: Miguel-Angel-Mateo-Casali
     email: mmateo@cigip.upv.es
