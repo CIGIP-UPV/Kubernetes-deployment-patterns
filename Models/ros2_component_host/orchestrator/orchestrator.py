@@ -72,8 +72,12 @@ class ComponentManagerClient(Node):
         self._loaded: dict[str, int] = {}
 
     async def _wait_service(self, client, name: str):
-        """Wait until the component_container service is ready."""
-        for _ in range(60):  # 60 × 0.5s = 30s grace
+        """Wait until the component_container service is ready.
+        Bumped from 30s → 90s grace because Jetson cold-start of
+        component_container_isolated can take 45-60s for the rclpy
+        plugin scanner + service registration.
+        """
+        for _ in range(180):  # 180 × 0.5s = 90s grace
             if client.service_is_ready():
                 return
             await asyncio.sleep(0.5)

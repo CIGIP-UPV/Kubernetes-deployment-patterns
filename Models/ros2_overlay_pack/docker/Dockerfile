@@ -31,8 +31,18 @@
 ARG REGISTRY=gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes
 ARG ROS_DISTRO=humble
 
-# ── STAGE 1: BUILDER (FROM ros2-base) ────────────────────────────────────────
-FROM ${REGISTRY}/ros2-base:latest AS builder
+# ── STAGE 1: BUILDER (FROM ros2-base, FORCED ARM64) ──────────────────────────
+# We force the builder to arm64 because:
+#   1) ros2-base is arm64-only (Jetson L4T runtime).
+#   2) The CARRIER's job is to TRANSPORT the overlay artifacts as opaque
+#      bytes, not to execute them. The /opt/overlay/ contents are arm64
+#      (Jetson PyTorch wheel, etc.), but they travel inside a tarball
+#      that is later extracted on the edge node (also arm64).
+#   3) The CARRIER itself, however, runs on the cloud node which may be
+#      amd64. So the FINAL stage uses busybox (multi-arch) — see below.
+# Build with: --platform=linux/amd64,linux/arm64 to publish a multi-arch
+# manifest of the carrier. Containerd on each node selects the right one.
+FROM --platform=linux/arm64 ${REGISTRY}/ros2-base:latest AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV ROS_DISTRO=${ROS_DISTRO}

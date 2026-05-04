@@ -46,11 +46,18 @@ ENV HF_HOME=/opt/huggingface_cache
 ENV HF_HUB_CACHE=/opt/huggingface_cache
 
 # ── System deps: audio + ROS rclpy_components container binary ──────────
+# rclpy_components: provides `component_container_isolated` for PYTHON
+#   plugins. Without it, `ros2 run rclpy_components ...` fails with
+#   "Package 'rclpy_components' not found". This is the runner the chart
+#   actually invokes.
+# rclcpp_components: C++ equivalent (kept for completeness — plugins
+#   compiled in C++ would need it).
 RUN for attempt in 1 2 3; do \
       echo "[apt] Attempt $attempt..." && \
       apt-get update && \
       apt-get install -y --no-install-recommends \
         libasound2 portaudio19-dev libsndfile1 \
+        ros-${ROS_DISTRO}-rclpy-components \
         ros-${ROS_DISTRO}-rclcpp-components \
         ros-${ROS_DISTRO}-composition-interfaces \
       && break \

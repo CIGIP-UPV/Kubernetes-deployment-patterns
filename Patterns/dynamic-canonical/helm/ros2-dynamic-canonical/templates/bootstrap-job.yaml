@@ -60,11 +60,28 @@ spec:
 
               {{- range .Values.bootstrap.modules }}
               echo "[bootstrap] Loading module: {{ . }}"
-              curl -fsS --max-time {{ $.Values.bootstrap.totalTimeoutSeconds }} \
-                -X POST "http://${ORCH}/load" \
-                -H 'Content-Type: application/json' \
-                -d '{"module": "{{ . }}"}' \
-                && echo "" || { echo "[bootstrap] FAILED to load {{ . }}"; exit 1; }
+              # Retry up to 3 times with backoff. Covers transient 503s from
+              # the orchestrator's _wait_service while the component_container
+              # finishes registering its services on cold start.
+              loaded=0
+              for attempt in 1 2 3; do
+                if curl -fsS --max-time {{ $.Values.bootstrap.totalTimeoutSeconds }} \
+                    -X POST "http://${ORCH}/load" \
+                    -H 'Content-Type: application/json' \
+                    -d '{"module": "{{ . }}"}'; then
+                  echo ""
+                  echo "[bootstrap] Loaded {{ . }} on attempt ${attempt}"
+                  loaded=1
+                  break
+                fi
+                echo ""
+                echo "[bootstrap] Attempt ${attempt} failed for {{ . }}, retrying in 10s..."
+                sleep 10
+              done
+              if [ "${loaded}" -ne 1 ]; then
+                echo "[bootstrap] FAILED to load {{ . }} after 3 attempts"
+                exit 1
+              fi
               {{- end }}
 
               echo "[bootstrap] All modules loaded:"
