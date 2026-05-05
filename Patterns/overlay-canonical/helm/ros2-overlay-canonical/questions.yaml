@@ -80,6 +80,26 @@ questions:
       - 3600
     group: "Overlay Storage"
 
+  # ── Overlay Mount Backend ────────────────────────────────────────
+  - variable: overlayMount.kind
+    label: "Overlay Mount Backend"
+    description: "Where to extract the 17 GB overlay tarball at runtime. Use 'hostPath' if the kubelet's root filesystem (e.g. Jetson SD card) is small but a larger disk is available elsewhere. Default 'emptyDir' lives on the kubelet root-dir and is pod-lifetime."
+    type: enum
+    default: "emptyDir"
+    required: true
+    options:
+      - "emptyDir"
+      - "hostPath"
+    group: "Overlay Storage"
+
+  - variable: overlayMount.hostPath
+    label: "Overlay HostPath (only when kind=hostPath)"
+    description: "Absolute path on the edge node where the overlay will be extracted. Directory created automatically. Used only when Overlay Mount Backend = hostPath. For Jetson with NVMe SSD: /mnt/ssd/overlay-canonical-runtime"
+    type: string
+    default: "/mnt/ssd/overlay-canonical-runtime"
+    show_if: "overlayMount.kind=hostPath"
+    group: "Overlay Storage"
+
   # ── Experiment Scenario ──────────────────────────────────────────
   - variable: ros.domainId
     label: "ROS Domain ID"
