@@ -45,24 +45,19 @@ ENV TRANSFORMERS_CACHE=/opt/huggingface_cache
 ENV HF_HOME=/opt/huggingface_cache
 ENV HF_HUB_CACHE=/opt/huggingface_cache
 
-# ── System deps: audio + ROS rclpy_components container binary ──────────
-# rclpy_components: provides `component_container_isolated` for PYTHON
-#   plugins. Without it, `ros2 run rclpy_components ...` fails with
-#   "Package 'rclpy_components' not found". This is the runner the chart
-#   actually invokes.
-# rclcpp_components: C++ equivalent (kept for completeness — plugins
-#   compiled in C++ would need it).
-RUN for attempt in 1 2 3; do \
-      echo "[apt] Attempt $attempt..." && \
-      apt-get update && \
-      apt-get install -y --no-install-recommends \
-        libasound2 portaudio19-dev libsndfile1 \
-        ros-${ROS_DISTRO}-rclpy-components \
-        ros-${ROS_DISTRO}-rclcpp-components \
-        ros-${ROS_DISTRO}-composition-interfaces \
-      && break \
-      || sleep 2; \
-    done && rm -rf /var/lib/apt/lists/*
+# ── System deps: audio + ROS components ─────────────────────────────────
+# IMPORTANT: ros-humble-rclpy-components is NOT available in apt for
+# Humble (only Iron+). The Python rclpy_components package must be built
+# from source — see the colcon stage below.
+# rclcpp_components: C++ equivalent, IS in apt (kept for completeness;
+# C++ plugins would need it).
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      git \
+      libasound2 portaudio19-dev libsndfile1 \
+      ros-${ROS_DISTRO}-rclcpp-components \
+      ros-${ROS_DISTRO}-composition-interfaces \
+    && rm -rf /var/lib/apt/lists/*
 
 # ── ML Python stack — system-wide install (NOT --target) ───────────────
 # Unlike overlay-pack which uses --target so deps travel in the carrier,
@@ -152,7 +147,17 @@ ENV TRANSFORMERS_OFFLINE=1
 # ── Build the 4 refactored ROS 2 packages ──────────────────────────────
 # colcon installs them (without --symlink-install, real files) so their
 # rclpy_components entry_points are discoverable by the container_isolated.
+#
+# rclpy_components is fetched from ros2/rclpy (humble branch) and built
+# alongside our packages. In Humble there is no apt deb for it; the
+# subdirectory rclpy_components/ in the rclpy repo IS a colcon package
+# (has package.xml + setup.py) and that's the supported install path.
 WORKDIR /opt/component_ws
+RUN git clone --depth=1 -b humble https://github.com/ros2/rclpy.git /tmp/rclpy_src && \
+    cp -r /tmp/rclpy_src/rclpy_components src/rclpy_components && \
+    rm -rf /tmp/rclpy_src && \
+    ls -la src/
+
 COPY Models/ros2_yolo_ws/src/yolo_detector_pkg     src/yolo_detector_pkg
 COPY Models/ros2_llava_ws/src/llava_pkg            src/llava_pkg
 COPY Models/ros2_voxtral_ws/src/voxtral_pkg        src/voxtral_pkg
@@ -161,7 +166,21 @@ SHELL ["/bin/bash", "-lc"]
 RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
     source /opt/base_ws/install/setup.bash && \
     colcon build \
-      --packages-select yolo_detector_pkg llava_pkg voxtral_pkg
+      --packages-select rclpy_components yolo_detector_pkg llava_pkg voxtral_pkg
+
+# Fail loudly at build time if rclpy_components didn't compile correctly
+RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
+    source /opt/base_ws/install/setup.bash && \
+    source /opt/component_ws/install/setup.bash && \
+    ros2 pkg list | grep -q '^rclpy_components$' || { \
+      echo "[build] FATAL: rclpy_components not registered with ament_index"; \
+      exit 1; \
+    } && \
+    ros2 pkg executables rclpy_components | grep -q 'component_container_isolated' || { \
+      echo "[build] FATAL: component_container_isolated executable not found"; \
+      exit 1; \
+    } && \
+    echo "[build] rclpy_components verified."
 
 # ── YOLOv8 weights ─────────────────────────────────────────────────────
 RUN mkdir -p /opt/models && \

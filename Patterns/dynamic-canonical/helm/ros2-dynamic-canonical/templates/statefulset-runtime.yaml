@@ -157,6 +157,10 @@ spec:
             - name: CYCLONEDDS_URI
               value: "file:///etc/cyclonedds/cyclonedds.xml"
             {{- end }}
+            - name: COMPONENT_CONTAINER_NAME
+              # Must match componentHost.containerName so the orchestrator
+              # builds the correct service paths (e.g. /<container>/_container/load_node).
+              value: {{ .Values.componentHost.containerName | quote }}
             - name: ORCHESTRATOR_PORT
               value: {{ .Values.orchestrator.port | quote }}
           ports:

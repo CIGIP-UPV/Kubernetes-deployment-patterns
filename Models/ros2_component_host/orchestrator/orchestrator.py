@@ -25,14 +25,15 @@ import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Any, Optional
 
 import rclpy
 from rclpy.node import Node
 from composition_interfaces.srv import LoadNode, UnloadNode, ListNodes
+from rcl_interfaces.msg import Parameter, ParameterValue, ParameterType
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import uvicorn
 
 
@@ -57,6 +58,53 @@ MODULE_REGISTRY = {
 }
 
 
+# ── Parameter conversion helpers ────────────────────────────────────────
+def _to_ros_parameter(name: str, value: Any) -> Parameter:
+    """Convert a Python value to a rcl_interfaces.msg.Parameter.
+
+    Used by /load to forward HTTP-supplied parameters into the LoadNode
+    service request. Each plugin's __init__ will receive these as if they
+    came from a launch file or a YAML param file.
+    """
+    p = Parameter()
+    p.name = name
+    pv = ParameterValue()
+    if isinstance(value, bool):
+        pv.type = ParameterType.PARAMETER_BOOL
+        pv.bool_value = value
+    elif isinstance(value, int):
+        pv.type = ParameterType.PARAMETER_INTEGER
+        pv.integer_value = value
+    elif isinstance(value, float):
+        pv.type = ParameterType.PARAMETER_DOUBLE
+        pv.double_value = value
+    elif isinstance(value, str):
+        pv.type = ParameterType.PARAMETER_STRING
+        pv.string_value = value
+    elif isinstance(value, list):
+        if not value:
+            pv.type = ParameterType.PARAMETER_STRING_ARRAY
+            pv.string_array_value = []
+        elif all(isinstance(x, bool) for x in value):
+            pv.type = ParameterType.PARAMETER_BOOL_ARRAY
+            pv.bool_array_value = value
+        elif all(isinstance(x, int) for x in value):
+            pv.type = ParameterType.PARAMETER_INTEGER_ARRAY
+            pv.integer_array_value = value
+        elif all(isinstance(x, float) for x in value):
+            pv.type = ParameterType.PARAMETER_DOUBLE_ARRAY
+            pv.double_array_value = value
+        elif all(isinstance(x, str) for x in value):
+            pv.type = ParameterType.PARAMETER_STRING_ARRAY
+            pv.string_array_value = value
+        else:
+            raise ValueError(f"Mixed-type array not supported for parameter '{name}'")
+    else:
+        raise ValueError(f"Unsupported parameter type {type(value).__name__} for '{name}'")
+    p.value = pv
+    return p
+
+
 # ── ROS 2 client node ──────────────────────────────────────────────────
 class ComponentManagerClient(Node):
     """rclpy node that calls the component_container's services."""
@@ -65,9 +113,15 @@ class ComponentManagerClient(Node):
 
     def __init__(self):
         super().__init__('component_manager_orchestrator')
-        self.cli_load   = self.create_client(LoadNode,   '/ComponentManager/_container/load_node')
-        self.cli_unload = self.create_client(UnloadNode, '/ComponentManager/_container/unload_node')
-        self.cli_list   = self.create_client(ListNodes,  '/ComponentManager/_container/list_nodes')
+        # Container name comes from env (defaults to ComponentManager). This
+        # MUST match the chart's componentHost.containerName so service paths
+        # resolve correctly.
+        container_name = os.environ.get('COMPONENT_CONTAINER_NAME', 'ComponentManager')
+        prefix = f'/{container_name}/_container'
+        log.info(f'orchestrator using container prefix: {prefix}')
+        self.cli_load   = self.create_client(LoadNode,   f'{prefix}/load_node')
+        self.cli_unload = self.create_client(UnloadNode, f'{prefix}/unload_node')
+        self.cli_list   = self.create_client(ListNodes,  f'{prefix}/list_nodes')
         # Tracks loaded plugin → unique_id (returned by LoadNode), needed for unload.
         self._loaded: dict[str, int] = {}
 
@@ -83,7 +137,7 @@ class ComponentManagerClient(Node):
             await asyncio.sleep(0.5)
         raise HTTPException(503, f'Service {name} not available — is component_container running?')
 
-    async def load(self, module: str) -> dict:
+    async def load(self, module: str, parameters: Optional[dict] = None) -> dict:
         if module not in MODULE_REGISTRY:
             raise HTTPException(404, f'Unknown module: {module}. '
                                        f'Known: {list(MODULE_REGISTRY.keys())}')
@@ -99,8 +153,14 @@ class ComponentManagerClient(Node):
         req.plugin_name  = spec['plugin']
         req.node_name    = ''  # let the component pick its default
         req.node_namespace = ''
-        # The class's __init__ will declare its own parameters using the
-        # default values; if you need overrides, populate req.parameters.
+        # Forward optional parameters from HTTP body. They override the
+        # plugin's declare_parameter() defaults at component __init__ time.
+        if parameters:
+            try:
+                req.parameters = [_to_ros_parameter(k, v) for k, v in parameters.items()]
+                log.info(f'[load] {module} parameters: {parameters}')
+            except ValueError as e:
+                raise HTTPException(400, f'Invalid parameter: {e}')
 
         log.info(f'[load] {module} → {spec["plugin"]}')
         future = self.cli_load.call_async(req)
@@ -165,6 +225,7 @@ async def _spin_until(node: Node, future):
 # ── FastAPI app ─────────────────────────────────────────────────────────
 class LoadRequest(BaseModel):
     module: str
+    parameters: dict[str, Any] = Field(default_factory=dict)
 
 class UnloadRequest(BaseModel):
     module: str
@@ -202,7 +263,7 @@ async def list_components():
 
 @app.post('/load')
 async def load_component(req: LoadRequest):
-    return await app.state.client.load(req.module)
+    return await app.state.client.load(req.module, req.parameters)
 
 
 @app.post('/unload')

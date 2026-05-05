@@ -60,6 +60,43 @@ spec:
 
               {{- range .Values.bootstrap.modules }}
               echo "[bootstrap] Loading module: {{ . }}"
+              # Per-module parameter payload. Each block sets PAYLOAD with the
+              # JSON body to POST. The plugin's __init__ receives these as
+              # ROS 2 parameters (overriding declare_parameter defaults).
+              {{- if eq . "camera" }}
+              PAYLOAD='{"module":"camera","parameters":{
+                "device":"{{ $.Values.camera.device }}",
+                "width":{{ $.Values.camera.width }},
+                "height":{{ $.Values.camera.height }},
+                "fps":{{ $.Values.camera.fps }},
+                "frame_id":"{{ $.Values.camera.frameId }}",
+                "synthetic_mode":{{ $.Values.camera.syntheticMode }}
+              }}'
+              {{- else if eq . "yolo" }}
+              PAYLOAD='{"module":"yolo","parameters":{
+                "model_path":"{{ $.Values.yolo.modelPath }}",
+                "conf":{{ $.Values.yolo.conf }},
+                "filter_classes":"{{ $.Values.yolo.filterClasses }}",
+                "publish_debug_image":"{{ $.Values.yolo.publishDebugImage }}",
+                "publish_metrics":"{{ $.Values.yolo.publishMetrics }}"
+              }}'
+              {{- else if eq . "llava" }}
+              PAYLOAD='{"module":"llava","parameters":{
+                "model_id":"{{ $.Values.llava.modelId }}",
+                "trigger_on_yolo":{{ $.Values.llava.triggerOnYolo }},
+                "yolo_trigger_interval_s":{{ $.Values.llava.yoloTriggerIntervalS }},
+                "max_new_tokens":{{ $.Values.llava.maxNewTokens }},
+                "load_in_4bit":{{ $.Values.llava.load4bit }}
+              }}'
+              {{- else if eq . "voxtral" }}
+              PAYLOAD='{"module":"voxtral","parameters":{
+                "audio_mode":{{ $.Values.voxtral.audioMode }},
+                "model_id":"{{ $.Values.voxtral.modelId }}"
+              }}'
+              {{- else }}
+              PAYLOAD='{"module":"{{ . }}"}'
+              {{- end }}
+
               # Retry up to 3 times with backoff. Covers transient 503s from
               # the orchestrator's _wait_service while the component_container
               # finishes registering its services on cold start.
@@ -68,7 +105,7 @@ spec:
                 if curl -fsS --max-time {{ $.Values.bootstrap.totalTimeoutSeconds }} \
                     -X POST "http://${ORCH}/load" \
                     -H 'Content-Type: application/json' \
-                    -d '{"module": "{{ . }}"}'; then
+                    -d "$PAYLOAD"; then
                   echo ""
                   echo "[bootstrap] Loaded {{ . }} on attempt ${attempt}"
                   loaded=1

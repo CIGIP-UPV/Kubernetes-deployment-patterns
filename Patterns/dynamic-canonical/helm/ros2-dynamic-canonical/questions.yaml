@@ -27,17 +27,6 @@ questions:
       - "edgenode01"
     group: "Node Placement"
 
-  - variable: nodes.cloud.name
-    label: "Cloud Node"
-    description: "Hostname of the cloud node where the dashboard runs"
-    type: enum
-    default: "kb2"
-    required: true
-    options:
-      - "kb2"
-      - "worker1-kb2"
-    group: "Node Placement"
-
   # ── Bootstrap (initial component load) ───────────────────────────
   - variable: bootstrap.enabled
     label: "Enable Bootstrap Job"
@@ -112,6 +101,92 @@ questions:
     type: boolean
     default: false
     group: "Camera"
+
+  - variable: camera.mountVideoDevice
+    label: "Mount Video Device (privileged)"
+    description: "Required for real camera access. Leave unchecked when using syntheticMode"
+    type: boolean
+    default: true
+    show_if: "camera.syntheticMode=false"
+    group: "Camera"
+
+  # ── YOLO ─────────────────────────────────────────────────────────
+  # These parameters are forwarded by the bootstrap Job to /load as
+  # ROS 2 parameters when each component is loaded into the container.
+  - variable: yolo.filterClasses
+    label: "Filter Detection Classes"
+    description: "COCO class IDs to detect (empty = all 80). Examples: '0' = person, '0,56,60' = person+chair+table"
+    type: string
+    default: "0,56,60"
+    group: "YOLO"
+
+  - variable: yolo.publishDebugImage
+    label: "Publish Debug Image"
+    description: "Publish annotated YOLO detection image (required for dashboard video feed)"
+    type: enum
+    default: "true"
+    options:
+      - "true"
+      - "false"
+    group: "YOLO"
+
+  - variable: yolo.publishMetrics
+    label: "Publish Benchmark Metrics"
+    description: "Enable latency and inference time metrics on ROS topics"
+    type: enum
+    default: "true"
+    options:
+      - "true"
+      - "false"
+    group: "YOLO"
+
+  # ── LLaVA — Visual Reasoning ─────────────────────────────────────
+  - variable: llava.triggerOnYolo
+    label: "Trigger on YOLO Detection"
+    description: "Automatically analyze scene when YOLO detects objects"
+    type: boolean
+    default: true
+    group: "LLaVA — Razonamiento Visual"
+
+  - variable: llava.yoloTriggerIntervalS
+    label: "YOLO Trigger Interval (s)"
+    description: "Minimum seconds between YOLO-triggered LLaVA inferences (GPU throttle)"
+    type: enum
+    default: 30.0
+    show_if: "llava.triggerOnYolo=true"
+    options:
+      - 5.0
+      - 8.0
+      - 15.0
+      - 30.0
+    group: "LLaVA — Razonamiento Visual"
+
+  - variable: llava.load4bit
+    label: "4-bit Quantization"
+    description: "Load LLaVA in 4-bit on amd64 (Jetson always uses FP16). Reduces VRAM ~14GB → ~4GB"
+    type: boolean
+    default: true
+    group: "LLaVA — Razonamiento Visual"
+
+  - variable: llava.maxNewTokens
+    label: "Max Response Tokens"
+    description: "Maximum tokens LLaVA generates per inference (longer = slower)"
+    type: enum
+    default: 150
+    options:
+      - 50
+      - 100
+      - 150
+      - 250
+    group: "LLaVA — Razonamiento Visual"
+
+  # ── Voxtral — Voice Interaction ──────────────────────────────────
+  - variable: voxtral.audioMode
+    label: "Audio Mode"
+    description: "FALSE recommended for dynamic-canonical: transformers 4.48 (LLaVA constraint) lacks VoxtralProcessor (added in 4.54). Voxtral falls back to TEXT_SIMULATION mode automatically. Browser audio still works."
+    type: boolean
+    default: false
+    group: "Voxtral — Interacción por Voz"
 
   # ── GPU ──────────────────────────────────────────────────────────
   - variable: gpu.enabled

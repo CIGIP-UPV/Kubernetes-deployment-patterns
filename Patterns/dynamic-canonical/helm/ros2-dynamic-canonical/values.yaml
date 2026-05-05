@@ -17,13 +17,11 @@ ros:
   localhostOnly: "0"
 
 # ── Nodos del cluster ─────────────────────────────────────────────────
-# El pod corre en edgenode01 (necesita la GPU). El dashboard puede ir
-# en kb2 (cloud) si lo prefieres.
+# El pod corre en edgenode01 (necesita la GPU). El dashboard se pinea con
+# dashboard.nodeHostname más abajo.
 nodes:
   edge:
     name: edgenode01
-  cloud:
-    name: kb2
 
 # ── Camera ──
 camera:
@@ -34,6 +32,29 @@ camera:
   frameId: camera
   syntheticMode: false
   mountVideoDevice: true
+
+# ── YOLO ── (forwarded by bootstrap Job to /load as ROS parameters)
+yolo:
+  modelPath: /opt/models/yolov8n.pt
+  conf: 0.25
+  filterClasses: "0,56,60"      # person+chair+dining table; "" = all 80 COCO classes
+  publishDebugImage: "true"
+  publishMetrics: "true"
+
+# ── LLaVA ──
+llava:
+  modelId: llava-hf/llava-1.5-7b-hf
+  triggerOnYolo: true
+  yoloTriggerIntervalS: 30.0
+  maxNewTokens: 150
+  load4bit: true                # Ignored on Jetson (FP16 used directly)
+
+# ── Voxtral ──
+# transformers 4.48 (LLaVA constraint) lacks VoxtralProcessor. Voxtral
+# falls back to TEXT_SIMULATION at runtime; browser audio still works.
+voxtral:
+  audioMode: false
+  modelId: mistralai/Voxtral-Mini-3B-2507
 
 # ── Component container (host process) ────────────────────────────────
 componentHost:
