@@ -100,10 +100,16 @@ RUN for attempt in 1 2 3; do \
         ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
         ros-${ROS_DISTRO}-cv-bridge \
         ros-${ROS_DISTRO}-image-transport \
+        ros-${ROS_DISTRO}-vision-msgs \
       && break \
       || { echo "[apt] Attempt $attempt failed (QEMU?), retrying..."; \
            apt-get install -f -y || true; sleep 2; }; \
-    done && rm -rf /var/lib/apt/lists/*
+    done && \
+    # Loud check: if vision_msgs failed silently (apt retry loop swallows
+    # "Unable to locate package" exit codes), fail the build now.
+    dpkg -s ros-${ROS_DISTRO}-vision-msgs >/dev/null 2>&1 || \
+      { echo "[apt] FATAL: ros-${ROS_DISTRO}-vision-msgs not installed"; exit 1; } && \
+    rm -rf /var/lib/apt/lists/*
 
 # ── Copy CUDA 12.6 + cuDNN 9 runtime libs from the multi-stage above ─────────
 # Even though base has no PyTorch, having CUDA libs here means the overlay-pack
