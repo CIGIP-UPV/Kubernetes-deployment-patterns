@@ -419,12 +419,20 @@ spec:
             failureThreshold: 3
 
       volumes:
-        # emptyDir holds the extracted overlay (~17 GB on disk).
-        # Pod-lifetime — re-downloaded on each pod restart. That's
-        # acceptable on a stable single-replica StatefulSet; for fleets
-        # one would switch to a persistent volume per pod.
+        # overlay-mount holds the extracted overlay (~17 GB on disk).
+        # Two backends supported via overlayMount.kind:
+        #   • emptyDir (default)  → pod-lifetime, lives on kubelet root-dir
+        #   • hostPath            → persistent, pinned to a host path; useful
+        #     when the kubelet root-dir is on a small disk (e.g. Jetson SD
+        #     card) but the node has a larger SSD mounted elsewhere
         - name: overlay-mount
+          {{- if eq (.Values.overlayMount.kind | default "emptyDir") "hostPath" }}
+          hostPath:
+            path: {{ .Values.overlayMount.hostPath | quote }}
+            type: DirectoryOrCreate
+          {{- else }}
           emptyDir: {}
+          {{- end }}
         {{- if .Values.cyclonedds.enabled }}
         - name: cyclonedds
           configMap:

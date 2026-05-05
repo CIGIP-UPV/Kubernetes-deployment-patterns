@@ -162,6 +162,19 @@ overlaySync:
     pullPolicy: IfNotPresent
   timeoutSeconds: 1800            # 30 min (margen amplio para 17 GB en LAN K3s)
 
+# ── Overlay mount backend (where the 17 GB extracted overlay lives) ─────────
+# kind: emptyDir   → pod-lifetime, on the kubelet root-dir filesystem.
+#                    Default. OK if the kubelet's disk has 30+ GB free.
+# kind: hostPath   → persistent, on a specific host path. Use when the
+#                    kubelet root-dir is on a small disk (Jetson SD card)
+#                    but the node has a larger SSD mounted elsewhere.
+#                    Set hostPath to that location; will be reused across
+#                    pod restarts (faster restarts). The dir survives
+#                    helm uninstall — clean it manually if needed.
+overlayMount:
+  kind: emptyDir                  # or "hostPath"
+  hostPath: /mnt/ssd/overlay-canonical-runtime
+
 # ── Dashboard (cloud, kb2) ──────────────────────────────────────────────────
 dashboard:
   enabled: true

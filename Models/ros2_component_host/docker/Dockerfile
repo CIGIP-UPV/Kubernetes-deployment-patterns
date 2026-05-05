@@ -153,9 +153,20 @@ ENV TRANSFORMERS_OFFLINE=1
 # subdirectory rclpy_components/ in the rclpy repo IS a colcon package
 # (has package.xml + setup.py) and that's the supported install path.
 WORKDIR /opt/component_ws
-RUN git clone --depth=1 -b humble https://github.com/ros2/rclpy.git /tmp/rclpy_src && \
+# rclpy_components subdir is only in iron+ branches of ros2/rclpy (NOT in
+# humble). The Python code is pure rclpy-API on top, so it's compatible
+# with Humble's rclpy at runtime.
+# If iron later removes this folder, fall back to listing the repo so we
+# can adapt the fetch path.
+RUN git clone --depth=1 -b iron https://github.com/ros2/rclpy.git /tmp/rclpy_src && \
+    if [ ! -d /tmp/rclpy_src/rclpy_components ]; then \
+      echo "[build] FATAL: rclpy_components dir not in iron branch. Listing repo:" && \
+      ls -la /tmp/rclpy_src/ && \
+      exit 1; \
+    fi && \
     cp -r /tmp/rclpy_src/rclpy_components src/rclpy_components && \
     rm -rf /tmp/rclpy_src && \
+    echo "[build] rclpy_components fetched. Workspace src/:" && \
     ls -la src/
 
 COPY Models/ros2_yolo_ws/src/yolo_detector_pkg     src/yolo_detector_pkg
