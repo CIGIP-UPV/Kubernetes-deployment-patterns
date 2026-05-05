@@ -288,22 +288,24 @@ spec:
               source /opt/overlay/install/setup.bash
 
               # ── Workaround for ros2-overlay-pack <= 1.0.x ──
-              # The carrier's pip resolution drags nvidia-cuda-runtime-cu13
-              # and nvidia-cudnn-cu13 (datacenter CUDA 13) as transitive deps
-              # of ultralytics/transformers. The Jetson PyTorch wheel that
-              # follows force-reinstalls torch but does NOT remove these,
-              # and at import time PyTorch dlopens the CU13 libs, breaking
-              # CUDA on Tegra (libcuda.so version mismatch).
-              # Remove them at runtime so the Jetson-native libs win.
-              for pkg in nvidia_cuda_runtime_cu13 nvidia_cudnn_cu13 \
-                         nvidia_cuda_nvrtc_cu13 nvidia_cublas_cu13 \
-                         nvidia_cusolver_cu13 nvidia_cusparse_cu13 \
-                         nvidia_curand_cu13 nvidia_nccl_cu13 \
-                         nvidia_cufft_cu13 nvidia_cuda_cupti_cu13 \
-                         cuda_toolkit nvidia; do
-                find /opt/overlay/python-deps -maxdepth 1 -name "${pkg}*" \
-                     -exec rm -rf {} + 2>/dev/null || true
-              done
+              # pip pulls nvidia-cuda-runtime-cu13 + nvidia-cudnn-cu13 etc.
+              # as transitive deps of ultralytics/transformers. Their .so
+              # files install under /opt/overlay/python-deps/nvidia/<lib>/
+              # as a SHARED namespace package, so deleting the .dist-info
+              # dirs alone is not enough — we must wipe the nvidia/ dir
+              # itself. The Jetson PyTorch wheel does NOT depend on these
+              # (it links libcuda from /usr/local/cuda/lib64 inherited
+              # from ros2-base).
+              echo "[runtime] Stripping nvidia-cu13 datacenter libs from overlay..."
+              rm -rf /opt/overlay/python-deps/nvidia      2>/dev/null || true
+              rm -rf /opt/overlay/python-deps/cuda_toolkit 2>/dev/null || true
+              # Also remove any *.dist-info / *.libs folders that referenced them
+              find /opt/overlay/python-deps -maxdepth 1 -type d \
+                \( -name "nvidia_*" -o -name "cuda_toolkit*" \) \
+                -exec rm -rf {} + 2>/dev/null || true
+              echo "[runtime] Remaining python-deps top-level (nvidia/cuda):"
+              ls /opt/overlay/python-deps 2>/dev/null | grep -i -E "nvidia|cuda" || \
+                echo "  (none — clean)"
 
               # PYTHONPATH for the overlay's pip --target site-packages
               # (PyTorch, transformers, accelerate, ultralytics, etc.)

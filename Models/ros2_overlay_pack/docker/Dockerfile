@@ -111,14 +111,20 @@ RUN ARCH=$(dpkg --print-architecture) && \
         --force-reinstall --no-deps "torchaudio==2.5.0" || true && \
       PYTHONPATH=${OVERLAY_PYDEPS} python3 /tmp/patch_torchvision_jetson.py && \
       # Strip nvidia-cu13 datacenter libs that pip pulled in transitively. \
-      # These conflict with the Jetson-native libcuda.so/libcudart.so on \
-      # Tegra. Same cleanup as ros2-monolithic. \
-      echo "[cleanup] Removing nvidia-cu13 / cuda_toolkit packages from overlay..." && \
+      # The actual .so files install under nvidia/<lib>/ as a SHARED \
+      # namespace package, so deleting only the *.dist-info dirs is not \
+      # enough — wipe the nvidia/ tree itself. The Jetson PyTorch wheel \
+      # links libcuda from /usr/local/cuda/lib64 (inherited from ros2-base) \
+      # so it does NOT depend on these. \
+      echo "[cleanup] Removing nvidia-cu13 / cuda_toolkit from overlay..." && \
+      rm -rf ${OVERLAY_PYDEPS}/nvidia      2>/dev/null || true && \
+      rm -rf ${OVERLAY_PYDEPS}/cuda_toolkit 2>/dev/null || true && \
       find ${OVERLAY_PYDEPS} -maxdepth 1 -type d \
-        \( -name "nvidia*" -o -name "cuda_toolkit*" \) \
+        \( -name "nvidia_*" -o -name "cuda_toolkit*" \) \
         -exec rm -rf {} + 2>/dev/null || true && \
-      echo "[cleanup] Done. Remaining at top of OVERLAY_PYDEPS:" && \
-      ls ${OVERLAY_PYDEPS} | grep -i -E "nvidia|cuda|torch" || true ; \
+      echo "[cleanup] Remaining nvidia/cuda entries (should be empty):" && \
+      ls ${OVERLAY_PYDEPS} | grep -i -E "nvidia|cuda" || \
+        echo "  (none — clean)" ; \
     else \
       python3 -m pip install --no-cache-dir --target ${OVERLAY_PYDEPS} \
         torch==2.4.1+cu121 torchvision==0.19.1+cu121 torchaudio==2.4.1+cu121 \
