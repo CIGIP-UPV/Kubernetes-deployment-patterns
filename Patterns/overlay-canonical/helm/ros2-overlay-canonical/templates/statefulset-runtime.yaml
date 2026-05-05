@@ -399,7 +399,15 @@ spec:
           volumeMounts:
             - name: overlay-mount
               mountPath: /opt/overlay
-              readOnly: true
+              # Was readOnly: true. Switched to read-write so the runtime
+              # cleanup (strip nvidia-cu13 datacenter libs) can write to
+              # /opt/overlay/python-deps. Models and overlay packages are
+              # still semantically immutable — no production code modifies
+              # them — but pip's transitive datacenter libs need to be
+              # purged after extraction to avoid CUDA driver conflicts on
+              # Tegra. Once ros2-overlay-pack >= 1.0.7 ships with the
+              # cleanup baked at build time, this can be reverted to RO.
+              readOnly: false
             {{- if .Values.cyclonedds.enabled }}
             - name: cyclonedds
               mountPath: /etc/cyclonedds

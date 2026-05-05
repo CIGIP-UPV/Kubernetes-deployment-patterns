@@ -102,29 +102,44 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip && \
 # patch_torchvision_jetson.py is staged in /tmp/ by ros2-base.
 RUN ARCH=$(dpkg --print-architecture) && \
     if [ "$ARCH" = "arm64" ]; then \
+      # 1) WIPE the x86_64/cu13 torch that pip pulled as transitive dep \
+      #    of ultralytics/transformers. We delete BOTH the package dirs \
+      #    AND the dist-info so pip's reinstall sees a fresh slate. \
+      echo "[cleanup] Wiping pip-resolved torch + cu13 deps..." && \
+      rm -rf ${OVERLAY_PYDEPS}/torch \
+             ${OVERLAY_PYDEPS}/torchvision \
+             ${OVERLAY_PYDEPS}/torchaudio \
+             ${OVERLAY_PYDEPS}/nvidia \
+             ${OVERLAY_PYDEPS}/cuda_toolkit \
+             ${OVERLAY_PYDEPS}/cuda \
+             2>/dev/null || true && \
+      find ${OVERLAY_PYDEPS} -maxdepth 1 -type d \
+        \( -name "torch-*.dist-info" \
+        -o -name "torchvision-*.dist-info" \
+        -o -name "torchaudio-*.dist-info" \
+        -o -name "nvidia_*" \
+        -o -name "cuda_toolkit*" \
+        -o -name "cuda_*-*.dist-info" \) \
+        -exec rm -rf {} + 2>/dev/null || true && \
+      \
+      # 2) NOW install the Jetson PyTorch wheel into a clean target. \
       python3 -m pip install --no-cache-dir --target ${OVERLAY_PYDEPS} \
-        --force-reinstall --no-deps \
+        --no-deps \
         "https://developer.download.nvidia.com/compute/redist/jp/v61/pytorch/torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl" && \
       python3 -m pip install --no-cache-dir --target ${OVERLAY_PYDEPS} \
-        --force-reinstall --no-deps "torchvision==0.20.0" && \
+        --no-deps "torchvision==0.20.0" && \
       python3 -m pip install --no-cache-dir --target ${OVERLAY_PYDEPS} \
-        --force-reinstall --no-deps "torchaudio==2.5.0" || true && \
+        --no-deps "torchaudio==2.5.0" || true && \
       PYTHONPATH=${OVERLAY_PYDEPS} python3 /tmp/patch_torchvision_jetson.py && \
-      # Strip nvidia-cu13 datacenter libs that pip pulled in transitively. \
-      # The actual .so files install under nvidia/<lib>/ as a SHARED \
-      # namespace package, so deleting only the *.dist-info dirs is not \
-      # enough — wipe the nvidia/ tree itself. The Jetson PyTorch wheel \
-      # links libcuda from /usr/local/cuda/lib64 (inherited from ros2-base) \
-      # so it does NOT depend on these. \
-      echo "[cleanup] Removing nvidia-cu13 / cuda_toolkit from overlay..." && \
-      rm -rf ${OVERLAY_PYDEPS}/nvidia      2>/dev/null || true && \
-      rm -rf ${OVERLAY_PYDEPS}/cuda_toolkit 2>/dev/null || true && \
-      find ${OVERLAY_PYDEPS} -maxdepth 1 -type d \
-        \( -name "nvidia_*" -o -name "cuda_toolkit*" \) \
-        -exec rm -rf {} + 2>/dev/null || true && \
-      echo "[cleanup] Remaining nvidia/cuda entries (should be empty):" && \
-      ls ${OVERLAY_PYDEPS} | grep -i -E "nvidia|cuda" || \
-        echo "  (none — clean)" ; \
+      \
+      # 3) Sanity check: confirm Jetson torch is what's installed. \
+      echo "[verify] Top-level python-deps after install:" && \
+      ls ${OVERLAY_PYDEPS} | grep -i -E "torch|nvidia|cuda" | head -20 && \
+      VERSION=$(PYTHONPATH=${OVERLAY_PYDEPS} python3 -c "import torch; print(torch.__version__)") && \
+      echo "[verify] Installed torch version: ${VERSION}" && \
+      echo "${VERSION}" | grep -q "2.5.0a0" || \
+        { echo "[verify] FATAL: Jetson torch wheel NOT correctly installed (got '${VERSION}')"; exit 1; } && \
+      echo "[verify] OK — Jetson torch wheel installed cleanly" ; \
     else \
       python3 -m pip install --no-cache-dir --target ${OVERLAY_PYDEPS} \
         torch==2.4.1+cu121 torchvision==0.19.1+cu121 torchaudio==2.4.1+cu121 \

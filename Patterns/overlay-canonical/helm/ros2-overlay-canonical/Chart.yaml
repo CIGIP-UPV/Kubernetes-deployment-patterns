@@ -13,7 +13,7 @@ description: |
   Replaces Patterns/overlay-workspaces/ which monolithically packed both
   layers in a single image (~22 GB) and didn't separate base from overlay.
 type: application
-version: 1.0.7
+version: 1.0.8
 appVersion: humble
 keywords:
   - ros2
