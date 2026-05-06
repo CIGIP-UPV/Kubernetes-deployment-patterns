@@ -320,22 +320,6 @@ cold-cold runs: **~500 Mbps**.
 | overlay-canonical    | Multi-edge fleets with recurring AI model updates     | Cloud→PVC→edge double hop                               |
 | dynamic-canonical    | A/B testing, hot-swap, iterative development          | Single fat image, no multi-edge fan-out                  |
 
-### 9. Reproducibility caveats
-
-The IEEE Access submission is built on n=1 measurements per pattern. The
-following items are flagged as future work:
-
-- Measured cold-cold for **monolithic** and **microservices** (the table
-  above currently shows estimates).
-- Dynamic-canonical runtime metrics with a longer warm-up window so the
-  YOLO-only $T_{\text{inf}}$ stabilises before sampling.
-- Independent verification of the $T_{\text{ready}}$ delta between
-  overlay/dynamic (~0.12–0.18 s) and monolithic/microservices (~0.75 s)
-  — to rule out a measurement artefact.
-- Multi-run statistics (mean ± SD across n ≥ 3 runs).
-- Energy metrics ($P_{\text{avg}}$, $E_{\text{inf}}$, $\eta_{\text{energy}}$)
-  via `tegrastats`, which currently is not exposed inside the runtime
-  containers.
 
 ## Repository layout
 
