@@ -1,0 +1,101 @@
+apiVersion: v1
+entries:
+  ros2-dynamic-canonical:
+  - annotations:
+      catalog.cattle.io/timeout: 30m
+    apiVersion: v2
+    appVersion: humble
+    created: "2026-05-06T20:26:53.344021238Z"
+    description: 'Canonical Dynamic Module Loading pattern for ROS 2 robotics on Kubernetes.  Realizes
+      the canonical ROS 2 dynamic composition theory:   - A long-lived component_container_isolated
+      process exposes     LoadNode / UnloadNode services.   - Plugins (camera, yolo,
+      llava, voxtral) are registered via     `rclpy_components` entry_points and loaded
+      INTO the container''s     process on demand — true intra-process composition,
+      not subprocess     spawning.   - A FastAPI orchestrator container (sibling in
+      the same pod) calls     those services via HTTP API, exposing /load, /unload,
+      /list to     the dashboard.  This canonical realisation uses true intra-process
+      composition through rclpy_components and the standard ROS 2 LoadNode / UnloadNode
+      service contract, instead of spawning a subprocess per loaded module. '
+    digest: 20e811fec8b558f88a740345e3bdb4a5d815cbb0f841a096ff1eee90fb418ddf
+    keywords:
+    - ros2
+    - dynamic-composition
+    - rclpy-components
+    - canonical
+    maintainers:
+    - email: mmateo@cigip.upv.es
+      name: Miguel-Angel-Mateo-Casali
+    name: ros2-dynamic-canonical
+    type: application
+    urls:
+    - https://cigip-upv.github.io/Kubernetes-deployment-patterns/charts/ros2-dynamic-canonical-1.0.0.tgz
+    version: 1.0.0
+  ros2-microservices:
+  - apiVersion: v2
+    appVersion: humble
+    created: "2026-05-06T20:26:53.345410321Z"
+    description: Microservices ROS 2 pattern with decoupled camera, YOLO, LLaVA, and
+      Voxtral services
+    digest: 56ad1411279c1a27ef2f131c3ca4a06986cf216b19081d6861fd37d77fd5e9c5
+    keywords:
+    - ros2
+    - microservices
+    - robotics
+    maintainers:
+    - email: mmateo@cigip.upv.es
+      name: Miguel-Angel-Mateo-Casali
+    name: ros2-microservices
+    type: application
+    urls:
+    - https://cigip-upv.github.io/Kubernetes-deployment-patterns/charts/ros2-microservices-1.0.0.tgz
+    version: 1.0.0
+  ros2-monolithic:
+  - apiVersion: v2
+    appVersion: humble
+    created: "2026-05-06T20:26:53.346508729Z"
+    description: Monolithic ROS 2 pattern with camera + YOLO + LLaVA + Voxtral in
+      a single runtime container
+    digest: 178a3ab253be48ffdfbcf4c854acf88f4f2ab21a020c6bd684bb824a763ba854
+    keywords:
+    - ros2
+    - monolithic
+    - robotics
+    maintainers:
+    - email: mmateo@cigip.upv.es
+      name: Miguel-Angel-Mateo-Casali
+    name: ros2-monolithic
+    type: application
+    urls:
+    - https://cigip-upv.github.io/Kubernetes-deployment-patterns/charts/ros2-monolithic-1.0.0.tgz
+    version: 1.0.0
+  ros2-overlay-canonical:
+  - annotations:
+      catalog.cattle.io/timeout: 45m
+    apiVersion: v2
+    appVersion: humble
+    created: "2026-05-06T20:26:53.347818383Z"
+    description: 'Canonical Overlay Workspaces pattern for ROS 2 robotics on Kubernetes.  Realizes
+      the OTA cloud-edge delivery model from the paper:   - ros2-base (immutable platform:
+      ROS 2 + camera driver + CUDA)   - ros2-overlay-pack (mutable AI layer: ML stack
+      + nodes + models)     delivered as an OCI carrier image, extracted by a Helm
+      pre-install Job     to a PVC on the cloud node, and synced via HTTP from an
+      nginx sidecar     to the edge node''s runtime pod via initContainer.  This canonical
+      realisation strictly separates immutable base from mutable overlay so that AI
+      updates only re-publish the overlay-pack carrier (~25 GB), keeping the ROS 2
+      base image (~2.2 GB) intact across releases. '
+    digest: ed120b73b12e062a2278553f7a56df30b3e0ef220be37f48fe8be7e5819fc5dc
+    keywords:
+    - ros2
+    - overlay
+    - cloud-edge
+    - canonical
+    - ota
+    maintainers:
+    - email: mmateo@cigip.upv.es
+      name: Miguel-Angel-Mateo-Casali
+    name: ros2-overlay-canonical
+    type: application
+    urls:
+    - https://cigip-upv.github.io/Kubernetes-deployment-patterns/charts/ros2-overlay-canonical-1.0.0.tgz
+    version: 1.0.0
+generated: "2026-05-06T20:26:53.342664435Z"
