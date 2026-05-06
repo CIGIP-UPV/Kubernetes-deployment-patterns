@@ -198,12 +198,12 @@ $T_{\text{inf}}$ stabilises in the 35–50 ms band after ~5 min of warm-up.
 
 ### 2. Image footprint and typical OTA payload
 
-| Pattern              | $S_{\text{img}}$ total | Image breakdown                                  | OTA payload (one update)                |
-|----------------------|-----------------------:|--------------------------------------------------|------------------------------------------|
-| monolithic           |   30.0 GB              | 1 image (whole stack)                            | 30 GB (entire image)                     |
-| microservices        |   41.2 GB              | 5 images (camera, yolo, llava, voxtral, dash)    | 5–19 GB (only the changed microservice)  |
-| **overlay-canonical**|   **27.5 GB**          | base 2.24 + overlay-pack 25.05 + dashboard 0.25  | **25 GB** (only the overlay-pack)        |
-| dynamic-canonical    |   30.0 GB              | component-host 29.77 + dashboard 0.25            | 30 GB (entire image)                     |
+| Pattern              | $S_{\text{img}}$  total | Image breakdown                                  | OTA payload (one update)                |
+|----------------------|------------------------:|--------------------------------------------------|------------------------------------------|
+| monolithic           |                 30.0 GB | 1 image (whole stack)                            | 30 GB (entire image)                     |
+| microservices        |                 41.2 GB | 5 images (camera, yolo, llava, voxtral, dash)    | 5–19 GB (only the changed microservice)  |
+| **overlay-canonical**|             **27.5 GB** | base 2.24 + overlay-pack 25.05 + dashboard 0.25  | **25 GB** (only the overlay-pack)        |
+| dynamic-canonical    |                 30.0 GB | component-host 29.77 + dashboard 0.25            | 30 GB (entire image)                     |
 
 Overlay-canonical wins on footprint (27.5 GB) thanks to the immutable
 base + mutable overlay split; microservices is the heaviest because each
@@ -234,16 +234,16 @@ rosbridge, after the inference pipeline reached a steady regime:
 | Metric               | Monolithic | Microservices | Overlay-canonical | Dynamic-canonical |
 |----------------------|-----------:|--------------:|------------------:|------------------:|
 | $T_{\text{inf}}$ (avg) | 44.9 ms  | 35.8 ms       | **32.7 ms**       | 76.3 ms           |
-| $f_{\text{FPS}}$ (pub) | 10.0 fps | 10.6 fps      | 10.2 fps          | 5.6 fps           |
-| $f_{\text{FPS}}$ (theor.) | n/a   | n/a           | 30.6 fps          | 13.1 fps          |
-| $T_{\text{e2e}}$ (avg) | 61 ms    | 58 ms         | 15 ms ¹           | 882 ms ²          |
-| $J_{\text{inf}}$       | 7.0 ms   | 10.8 ms       | 8.5 ms            | 73.3 ms           |
-| $U_{\text{CPU}}$ (avg / max) | 20.5 / 26.6 % | 23.0 / 37.8 % | 21.2 / 45.3 % | 23.2 / 38.0 % |
+| $f_{\text{FPS}}$ (pub) | 10.0 fps | **10.6 fps**  | 10.2 fps          | 5.6 fps           |
+| $f_{\text{FPS}}$ (theor.) | n/a   | n/a           | **30.6 fps**      | 13.1 fps          |
+| $T_{\text{e2e}}$ (avg) | 61 ms    | 58 ms         | **15 ms** ¹       | 882 ms ²          |
+| $J_{\text{inf}}$       | **7.0 ms** | 10.8 ms     | 8.5 ms            | 73.3 ms           |
+| $U_{\text{CPU}}$ (avg / max) | **20.5 / 26.6 %** | 23.0 / 37.8 % | 21.2 / 45.3 % | 23.2 / 38.0 % |
 | $U_{\text{GPU}}$ (avg / max) | 88.7 / 99.8 % | 54.3 / 99.9 % | 51.7 / 99.9 % | **47.5 / 99.8 %** |
-| $U_{\text{RAM}}$ (avg / max) | 33.2 / 33.2 % | 52.6 / 53.3 % | 33.3 / 33.7 % | 32.5 / 32.5 % |
-| $L_{\text{IO}}$ (read/write) | 0.00 / n/a MB/s | 1.43 / n/a MB/s | 0.12 / 0.03 MB/s | 0.00 / 0.00 MB/s |
-| Voxtral audio mode   | TEXT_SIM   | AUDIO REAL    | TEXT_SIM          | TEXT_SIM ³        |
-| YOLO real-camera detection | ✅   | ✅            | ✅ chair 73 %     | ✅ 2 × chair (70 %, 54 %) |
+| $U_{\text{RAM}}$ (avg / max) | 33.2 / 33.2 % | 52.6 / 53.3 % | 33.3 / 33.7 % | **32.5 / 32.5 %** |
+| $L_{\text{IO}}$ (read/write) | 0.00 / n/a MB/s | 1.43 / n/a MB/s | 0.12 / 0.03 MB/s | **0.00 / 0.00 MB/s** |
+| Voxtral audio mode   | TEXT_SIM   | **AUDIO REAL** | TEXT_SIM         | TEXT_SIM ³        |
+| YOLO real-camera detection | ✅   | ✅            | ✅     | ✅  |
 | LLaVA scene description    | ✅   | ✅            | ✅                | ✅                 |
 
 ¹ Overlay-canonical was sampled before the auto-LLaVA trigger fired. Once
