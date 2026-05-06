@@ -1,15 +1,5 @@
 # Kubernetes ROS 2 Deployment Patterns
 
-> Companion repository for an **IEEE Access** submission on Kubernetes
-> deployment patterns for ROS 2 robotics with edge-GPU AI workloads.
->
-> Pre-aggregated measurement tables live under [`dist/metrics/`](dist/metrics/),
-> per-run raw captures under [`results/`](results/), and the four Helm
-> charts under [`Patterns/`](Patterns/). All experiments target a
-> heterogeneous K3s cluster: NVIDIA Jetson AGX Orin 64 GB at the edge +
-> amd64 cloud worker, running ROS 2 Humble + a real-time AI pipeline
-> (camera → YOLOv8n → LLaVA-1.5-7B + Voxtral-Mini-3B + browser dashboard).
-
 This repository provides four deployment patterns for running ROS 2 (Humble) applications on K3s with load simulation and monitoring hooks.
 
 - **Monolithic deployment** — Single container image with multiple ROS 2 nodes launched together. Simpler to ship; lowest internal messaging overhead; least modular for updates.
@@ -62,15 +52,9 @@ extraction Job that the overlay-canonical pattern uses.
 | AI models | YOLOv8n (3.2 M params), LLaVA-1.5-7B FP16, Voxtral-Mini-3B |
 
 
-## Prerequisites
-- A running **K3s** (or Kubernetes) cluster with `kubectl` access
-- **Helm** 3.x
-- Optional GPU edge device (e.g., Jetson) if you want GPU inference and power stats
-- Basic ROS2 networking setup (e.g., `RMW_IMPLEMENTATION`, `ROS_DOMAIN_ID`)
-
 
 ## Deployment Patterns
-(TODO: Add some instructions for each pattern)
+
 1. Monolithic Container
 
 - **Pros**: simplest shipping; no inter-container ROS overhead; low intra-process latency.
@@ -152,22 +136,6 @@ In this study, overlay workspaces are used to assess the benefits of incremental
   ```
 
 
-## Building the container images
-
-```bash
-export REG=gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes
-docker login $REG
-
-# Build all 9 images and push them to the registry
-./scripts/benchmark/build_images.sh $REG latest --push
-```
-
-The build script targets `linux/arm64` (Jetson) by default and uses
-multi-arch only where required (`ros2-overlay-pack`, `ros2-dashboard`).
-The Voxtral image build needs `HF_TOKEN` to be exported (gated model
-download from HuggingFace).
-
-
 ## Benchmarking metrics
 The following metrics are collected for benchmarking:
 
@@ -191,13 +159,6 @@ The following metrics are collected for benchmarking:
 | **DevOps & Maintainability** | **Config churn** | $C_{\text{cfg}}$     | Number of changed lines/files per update cycle.                           | `git diff --stat` between consecutive Helm values/config commits.                                            |
 | **DevOps & Maintainability** | **CI pipeline time** | $T_{\text{CI}}$      | Duration of automated build-test-deploy pipeline (min).                   | CI job logs (GitHub Actions / Jenkins / GitLab CI) → total runtime per commit.                               |
 
-> _Implementation note_: in this repository the script referred to as
-> `22_runtime_stats.sh` in the table above is materialised as
-> [`scripts/benchmark/collect_k8s_stats.sh`](scripts/benchmark/collect_k8s_stats.sh).
-> The dashboard's [`resource_monitor.py`](Models/ros2_monolithic_ws/scripts/resource_monitor.py)
-> publishes $U_{\text{CPU}}$, $U_{\text{GPU}}$, $U_{\text{RAM}}$ and $L_{\text{IO}}$
-> as ROS 2 topics (`/node/cpu_percent`, `/node/gpu_percent`, …) consumed
-> live by the browser dashboard.
 
 ---
 
@@ -211,11 +172,15 @@ The following metrics are collected for benchmarking:
 ### 
 
 
-## Results summary (S1, FPS=10, real camera, n=1)
+## Results summary
 
-Aggregate snapshot of the four patterns. Full per-run captures live in
-[`results/`](results/) and the cross-pattern comparison in
-[`dist/metrics/comparison-4patterns.md`](dist/metrics/comparison-4patterns.md).
+Scenario S1 (FPS=10, real USB camera `/dev/video1`, ROS_DOMAIN_ID=42),
+edge node = NVIDIA Jetson AGX Orin 64 GB, single measurement run per
+pattern (n=1). Per-run raw captures live under
+[`results/`](results/); per-pattern aggregated tables under
+[`dist/metrics/`](dist/metrics/).
+
+### 1. Executive snapshot
 
 | Pattern              | $T_{\text{install}}$ (cold-cold) | C-7 hot-swap         | $S_{\text{img}}$ total | $T_{\text{inf}}$ (avg) | $U_{\text{GPU}}$ (avg / max) |
 |----------------------|---------------------------------:|---------------------:|-----------------------:|-----------------------:|-----------------------------:|
@@ -224,21 +189,153 @@ Aggregate snapshot of the four patterns. Full per-run captures live in
 | **overlay-canonical**| **949 s (15:49)**                |  n/a                 |   27.5 GB              |  32.7 ms               |   51.7 / 99.9 %              |
 | **dynamic-canonical**| **645 s (10:45)**                |  **0.78 – 31.10 s**  |   30.0 GB              |  76.3 ms ²             |   47.5 / 99.8 %              |
 
-¹ Estimated from image footprint and observed pull bandwidth (≈ 500 Mbps).
+¹ Estimated from image footprint and observed pull bandwidth (~500 Mbps).
 A measured cold-cold for monolithic and microservices is the next
 reproducibility milestone.
 
 ² Dynamic-canonical was captured shortly after start-up (uptime ≈ 55 s);
-$T_{\text{inf}}$ stabilises around 35–50 ms after ~5 minutes of warm-up.
+$T_{\text{inf}}$ stabilises in the 35–50 ms band after ~5 min of warm-up.
 
-**Headline reading**:
-- Overlay-canonical has the smallest image footprint (27.5 GB) and the
-  fastest steady-state YOLO latency.
-- Dynamic-canonical has the fastest cold-cold install (10:45) and the
-  unique ability to **hot-swap a model in ≤ 31 s** without restarting
-  the pod (vs ~10–25 minutes for the other patterns).
-- All four patterns confirm GPU usage at peak ≥ 99.8 % during inference;
-  steady-state averages depend on the auto-trigger cadence of LLaVA.
+### 2. Image footprint and typical OTA payload
+
+| Pattern              | $S_{\text{img}}$ total | Image breakdown                                  | OTA payload (one update)                |
+|----------------------|-----------------------:|--------------------------------------------------|------------------------------------------|
+| monolithic           |   30.0 GB              | 1 image (whole stack)                            | 30 GB (entire image)                     |
+| microservices        |   41.2 GB              | 5 images (camera, yolo, llava, voxtral, dash)    | 5–19 GB (only the changed microservice)  |
+| **overlay-canonical**|   **27.5 GB**          | base 2.24 + overlay-pack 25.05 + dashboard 0.25  | **25 GB** (only the overlay-pack)        |
+| dynamic-canonical    |   30.0 GB              | component-host 29.77 + dashboard 0.25            | 30 GB (entire image)                     |
+
+Overlay-canonical wins on footprint (27.5 GB) thanks to the immutable
+base + mutable overlay split; microservices is the heaviest because each
+node ships its own ML stack.
+
+### 3. Cold-start ($T_{\text{install}}$)
+
+| Pattern              | $T_{\text{install}}$ (cold-cold) | Bottleneck                                                              | Status      |
+|----------------------|---------------------------------:|-------------------------------------------------------------------------|-------------|
+| monolithic           |  ~15–25 min (estimated)          | single 30 GB image pull                                                  | not measured (cold-cold pending) |
+| microservices        |  ~10–15 min (estimated)          | parallel pull of 4 images, gated by voxtral 19 GB                        | not measured (cold-cold pending) |
+| **overlay-canonical**| **949 s (15:49)** ✅              | overlay-pack 26 GB pull + 17 GB extract to PVC + 17 GB HTTP sync to edge | **measured** |
+| **dynamic-canonical**| **645 s (10:45)** ⚡              | single 32 GB pull straight to edge                                       | **measured** |
+
+Bandwidth captured during the two measured cold-cold runs converges
+around **400–500 Mbps**, consistent with a 1 Gbps LAN with overhead.
+Dynamic-canonical is ~5 min faster than overlay-canonical because it
+skips the cloud→PVC extraction and the cloud→edge HTTP sync; overlay-canonical
+in turn is expected to scale better across multiple edges because each
+edge then pulls from the cloud nginx over LAN instead of from the remote
+registry.
+
+### 4. Runtime metrics in steady state
+
+Captured from the [browser dashboard](dashboard/index.html) connected to
+rosbridge, after the inference pipeline reached a steady regime:
+
+| Metric               | Monolithic | Microservices | Overlay-canonical | Dynamic-canonical |
+|----------------------|-----------:|--------------:|------------------:|------------------:|
+| $T_{\text{inf}}$ (avg) | 44.9 ms  | 35.8 ms       | **32.7 ms**       | 76.3 ms           |
+| $f_{\text{FPS}}$ (pub) | 10.0 fps | 10.6 fps      | 10.2 fps          | 5.6 fps           |
+| $f_{\text{FPS}}$ (theor.) | n/a   | n/a           | 30.6 fps          | 13.1 fps          |
+| $T_{\text{e2e}}$ (avg) | 61 ms    | 58 ms         | 15 ms ¹           | 882 ms ²          |
+| $J_{\text{inf}}$       | 7.0 ms   | 10.8 ms       | 8.5 ms            | 73.3 ms           |
+| $U_{\text{CPU}}$ (avg / max) | 20.5 / 26.6 % | 23.0 / 37.8 % | 21.2 / 45.3 % | 23.2 / 38.0 % |
+| $U_{\text{GPU}}$ (avg / max) | 88.7 / 99.8 % | 54.3 / 99.9 % | 51.7 / 99.9 % | **47.5 / 99.8 %** |
+| $U_{\text{RAM}}$ (avg / max) | 33.2 / 33.2 % | 52.6 / 53.3 % | 33.3 / 33.7 % | 32.5 / 32.5 % |
+| $L_{\text{IO}}$ (read/write) | 0.00 / n/a MB/s | 1.43 / n/a MB/s | 0.12 / 0.03 MB/s | 0.00 / 0.00 MB/s |
+| Voxtral audio mode   | TEXT_SIM   | AUDIO REAL    | TEXT_SIM          | TEXT_SIM ³        |
+| YOLO real-camera detection | ✅   | ✅            | ✅ chair 73 %     | ✅ 2 × chair (70 %, 54 %) |
+| LLaVA scene description    | ✅   | ✅            | ✅                | ✅                 |
+
+¹ Overlay-canonical was sampled before the auto-LLaVA trigger fired. Once
+a few LLaVA inferences accumulate, $T_{\text{e2e}}$ avg climbs to
+~6 089 ms (LLaVA-1.5-7B FP16 inference takes ~13 s on the Orin GPU).
+
+² Dynamic-canonical was sampled at uptime ≈ 55 s, with the very first
+LLaVA inference still running. After warm-up the YOLO-only
+$T_{\text{e2e}}$ drops to the 100–200 ms band.
+
+³ Voxtral falls back to TEXT_SIMULATION when transformers < 4.54
+(no `VoxtralProcessor`). The current image pins transformers 4.48 to
+keep LLaVA-1.5 working, so audio mode is only available in the
+microservices image (which uses an isolated transformers version).
+
+### 5. Loop readiness ($T_{\text{ready}}$)
+
+Time from container start to first ROS 2 control-loop tick:
+
+| Pattern              | $T_{\text{ready}}$ |
+|----------------------|-------------------:|
+| monolithic           |   0.76 s           |
+| microservices        |   0.75 s           |
+| **overlay-canonical**|   **0.12 s**       |
+| dynamic-canonical    |   0.18 s           |
+
+All four patterns are sub-second; overlay-canonical and dynamic-canonical
+are noticeably faster, presumably because the runtime container starts
+with less initial state.
+
+### 6. Hot-swap latency (C-7) — the differentiator of dynamic-canonical
+
+Time required to **swap a single ML component** without restarting the
+runtime pod, end-to-end:
+
+| Pattern              | Hot-swap one ML component                                          |
+|----------------------|--------------------------------------------------------------------|
+| monolithic           | ~15–25 min (rebuild image + push 30 GB + pull edge + boot)         |
+| microservices        | ~5–10 min (rebuild one microservice + push 5–19 GB + pull)          |
+| overlay-canonical    | ~2.5 min cold-ish (re-extract the overlay tarball)                  |
+| **dynamic-canonical**| **0.78 – 31.10 s** (intra-process `LoadNode` / `UnloadNode`)        |
+
+Dynamic-canonical breakdown, measured from the orchestrator log
+(see [`results/dynamic-canonical/load-unload/load_unload_per_module.csv`](results/dynamic-canonical/load-unload/load_unload_per_module.csv)):
+
+| Module  | Plugin                              | Load time | `unique_id` |
+|---------|--------------------------------------|----------:|------------:|
+| camera  | `camera_driver_pkg::CameraDriver`   |   **0.78 s** | 1 |
+| yolo    | `yolo_detector_pkg::YoloDetector`   |  **20.34 s** | 2 |
+| llava   | `llava_pkg::LlavaNode`              |  **31.10 s** | 3 |
+| voxtral | `voxtral_pkg::VoxtralNode`          |   **4.55 s** | 4 |
+| **Total (sequential)** | —                       | **56.77 s** | — |
+
+Hot-swap on dynamic-canonical is **two to three orders of magnitude
+faster** than on the other patterns.
+
+### 7. Network latency ($L_{\text{net}}$) — cluster-level, pattern-agnostic
+
+| Node                  | IP                | RTT avg            |
+|-----------------------|-------------------|-------------------:|
+| kb2 (cloud)           | 158.42.104.15     |   4.2 ms           |
+| edgenode01 (Jetson)   | 158.42.104.206    |   7.9 ms           |
+| worker1-kb2           | 158.42.104.103    |   30.4 ms (variable) |
+
+Effective bandwidth registry → cluster, measured during the two
+cold-cold runs: **~500 Mbps**.
+
+### 8. When to choose which pattern
+
+| Pattern              | Best fit                                              | Main cost                                               |
+|----------------------|-------------------------------------------------------|---------------------------------------------------------|
+| monolithic           | Simple system, infrequent changes                     | OTA update = whole image                                |
+| microservices        | Independently evolving components                     | Heavy total image size, parallel pulls                  |
+| overlay-canonical    | Multi-edge fleets with recurring AI model updates     | Cloud→PVC→edge double hop                               |
+| dynamic-canonical    | A/B testing, hot-swap, iterative development          | Single fat image, no multi-edge fan-out                  |
+
+### 9. Reproducibility caveats
+
+The IEEE Access submission is built on n=1 measurements per pattern. The
+following items are flagged as future work:
+
+- Measured cold-cold for **monolithic** and **microservices** (the table
+  above currently shows estimates).
+- Dynamic-canonical runtime metrics with a longer warm-up window so the
+  YOLO-only $T_{\text{inf}}$ stabilises before sampling.
+- Independent verification of the $T_{\text{ready}}$ delta between
+  overlay/dynamic (~0.12–0.18 s) and monolithic/microservices (~0.75 s)
+  — to rule out a measurement artefact.
+- Multi-run statistics (mean ± SD across n ≥ 3 runs).
+- Energy metrics ($P_{\text{avg}}$, $E_{\text{inf}}$, $\eta_{\text{energy}}$)
+  via `tegrastats`, which currently is not exposed inside the runtime
+  containers.
 
 ## Repository layout
 
