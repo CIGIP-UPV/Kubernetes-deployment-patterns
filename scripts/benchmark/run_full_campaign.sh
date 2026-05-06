@@ -148,22 +148,33 @@ install_pattern() {
   local pattern=$1
   local release=$2
 
+  # Helm's default --timeout for pre-install/post-install hooks is 5 min,
+  # which is too short for overlay-canonical (26 GB image pull + 17 GB
+  # cp to PVC during the pre-install Job) and dynamic-canonical (32 GB
+  # pull + bootstrap Job loading 4 plugins). We bump to 45m to match
+  # the catalog.cattle.io/timeout already declared in those charts'
+  # Chart.yaml annotations.
+  local HELM_TIMEOUT="${HELM_TIMEOUT:-45m}"
+
   case "${pattern}" in
     monolithic)
       helm install "${release}" "${PROJECT_ROOT}/Patterns/monolithic/helm" \
         -n "${NAMESPACE}" --create-namespace \
+        --timeout "${HELM_TIMEOUT}" --wait \
         --set image.tag="${IMAGE_TAG}" \
         --set camera.device="${CAMERA_DEVICE}"
       ;;
     microservices)
       helm install "${release}" "${PROJECT_ROOT}/Patterns/microservices/helm/ros2-microservices" \
         -n "${NAMESPACE}" --create-namespace \
+        --timeout "${HELM_TIMEOUT}" --wait \
         --set image.tag="${IMAGE_TAG}" \
         --set camera.device="${CAMERA_DEVICE}"
       ;;
     overlay-canonical)
       helm install "${release}" "${PROJECT_ROOT}/Patterns/overlay-canonical/helm/ros2-overlay-canonical" \
         -n "${NAMESPACE}" --create-namespace \
+        --timeout "${HELM_TIMEOUT}" --wait \
         --set images.base.tag="${IMAGE_TAG}" \
         --set images.overlayPack.tag="${IMAGE_TAG}" \
         --set camera.device="${CAMERA_DEVICE}"
@@ -171,6 +182,7 @@ install_pattern() {
     dynamic-canonical)
       helm install "${release}" "${PROJECT_ROOT}/Patterns/dynamic-canonical/helm/ros2-dynamic-canonical" \
         -n "${NAMESPACE}" --create-namespace \
+        --timeout "${HELM_TIMEOUT}" --wait \
         --set image.tag="${IMAGE_TAG}" \
         --set camera.device="${CAMERA_DEVICE}"
       ;;
