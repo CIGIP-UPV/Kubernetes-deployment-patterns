@@ -97,7 +97,6 @@ build "ros2-yolo"           "Models/ros2_yolo_ws/docker/Dockerfile"        "."  
 build "ros2-llava"          "Models/ros2_llava_ws/docker/Dockerfile"       "."                  "${ARM64_ONLY}"  no
 build "ros2-voxtral"        "Models/ros2_voxtral_ws/docker/Dockerfile"     "."                  "${ARM64_ONLY}"  yes
 build "ros2-monolithic"     "Models/ros2_monolithic_ws/docker/Dockerfile"  "."                  "${ARM64_ONLY}"  yes
-build "ros2-overlay"        "Models/ros2_overlay_ws/docker/Dockerfile"     "."                  "${ARM64_ONLY}"  yes
 
 # Canonical pattern images (edge-only, arm64)
 build "ros2-base"           "Models/ros2_base/docker/Dockerfile"           "."                  "${ARM64_ONLY}"  no

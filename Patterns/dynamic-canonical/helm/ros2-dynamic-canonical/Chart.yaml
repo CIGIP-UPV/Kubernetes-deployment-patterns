@@ -14,9 +14,9 @@ description: |
       those services via HTTP API, exposing /load, /unload, /list to
       the dashboard.
 
-  Replaces Patterns/dynamic-loader/ which used FastAPI + subprocess.Popen
-  to spawn separate `ros2 run` processes — same hot-swap UX but missing
-  the canonical composition semantics described in the paper.
+  This canonical realisation uses true intra-process composition through
+  rclpy_components and the standard ROS 2 LoadNode / UnloadNode service
+  contract, instead of spawning a subprocess per loaded module.
 type: application
 version: 1.0.5
 appVersion: humble

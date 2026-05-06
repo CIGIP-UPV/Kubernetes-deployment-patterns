@@ -1,2 +1,27 @@
-# Claude Code project context
+# Claude Code project context (local notes, not for upstream)
 CLAUDE.md
+
+# macOS metadata
+.DS_Store
+**/.DS_Store
+
+# IDE settings
+.idea/
+.vscode/
+*.swp
+
+# Build artifacts (logs and packaged charts; CI regenerates them)
+build-*.log
+*.log
+dist/charts/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Local kubeconfig
+.kube/
+
+# OS-specific
+Thumbs.db

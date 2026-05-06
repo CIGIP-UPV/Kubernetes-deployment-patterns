@@ -45,7 +45,7 @@ T_READY="${4:-}"
 
 if [ -z "${PATTERN}" ]; then
   echo "Usage: $0 <pattern> [release] [namespace] [t_ready_sec]"
-  echo "Patterns: monolithic | microservices | overlay-workspaces | dynamic-loader | overlay-canonical | dynamic-canonical"
+  echo "Patterns: monolithic | microservices | overlay-canonical | dynamic-canonical"
   exit 1
 fi
 
@@ -64,12 +64,6 @@ case "${PATTERN}" in
     ;;
   microservices)
     IMAGES=("ros2-camera" "ros2-yolo" "ros2-llava" "ros2-voxtral" "ros2-dashboard")
-    ;;
-  overlay-workspaces)
-    IMAGES=("ros2-overlay" "ros2-dashboard")
-    ;;
-  dynamic-loader)
-    IMAGES=("ros2-monolithic" "ros2-dashboard")  # uses the monolithic base
     ;;
   overlay-canonical)
     IMAGES=("ros2-base" "ros2-overlay-pack" "ros2-dashboard")
@@ -195,8 +189,6 @@ if command -v git >/dev/null 2>&1 && [ -d "${PROJECT_ROOT}/.git" ]; then
     case "${PATTERN}" in
       monolithic)        chart_dir="Patterns/monolithic/helm" ;;
       microservices)     chart_dir="Patterns/microservices/helm/ros2-microservices" ;;
-      overlay-workspaces) chart_dir="Patterns/overlay-workspaces/helm/ros2-overlay" ;;
-      dynamic-loader)    chart_dir="Patterns/dynamic-loader/helm/dynamic-loader" ;;
       overlay-canonical) chart_dir="Patterns/overlay-canonical/helm/ros2-overlay-canonical" ;;
       dynamic-canonical) chart_dir="Patterns/dynamic-canonical/helm/ros2-dynamic-canonical" ;;
     esac

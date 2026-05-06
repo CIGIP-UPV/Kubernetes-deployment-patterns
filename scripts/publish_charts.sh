@@ -24,12 +24,11 @@ DIST_DIR="${PROJECT_ROOT}/dist/charts"
 TMP_DIR=$(mktemp -d)
 
 # Chart paths (relative to PROJECT_ROOT)
+# The four deployment patterns analysed in the IEEE Access submission:
+#   monolithic, microservices, overlay-canonical, dynamic-canonical
 CHARTS=(
   "Patterns/monolithic/helm"
   "Patterns/microservices/helm/ros2-microservices"
-  "Patterns/dynamic-loader/helm/dynamic-loader"
-  "Patterns/overlay-workspaces/helm/ros2-overlay"
-  # Canonical patterns (per docs/PLAN-2026-04-27-overlay-dynamic-canonical.md)
   "Patterns/overlay-canonical/helm/ros2-overlay-canonical"
   "Patterns/dynamic-canonical/helm/ros2-dynamic-canonical"
 )

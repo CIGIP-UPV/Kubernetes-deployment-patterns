@@ -10,8 +10,9 @@ description: |
       to a PVC on the cloud node, and synced via HTTP from an nginx sidecar
       to the edge node's runtime pod via initContainer.
 
-  Replaces Patterns/overlay-workspaces/ which monolithically packed both
-  layers in a single image (~22 GB) and didn't separate base from overlay.
+  This canonical realisation strictly separates immutable base from mutable
+  overlay so that AI updates only re-publish the overlay-pack carrier
+  (~25 GB), keeping the ROS 2 base image (~2.2 GB) intact across releases.
 type: application
 version: 1.0.9
 appVersion: humble
