@@ -87,10 +87,17 @@ spec:
                 "publish_metrics":{{ $.Values.yolo.publishMetrics }}
               }}'
               {{- else if eq . "llava" }}
+              # yolo_trigger_interval_s: the plugin declares this as DOUBLE
+              # via `declare_parameter('yolo_trigger_interval_s', 30.0)`.
+              # Helm's default float formatter strips trailing zeros, so a
+              # values.yaml of `30.0` gets rendered as `30` (an int in JSON),
+              # which makes rclpy raise InvalidParameterTypeException at load.
+              # `printf "%.1f"` forces a decimal point so JSON parses as
+              # float (DOUBLE).
               PAYLOAD='{"module":"llava","parameters":{
                 "model_id":"{{ $.Values.llava.modelId }}",
                 "trigger_on_yolo":{{ $.Values.llava.triggerOnYolo }},
-                "yolo_trigger_interval_s":{{ $.Values.llava.yoloTriggerIntervalS }},
+                "yolo_trigger_interval_s":{{ printf "%.1f" $.Values.llava.yoloTriggerIntervalS }},
                 "max_new_tokens":{{ $.Values.llava.maxNewTokens }},
                 "load_in_4bit":{{ $.Values.llava.load4bit }}
               }}'
