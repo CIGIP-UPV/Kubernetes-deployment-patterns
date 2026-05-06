@@ -123,21 +123,15 @@ questions:
   - variable: yolo.publishDebugImage
     label: "Publish Debug Image"
     description: "Publish annotated YOLO detection image (required for dashboard video feed)"
-    type: enum
-    default: "true"
-    options:
-      - "true"
-      - "false"
+    type: boolean
+    default: true
     group: "YOLO"
 
   - variable: yolo.publishMetrics
     label: "Publish Benchmark Metrics"
     description: "Enable latency and inference time metrics on ROS topics"
-    type: enum
-    default: "true"
-    options:
-      - "true"
-      - "false"
+    type: boolean
+    default: true
     group: "YOLO"
 
   # ── LLaVA — Visual Reasoning ─────────────────────────────────────

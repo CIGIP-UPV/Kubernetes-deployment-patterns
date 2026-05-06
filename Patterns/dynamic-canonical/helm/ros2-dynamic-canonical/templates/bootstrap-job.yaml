@@ -73,12 +73,18 @@ spec:
                 "synthetic_mode":{{ $.Values.camera.syntheticMode }}
               }}'
               {{- else if eq . "yolo" }}
+              # publish_debug_image and publish_metrics MUST be JSON booleans
+              # (true/false, no quotes) because the yolo plugin declares them
+              # as Parameter.Type.BOOL and rclpy raises InvalidParameterTypeException
+              # if it receives a STRING here. The values.yaml entries are also
+              # boolean (see values.yaml — type: boolean, no quotes around
+              # default).
               PAYLOAD='{"module":"yolo","parameters":{
                 "model_path":"{{ $.Values.yolo.modelPath }}",
                 "conf":{{ $.Values.yolo.conf }},
                 "filter_classes":"{{ $.Values.yolo.filterClasses }}",
-                "publish_debug_image":"{{ $.Values.yolo.publishDebugImage }}",
-                "publish_metrics":"{{ $.Values.yolo.publishMetrics }}"
+                "publish_debug_image":{{ $.Values.yolo.publishDebugImage }},
+                "publish_metrics":{{ $.Values.yolo.publishMetrics }}
               }}'
               {{- else if eq . "llava" }}
               PAYLOAD='{"module":"llava","parameters":{

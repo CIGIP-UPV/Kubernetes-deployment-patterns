@@ -38,8 +38,8 @@ yolo:
   modelPath: /opt/models/yolov8n.pt
   conf: 0.25
   filterClasses: "0,56,60"      # person+chair+dining table; "" = all 80 COCO classes
-  publishDebugImage: "true"
-  publishMetrics: "true"
+  publishDebugImage: true
+  publishMetrics: true
 
 # ── LLaVA ──
 llava:

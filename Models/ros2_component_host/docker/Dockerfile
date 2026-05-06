@@ -51,12 +51,25 @@ ENV HF_HUB_CACHE=/opt/huggingface_cache
 # from source — see the colcon stage below.
 # rclcpp_components: C++ equivalent, IS in apt (kept for completeness;
 # C++ plugins would need it).
+#
+# ros-humble-vision-msgs: explicit pin even though ros2-base already
+# installs it. The dependency surfaced when yolo_detector_pkg failed to
+# load with `ModuleNotFoundError: No module named 'vision_msgs'` on a
+# component-host image built against an older ros2-base. Listing it here
+# makes the dependency hermetic so we don't depend on a particular
+# ros2-base build state when rebuilding component-host.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       libasound2 portaudio19-dev libsndfile1 \
       ros-${ROS_DISTRO}-rclcpp-components \
       ros-${ROS_DISTRO}-composition-interfaces \
-    && rm -rf /var/lib/apt/lists/*
+      ros-${ROS_DISTRO}-vision-msgs \
+    && rm -rf /var/lib/apt/lists/* && \
+    # Loud check: fail the build now if vision_msgs didn't actually install
+    # (apt with --no-install-recommends sometimes silently swallows missing
+    # packages on older sources).
+    dpkg -s ros-${ROS_DISTRO}-vision-msgs >/dev/null 2>&1 || \
+      { echo "[apt] FATAL: ros-${ROS_DISTRO}-vision-msgs not installed"; exit 1; }
 
 # ── ML Python stack — system-wide install (NOT --target) ───────────────
 # Unlike overlay-pack which uses --target so deps travel in the carrier,
