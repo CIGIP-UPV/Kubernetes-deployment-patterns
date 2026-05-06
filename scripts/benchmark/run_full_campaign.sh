@@ -127,6 +127,22 @@ purge_node_images() {
   esac
 }
 
+# ── Helper: short release name for each pattern ────────────────────────────
+# Kubernetes label values cap at 63 chars. Helm-generated Job names follow
+# the format "<release>-<chart>-<suffix>", so a long release name overflows
+# the limit (e.g. "overlay-canonical-pattern-ros2-overlay-canonical-overlay-
+# installer" = 66 chars). We use the same short release names as the
+# Rancher deployments to stay safely under the cap.
+release_name_for() {
+  case "$1" in
+    monolithic)         echo "monolithic-pattern" ;;
+    microservices)      echo "microservices-pattern" ;;
+    overlay-canonical)  echo "overlay-pattern" ;;
+    dynamic-canonical)  echo "dynamic-pattern" ;;
+    *)                  echo "$1-pattern" ;;
+  esac
+}
+
 # ── Helper: install a pattern via helm ──────────────────────────────────────
 install_pattern() {
   local pattern=$1
@@ -185,7 +201,7 @@ for pattern in ${PATTERNS}; do
   log " Pattern: ${pattern}"
   log "═════════════════════════════════════════════════════════════"
 
-  RELEASE="${pattern}-pattern"
+  RELEASE="$(release_name_for "${pattern}")"
   RUN_DIR="${CAMPAIGN_DIR}/${pattern}"
   mkdir -p "${RUN_DIR}"
   STATUS="ok"

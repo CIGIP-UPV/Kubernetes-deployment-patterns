@@ -18,7 +18,7 @@ description: |
   rclpy_components and the standard ROS 2 LoadNode / UnloadNode service
   contract, instead of spawning a subprocess per loaded module.
 type: application
-version: 1.0.5
+version: 1.0.0
 appVersion: humble
 keywords:
   - ros2

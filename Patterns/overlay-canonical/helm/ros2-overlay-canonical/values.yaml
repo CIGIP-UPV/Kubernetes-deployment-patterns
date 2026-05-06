@@ -214,4 +214,11 @@ service:
   port: 8080
 
 nameOverride: ""
-fullnameOverride: ""
+# fullnameOverride pins all resource names to a stable, short prefix
+# regardless of the Helm release name used at install time. This keeps
+# resource names predictable for the IEEE Access reproducibility scripts
+# (results/, dist/metrics/) and well below the K8s 63-character label limit
+# (e.g. "overlay-pattern-overlay-installer" = 33 chars instead of the
+# 66 chars that "<release>-ros2-overlay-canonical-overlay-installer"
+# would produce for a long release name).
+fullnameOverride: "overlay-pattern"

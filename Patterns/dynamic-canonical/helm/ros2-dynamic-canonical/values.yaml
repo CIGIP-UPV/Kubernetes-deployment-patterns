@@ -154,4 +154,8 @@ securityContext:
   allowPrivilegeEscalation: false
 
 nameOverride: ""
-fullnameOverride: ""
+# fullnameOverride pins all resource names to a stable, short prefix
+# regardless of the Helm release name used at install time. This keeps
+# resource names predictable for the IEEE Access reproducibility scripts
+# (results/, dist/metrics/) and well below the K8s 63-character label limit.
+fullnameOverride: "dynamic-pattern"

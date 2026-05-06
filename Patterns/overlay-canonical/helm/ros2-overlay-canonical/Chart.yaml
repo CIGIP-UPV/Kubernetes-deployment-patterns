@@ -14,7 +14,7 @@ description: |
   overlay so that AI updates only re-publish the overlay-pack carrier
   (~25 GB), keeping the ROS 2 base image (~2.2 GB) intact across releases.
 type: application
-version: 1.0.9
+version: 1.0.0
 appVersion: humble
 keywords:
   - ros2
