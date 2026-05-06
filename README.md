@@ -286,8 +286,6 @@ runtime pod, end-to-end:
 | overlay-canonical    | ~2.5 min cold-ish (re-extract the overlay tarball)                  |
 | **dynamic-canonical**| **0.78 – 31.10 s** (intra-process `LoadNode` / `UnloadNode`)        |
 
-Dynamic-canonical breakdown, measured from the orchestrator log
-(see [`results/dynamic-canonical/load-unload/load_unload_per_module.csv`](results/dynamic-canonical/load-unload/load_unload_per_module.csv)):
 
 | Module  | Plugin                              | Load time | `unique_id` |
 |---------|--------------------------------------|----------:|------------:|
