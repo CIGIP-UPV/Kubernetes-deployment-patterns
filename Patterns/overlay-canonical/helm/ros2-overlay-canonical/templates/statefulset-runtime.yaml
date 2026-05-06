@@ -366,7 +366,8 @@ spec:
                   -p trigger_on_yolo:=${LLAVA_TRIGGER_ON_YOLO} \
                   -p yolo_trigger_interval_s:=$(printf "%.1f" "${LLAVA_YOLO_INTERVAL_S}") \
                   -p max_new_tokens:=${LLAVA_MAX_TOKENS} \
-                  -p load_in_4bit:=${LLAVA_LOAD_4BIT} &
+                  -p load_in_4bit:=${LLAVA_LOAD_4BIT} \
+                  -p hf_cache_dir:=/opt/overlay/huggingface_cache &
                 LLAVA_PID=$!
               fi
 
@@ -380,7 +381,8 @@ spec:
                   -p response_topic:=${VOICE_RESPONSE_TOPIC} \
                   -p llava_trigger_topic:=${LLAVA_TRIGGER_TOPIC} \
                   -p llava_response_topic:=${LLAVA_RESPONSE_TOPIC} \
-                  -p latency_topic:=${VOICE_LATENCY_TOPIC} &
+                  -p latency_topic:=${VOICE_LATENCY_TOPIC} \
+                  -p hf_cache_dir:=/opt/overlay/huggingface_cache &
                 VOXTRAL_PID=$!
               fi
 
