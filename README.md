@@ -1,15 +1,65 @@
 # Kubernetes ROS 2 Deployment Patterns
 
+> Companion repository for an **IEEE Access** submission on Kubernetes
+> deployment patterns for ROS 2 robotics with edge-GPU AI workloads.
+>
+> Pre-aggregated measurement tables live under [`dist/metrics/`](dist/metrics/),
+> per-run raw captures under [`results/`](results/), and the four Helm
+> charts under [`Patterns/`](Patterns/). All experiments target a
+> heterogeneous K3s cluster: NVIDIA Jetson AGX Orin 64 GB at the edge +
+> amd64 cloud worker, running ROS 2 Humble + a real-time AI pipeline
+> (camera → YOLOv8n → LLaVA-1.5-7B + Voxtral-Mini-3B + browser dashboard).
+
 This repository provides four deployment patterns for running ROS 2 (Humble) applications on K3s with load simulation and monitoring hooks.
 
-- **Monolithic deployment** — Single container image with multiple ROS 2 nodes launched together. Simpler to ship; lowest internal messaging overhead; least modular for updates.
+- **Monolithic deployment** — Single container image with multiple ROS 2 nodes launched together. Simpler to ship; lowest internal messaging overhead; least modular for updates.
 - **Microservices deployment** — Separate containers per capability (e.g., perception, inference, navigation), orchestrated via Kubernetes/Helm; enables independent scaling and fault isolation.
-- **Dynamic module loading (ROS 2 composition)** — Runtime loading/unloading of component nodes into a component manager; exposes control endpoints to compose functionality on the fly.
-- **Overlay workspaces** — Deliver new/updated ROS 2 packages as overlays on top of a stable base, minimizing rebuilds and enabling fast feature rollouts.
+- **Dynamic module loading (ROS 2 composition)** — Runtime loading/unloading of component nodes into a component manager; exposes control endpoints to compose functionality on the fly.
+- **Overlay workspaces** — Deliver new/updated ROS 2 packages as overlays on top of a stable base, minimizing rebuilds and enabling fast feature rollouts.
 
 Each pattern includes:
 - a **workload generator** (configurable via env vars / `values.yaml`) to simulate camera frames and inference load, and
 - **observability hooks** (Prometheus/Grafana) for runtime metrics.
+
+
+## Architecture overview
+
+The four patterns share a common topology. The Jetson AGX Orin acts as
+the edge node hosting the GPU-accelerated inference pipeline, while one
+or two amd64 nodes host the dashboard and the optional carrier
+extraction Job that the overlay-canonical pattern uses.
+
+```
+                   K3s cluster
+   ┌──────────────────────────────────────────────────────────────────────────┐
+   │                                                                          │
+   │   Cloud (kb2 / worker1-kb2, amd64)        Edge (edgenode01, Jetson Orin) │
+   │   ┌──────────────────────────┐            ┌──────────────────────┐       │
+   │   │  ros2-dashboard          │  ROS 2     │  runtime pod (GPU)   │       │
+   │   │   rosbridge + nginx      │ ◀────────▶ │   • camera_driver    │       │
+   │   │                          │  topics    │   • yolo_detector    │       │
+   │   │  overlay-server (nginx)  │            │   • llava_node       │       │
+   │   │   only in overlay-       │  HTTP      │   • voxtral_node     │       │
+   │   │   canonical              │ ◀────────▶ │  resource_monitor    │       │
+   │   └──────────────────────────┘  sync      └──────────────────────┘       │
+   │                                                                          │
+   └──────────────────────────────────────────────────────────────────────────┘
+       RMW: rmw_cyclonedds_cpp                     Jetson AGX Orin 64 GB
+       ROS_DOMAIN_ID: 42                           JetPack 6.1 / CUDA 12.6
+                                                   cuDNN 9.x
+```
+
+**Hardware & software stack used in the IEEE Access experiments**:
+
+| Component | Spec |
+|---|---|
+| Edge node | NVIDIA Jetson AGX Orin 64 GB, JetPack 6.1 (L4T R36.4.0) |
+| Cloud worker | amd64 server (kb2), Ubuntu 22.04 |
+| Cluster | K3s with `runtimeClassName: nvidia` for GPU access |
+| ROS 2 | Humble Hawksbill, RMW: CycloneDDS |
+| Container registry | GitLab Container Registry (CIGIP-UPV) |
+| Tooling | Helm 3.16+, kubectl 1.30+, docker buildx |
+| AI models | YOLOv8n (3.2 M params), LLaVA-1.5-7B FP16, Voxtral-Mini-3B |
 
 
 ## Prerequisites
@@ -31,6 +81,14 @@ Deployment is performed through one Kubernetes Deployment and one runtime image,
 However, any application change requires rebuilding and redeploying the whole image, even if only one internal component is modified.
 In this work, the monolithic pattern is used as the baseline reference against which the remaining patterns are compared.
 
+  **Helm install**:
+  ```bash
+  helm install mono-pattern Patterns/monolithic/helm \
+    --namespace ros2exp --create-namespace \
+    --set image.tag=latest \
+    --set camera.device=/dev/video1
+  ```
+
 
 2. Microservices
 
@@ -41,6 +99,14 @@ Each service can be deployed, monitored, restarted, and updated independently, w
 This pattern is particularly suitable when compute-intensive inference should be scheduled on different hardware than sensing components, for example separating edge acquisition from cloud-side processing.
 The main trade-off is the additional communication overhead introduced by inter-service ROS 2 traffic, together with increased deployment and observability complexity.
 In this study, the microservices pattern represents the most decoupled and orchestrated form of deployment.
+
+  **Helm install**:
+  ```bash
+  helm install micro-pattern Patterns/microservices/helm/ros2-microservices \
+    --namespace ros2exp --create-namespace \
+    --set image.tag=latest \
+    --set camera.device=/dev/video1
+  ```
 
 
 3. Dynamic Module Loading (ROS 2 Composition)
@@ -53,6 +119,16 @@ This approach is useful for rapid experimentation, adaptive functionality, and r
 Its main limitation is reduced isolation, because dynamically loaded components share a common execution environment and therefore require stricter control over module trust, lifecycle, and error handling.
 In this work, the dynamic loading pattern is used to evaluate the trade-off between deployment agility and runtime robustness.
 
+  **Helm install** (canonical realisation under
+  `Patterns/dynamic-canonical/`, using `component_container_isolated`
+  with `LoadNode`/`UnloadNode` services):
+  ```bash
+  helm install dynamic-pattern Patterns/dynamic-canonical/helm/ros2-dynamic-canonical \
+    --namespace ros2exp --create-namespace \
+    --set image.tag=latest \
+    --set camera.device=/dev/video1
+  ```
+
 
 4. Overlay Workspaces
 
@@ -63,6 +139,33 @@ This organization allows small incremental updates to be delivered without rebui
 The pattern is especially useful when the lower layers of the application remain stable but upper-layer functionality changes often during experimentation or iterative development.
 Its effectiveness depends on maintaining clear dependency boundaries between base and overlay layers; otherwise, the workspace structure becomes difficult to maintain and reproduce.
 In this study, overlay workspaces are used to assess the benefits of incremental delivery and controlled software evolution in Kubernetes-based ROS 2 systems.
+
+  **Helm install** (canonical realisation under
+  `Patterns/overlay-canonical/`, with an immutable `ros2-base` image and
+  a mutable `ros2-overlay-pack` carrier extracted into a PVC):
+  ```bash
+  helm install over-pattern Patterns/overlay-canonical/helm/ros2-overlay-canonical \
+    --namespace ros2exp --create-namespace \
+    --set images.base.tag=latest \
+    --set images.overlayPack.tag=latest \
+    --set camera.device=/dev/video1
+  ```
+
+
+## Building the container images
+
+```bash
+export REG=gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes
+docker login $REG
+
+# Build all 9 images and push them to the registry
+./scripts/benchmark/build_images.sh $REG latest --push
+```
+
+The build script targets `linux/arm64` (Jetson) by default and uses
+multi-arch only where required (`ros2-overlay-pack`, `ros2-dashboard`).
+The Voxtral image build needs `HF_TOKEN` to be exported (gated model
+download from HuggingFace).
 
 
 ## Benchmarking metrics
@@ -88,6 +191,14 @@ The following metrics are collected for benchmarking:
 | **DevOps & Maintainability** | **Config churn** | $C_{\text{cfg}}$     | Number of changed lines/files per update cycle.                           | `git diff --stat` between consecutive Helm values/config commits.                                            |
 | **DevOps & Maintainability** | **CI pipeline time** | $T_{\text{CI}}$      | Duration of automated build-test-deploy pipeline (min).                   | CI job logs (GitHub Actions / Jenkins / GitLab CI) → total runtime per commit.                               |
 
+> _Implementation note_: in this repository the script referred to as
+> `22_runtime_stats.sh` in the table above is materialised as
+> [`scripts/benchmark/collect_k8s_stats.sh`](scripts/benchmark/collect_k8s_stats.sh).
+> The dashboard's [`resource_monitor.py`](Models/ros2_monolithic_ws/scripts/resource_monitor.py)
+> publishes $U_{\text{CPU}}$, $U_{\text{GPU}}$, $U_{\text{RAM}}$ and $L_{\text{IO}}$
+> as ROS 2 topics (`/node/cpu_percent`, `/node/gpu_percent`, …) consumed
+> live by the browser dashboard.
+
 ---
 
 ### Optional Derived Indicators
@@ -98,3 +209,85 @@ The following metrics are collected for benchmarking:
 | **Energy efficiency** | $\eta_{\text{energy}} = f_{\text{FPS}} / P_{\text{avg}}$ — performance per watt.                                  |
 | **Deployment overhead ratio** | $R_{\text{deploy}} = T_{\text{install}} / T_{\text{ready}}$ — how long setup dominates runtime availability.      |
 ### 
+
+
+## Results summary (S1, FPS=10, real camera, n=1)
+
+Aggregate snapshot of the four patterns. Full per-run captures live in
+[`results/`](results/) and the cross-pattern comparison in
+[`dist/metrics/comparison-4patterns.md`](dist/metrics/comparison-4patterns.md).
+
+| Pattern              | $T_{\text{install}}$ (cold-cold) | C-7 hot-swap         | $S_{\text{img}}$ total | $T_{\text{inf}}$ (avg) | $U_{\text{GPU}}$ (avg / max) |
+|----------------------|---------------------------------:|---------------------:|-----------------------:|-----------------------:|-----------------------------:|
+| monolithic           |  ~15 min ¹                       |  n/a                 |   30.0 GB              |  44.9 ms               |   88.7 / 99.8 %              |
+| microservices        |  ~10–15 min ¹                    |  n/a                 |   41.2 GB              |  35.8 ms               |   54.3 / 99.9 %              |
+| **overlay-canonical**| **949 s (15:49)**                |  n/a                 |   27.5 GB              |  32.7 ms               |   51.7 / 99.9 %              |
+| **dynamic-canonical**| **645 s (10:45)**                |  **0.78 – 31.10 s**  |   30.0 GB              |  76.3 ms ²             |   47.5 / 99.8 %              |
+
+¹ Estimated from image footprint and observed pull bandwidth (≈ 500 Mbps).
+A measured cold-cold for monolithic and microservices is the next
+reproducibility milestone.
+
+² Dynamic-canonical was captured shortly after start-up (uptime ≈ 55 s);
+$T_{\text{inf}}$ stabilises around 35–50 ms after ~5 minutes of warm-up.
+
+**Headline reading**:
+- Overlay-canonical has the smallest image footprint (27.5 GB) and the
+  fastest steady-state YOLO latency.
+- Dynamic-canonical has the fastest cold-cold install (10:45) and the
+  unique ability to **hot-swap a model in ≤ 31 s** without restarting
+  the pod (vs ~10–25 minutes for the other patterns).
+- All four patterns confirm GPU usage at peak ≥ 99.8 % during inference;
+  steady-state averages depend on the auto-trigger cadence of LLaVA.
+
+## Repository layout
+
+```
+Models/                          Dockerfiles + ROS 2 source per workspace
+  cusparselt_stub.c              Stub for 16 cuSPARSELt symbols missing in JetPack 6.1
+  patch_torchvision_jetson.py    torchvision NMS patch for Jetson CUDA 12.6
+  ros2_base/                     ROS 2 base + camera driver + CUDA L4T runtime
+  ros2_cam_ws/                   camera_driver_pkg
+  ros2_yolo_ws/                  yolo_detector_pkg (YOLOv8n)
+  ros2_llava_ws/                 llava_pkg (LLaVA-1.5-7B)
+  ros2_voxtral_ws/               voxtral_pkg (Voxtral-Mini-3B)
+  ros2_monolithic_ws/            Monolithic image (all ROS 2 nodes baked in)
+  ros2_overlay_pack/             Overlay carrier image (canonical pattern)
+  ros2_component_host/           component_container_isolated host (canonical dynamic)
+  ros2_dashboard/                Web UI (rosbridge + nginx)
+Patterns/                        One Helm chart per deployment pattern
+  monolithic/
+  microservices/
+  overlay-canonical/
+  dynamic-canonical/
+dashboard/                       Static dashboard HTML
+scripts/
+  benchmark/                     Measurement scripts (capture, collect, probe)
+  publish_charts.sh              Manual gh-pages publish (CI does it automatically)
+dist/metrics/                    Per-pattern .md and .csv summary tables
+results/                         Per-run raw captures (T_ready, top, events, …)
+.github/workflows/               CI/CD: lint and publish charts to gh-pages
+```
+
+## License
+
+This repository is intended to be released under the
+[MIT License](LICENSE) (an explicit `LICENSE` file should be added at
+the repository root before submission).
+
+The container images depend on third-party software and models. Verify
+each downstream license matches your intended use:
+
+- ROS 2 Humble (Apache 2.0)
+- Ultralytics YOLOv8n (AGPL-3.0)
+- LLaVA-1.5-7B (Llama 2 community licence)
+- Voxtral-Mini-3B (Mistral AI gated access; research-only)
+- HuggingFace `transformers`, `torch`, `torchvision` (Apache 2.0 / BSD)
+
+
+## Maintainers
+
+- **Miguel-Ángel Mateo Casali** — `mmateo@cigip.upv.es`
+- **Francisco Fraile** — `ffraile@cigip.upv.es`
+- **Andrés Boza** — `aboza@cigip.upv.es`
+- CIGIP / I+D+i — Universitat Politècnica de València
