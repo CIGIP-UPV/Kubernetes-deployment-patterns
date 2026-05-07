@@ -68,6 +68,11 @@ WARMUP_SECONDS="${WARMUP_SECONDS:-600}"
 SAMPLE_SECONDS="${SAMPLE_SECONDS:-180}"
 ROSBRIDGE_URL="${ROSBRIDGE_URL:-ws://158.42.104.15:31407}"
 CAMERA_DEVICE="${CAMERA_DEVICE:-/dev/video1}"
+# Cloud node for overlay-canonical's pre-install Job, PVC and nginx
+# overlay-server. Default kb2; set to worker1-kb2 if kb2 is short on disk
+# (the overlay-pack image is ~26 GB and the PVC is ~30 GB, peak combined
+# usage during the install is ~70 GB).
+CLOUD_NODE="${CLOUD_NODE:-kb2}"
 COLD_COLD="${COLD_COLD:-false}"
 KEEP_DEPLOYMENT="${KEEP_DEPLOYMENT:-true}"
 ABORT_FILE="${ABORT_FILE:-/tmp/STOP_CAMPAIGN}"
@@ -94,6 +99,7 @@ log "============================================================"
 log " Campaign starting (id=${TS})"
 log " Patterns      : ${PATTERNS}"
 log " Namespace     : ${NAMESPACE}"
+log " Cloud node    : ${CLOUD_NODE} (overlay-canonical Job + PVC + nginx)"
 log " Warmup        : ${WARMUP_SECONDS} s"
 log " Sample window : ${SAMPLE_SECONDS} s"
 log " Cold-cold     : ${COLD_COLD}"
@@ -177,6 +183,7 @@ install_pattern() {
         --timeout "${HELM_TIMEOUT}" --wait \
         --set images.base.tag="${IMAGE_TAG}" \
         --set images.overlayPack.tag="${IMAGE_TAG}" \
+        --set nodes.cloud.name="${CLOUD_NODE}" \
         --set camera.device="${CAMERA_DEVICE}"
       ;;
     dynamic-canonical)
