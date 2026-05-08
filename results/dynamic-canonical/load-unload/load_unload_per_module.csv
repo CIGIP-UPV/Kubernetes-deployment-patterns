@@ -1,0 +1,6 @@
+module,plugin,load_s,unload_s,unique_id,source
+camera,camera_driver_pkg::CameraDriver,0.78,n/a,1,orchestrator_log_2026-05-06T12:11:32Z
+yolo,yolo_detector_pkg::YoloDetector,20.34,n/a,2,orchestrator_log_2026-05-06T12:11:53Z
+llava,llava_pkg::LlavaNode,31.10,n/a,3,orchestrator_log_2026-05-06T12:12:24Z
+voxtral,voxtral_pkg::VoxtralNode,4.55,n/a,4,orchestrator_log_2026-05-06T12:12:28Z
+TOTAL_sequential,4_modules,56.77,n/a,n/a,sum

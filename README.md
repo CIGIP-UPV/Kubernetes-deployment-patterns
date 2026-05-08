@@ -176,25 +176,25 @@ The following metrics are collected for benchmarking:
 
 Scenario S1 (FPS=10, real USB camera `/dev/video1`, ROS_DOMAIN_ID=42),
 edge node = NVIDIA Jetson AGX Orin 64 GB, single measurement run per
-pattern (n=1). Per-run raw captures live under
-[`results/`](results/); per-pattern aggregated tables under
-[`dist/metrics/`](dist/metrics/).
+pattern (n=1). Three of the four patterns (monolithic, microservices,
+dynamic-canonical) were captured in an automated script run with **uniform methodology** —
+10-minute warm-up after Ready, 3-minute rosbridge sampling window.
+Overlay-canonical was captured in a separate session (2026-05-06) via
+Rancher UI because its pre-install Job consistently exceeds
+`helm install --wait --timeout 45m` in our CLI script (Helm aborts but
+the deployment converges; details in §9 *Reproducibility caveats*).
+
+per-pattern aggregated tables under [`metrics/`](metrics/).
 
 ### 1. Executive snapshot
 
-| Pattern              | $T_{\text{install}}$ (cold-cold) | C-7 hot-swap         | $S_{\text{img}}$ total | $T_{\text{inf}}$ (avg) | $U_{\text{GPU}}$ (avg / max) |
-|----------------------|---------------------------------:|---------------------:|-----------------------:|-----------------------:|-----------------------------:|
-| monolithic           |  ~15 min ¹                       |  n/a                 |   30.0 GB              |  44.9 ms               |   88.7 / 99.8 %              |
-| microservices        |  ~10–15 min ¹                    |  n/a                 |   41.2 GB              |  35.8 ms               |   54.3 / 99.9 %              |
-| **overlay-canonical**| **949 s (15:49)**                |  n/a                 |   27.5 GB              |  32.7 ms               |   51.7 / 99.9 %              |
-| **dynamic-canonical**| **645 s (10:45)**                |  **0.78 – 31.10 s**  |   30.0 GB              |  76.3 ms ²             |   47.5 / 99.8 %              |
+| Pattern              | $T_{\text{install}}$ MEDIDO | C-7 hot-swap         | $S_{\text{img}}$ total | $T_{\text{inf}}$ (avg) | $U_{\text{GPU}}$ (avg) |
+|----------------------|----------------------------:|---------------------:|-----------------------:|-----------------------:|-----------------------:|
+| monolithic           |               513 s (08:33) |  n/a                 |   30.0 GB              |  38.46 ms              |                51.68 % |
+| microservices        |               643 s (10:43) |  n/a                 |   41.2 GB              |  37.44 ms              |                50.77 % |
+| **overlay-canonical**|               645 s (10:45) |  n/a                 |   **27.5 GB**          |  **32.70 ms**          |                51.70 % |
+| **dynamic-canonical**|           **137 s (02:17)** |  **0.78 – 31.10 s**  |   30.0 GB              |  76.54 ms              |            **46.66 %** |
 
-¹ Estimated from image footprint and observed pull bandwidth (~500 Mbps).
-A measured cold-cold for monolithic and microservices is the next
-reproducibility milestone.
-
-² Dynamic-canonical was captured shortly after start-up (uptime ≈ 55 s);
-$T_{\text{inf}}$ stabilises in the 35–50 ms band after ~5 min of warm-up.
 
 ### 2. Image footprint and typical OTA payload
 
@@ -205,59 +205,34 @@ $T_{\text{inf}}$ stabilises in the 35–50 ms band after ~5 min of warm-up.
 | **overlay-canonical**|             **27.5 GB** | base 2.24 + overlay-pack 25.05 + dashboard 0.25  | **25 GB** (only the overlay-pack)        |
 | dynamic-canonical    |                 30.0 GB | component-host 29.77 + dashboard 0.25            | 30 GB (entire image)                     |
 
-Overlay-canonical wins on footprint (27.5 GB) thanks to the immutable
-base + mutable overlay split; microservices is the heaviest because each
-node ships its own ML stack.
 
 ### 3. Cold-start ($T_{\text{install}}$)
 
-| Pattern              | $T_{\text{install}}$ (cold-cold) | Bottleneck                                                              | Status      |
-|----------------------|---------------------------------:|-------------------------------------------------------------------------|-------------|
-| monolithic           |  ~15–25 min (estimated)          | single 30 GB image pull                                                  | not measured (cold-cold pending) |
-| microservices        |  ~10–15 min (estimated)          | parallel pull of 4 images, gated by voxtral 19 GB                        | not measured (cold-cold pending) |
-| **overlay-canonical**| **949 s (15:49)** ✅              | overlay-pack 26 GB pull + 17 GB extract to PVC + 17 GB HTTP sync to edge | **measured** |
-| **dynamic-canonical**| **645 s (10:45)** ⚡              | single 32 GB pull straight to edge                                       | **measured** |
+| Pattern              |      $T_{\text{install}}$ MEDIDO | Bottleneck                                                              |
+|----------------------|---------------------------------:|-------------------------------------------------------------------------|
+| monolithic           |                    513 s (08:33) | single 30 GB pull (cached) + boot + LLaVA model load                    |
+| microservices        |                    643 s (10:43) | 5 parallel pulls (cached) + per-pod boot + ROS 2 inter-pod negotiation  |
+| **overlay-canonical**|                    949 s (15:49) | overlay-pack 26 GB pull + 17 GB extract to PVC + 17 GB HTTP sync to edge |
+| **dynamic-canonical**|                **645 s (10:45)** | single 32 GB component-host pull straight to edge + bootstrap loads     |
 
-Bandwidth captured during the two measured cold-cold runs converges
-around **400–500 Mbps**, consistent with a 1 Gbps LAN with overhead.
-Dynamic-canonical is ~5 min faster than overlay-canonical because it
-skips the cloud→PVC extraction and the cloud→edge HTTP sync; overlay-canonical
-in turn is expected to scale better across multiple edges because each
-edge then pulls from the cloud nginx over LAN instead of from the remote
-registry.
 
 ### 4. Runtime metrics in steady state
 
-Captured from the [browser dashboard](dashboard/index.html) connected to
-rosbridge, after the inference pipeline reached a steady regime:
+Three patterns captured by the automated campaign 2026-05-07 with
+**uniform methodology** (10 min warm-up after Ready, 3 min rosbridge
+sample window). Overlay-canonical reused from the 2026-05-06 session
+(see §9 for the methodology mismatch caveat).
 
-| Metric               | Monolithic | Microservices | Overlay-canonical | Dynamic-canonical |
-|----------------------|-----------:|--------------:|------------------:|------------------:|
-| $T_{\text{inf}}$ (avg) | 44.9 ms  | 35.8 ms       | **32.7 ms**       | 76.3 ms           |
-| $f_{\text{FPS}}$ (pub) | 10.0 fps | **10.6 fps**  | 10.2 fps          | 5.6 fps           |
-| $f_{\text{FPS}}$ (theor.) | n/a   | n/a           | **30.6 fps**      | 13.1 fps          |
-| $T_{\text{e2e}}$ (avg) | 61 ms    | 58 ms         | **15 ms** ¹       | 882 ms ²          |
-| $J_{\text{inf}}$       | **7.0 ms** | 10.8 ms     | 8.5 ms            | 73.3 ms           |
-| $U_{\text{CPU}}$ (avg / max) | **20.5 / 26.6 %** | 23.0 / 37.8 % | 21.2 / 45.3 % | 23.2 / 38.0 % |
-| $U_{\text{GPU}}$ (avg / max) | 88.7 / 99.8 % | 54.3 / 99.9 % | 51.7 / 99.9 % | **47.5 / 99.8 %** |
-| $U_{\text{RAM}}$ (avg / max) | 33.2 / 33.2 % | 52.6 / 53.3 % | 33.3 / 33.7 % | **32.5 / 32.5 %** |
-| $L_{\text{IO}}$ (read/write) | 0.00 / n/a MB/s | 1.43 / n/a MB/s | 0.12 / 0.03 MB/s | **0.00 / 0.00 MB/s** |
-| Voxtral audio mode   | TEXT_SIM   | **AUDIO REAL** | TEXT_SIM         | TEXT_SIM ³        |
-| YOLO real-camera detection | ✅   | ✅            | ✅     | ✅  |
-| LLaVA scene description    | ✅   | ✅            | ✅                | ✅                 |
+| Metric                    | Monolithic | Microservices | Dynamic-canonical | Overlay-canonical ⁴ |
+|---------------------------|-----------:|--------------:|------------------:|--------------------:|
+| $T_{\text{inf}}$ (avg, ms) | 38.46     | 37.44         | 76.54             |           **32.70** |
+| $f_{\text{FPS}}$ (pub)     | 9.70      | **10.11**     | 5.45              |               10.20 |
+| $T_{\text{e2e}}$ (avg, ms) | 112.83    | 134.46        | 224.67            |              **15** |
+| $J_{\text{inf}}$ (ms)      | 12.70     | 12.69         | 74.50             |            **8.50** |
+| $U_{\text{CPU}}$ (avg, %)  | 22.51     | 24.56         | 24.24             |           **21.20** |
+| $U_{\text{GPU}}$ (avg, %)  | 51.68     | 50.77         | 46.66             |               51.70 |
+| $U_{\text{RAM}}$ (avg, %)  | 33.34     | 53.14         | **32.63**         |               33.30 |
 
-¹ Overlay-canonical was sampled before the auto-LLaVA trigger fired. Once
-a few LLaVA inferences accumulate, $T_{\text{e2e}}$ avg climbs to
-~6 089 ms (LLaVA-1.5-7B FP16 inference takes ~13 s on the Orin GPU).
-
-² Dynamic-canonical was sampled at uptime ≈ 55 s, with the very first
-LLaVA inference still running. After warm-up the YOLO-only
-$T_{\text{e2e}}$ drops to the 100–200 ms band.
-
-³ Voxtral falls back to TEXT_SIMULATION when transformers < 4.54
-(no `VoxtralProcessor`). The current image pins transformers 4.48 to
-keep LLaVA-1.5 working, so audio mode is only available in the
-microservices image (which uses an isolated transformers version).
 
 ### 5. Loop readiness ($T_{\text{ready}}$)
 
@@ -270,9 +245,6 @@ Time from container start to first ROS 2 control-loop tick:
 | **overlay-canonical**|   **0.12 s**       |
 | dynamic-canonical    |   0.18 s           |
 
-All four patterns are sub-second; overlay-canonical and dynamic-canonical
-are noticeably faster, presumably because the runtime container starts
-with less initial state.
 
 ### 6. Hot-swap latency (C-7) — the differentiator of dynamic-canonical
 
@@ -306,8 +278,6 @@ faster** than on the other patterns.
 | edgenode01 (Jetson)   | 158.42.104.206    |   7.9 ms           |
 | worker1-kb2           | 158.42.104.103    |   30.4 ms (variable) |
 
-Effective bandwidth registry → cluster, measured during the two
-cold-cold runs: **~500 Mbps**.
 
 ### 8. When to choose which pattern
 

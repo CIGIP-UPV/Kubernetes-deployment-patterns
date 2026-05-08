@@ -1,0 +1,2 @@
+pattern,timestamp,s_img_total_gb,t_sched_avg_s,l_net_kb2_ms,l_net_edge_ms,c_cfg_files,t_ci_s,t_ready_s,eta_start,r_deploy
+dynamic-canonical,2026-05-06T12:12:28Z,30.02,518,4.2,7.9,0,,0.18,0.00155,0.943
