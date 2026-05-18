@@ -65,6 +65,39 @@ log "═════════════════════════
 
 echo "cycle,regimen,campaign_dir,started_at,finished_at,duration_s" > "${META_SUMMARY}"
 
+# ── Pre-flight: verificar que el secret regcred existe en ros2exp ───────────
+# Sin este secret los pods se quedan en ImagePullBackOff durante 45 min antes
+# de que helm install --wait dé timeout. Mejor abortar aquí con un mensaje
+# accionable.
+NAMESPACE_CHECK="${NAMESPACE:-ros2exp}"
+if ! kubectl get namespace "${NAMESPACE_CHECK}" >/dev/null 2>&1; then
+  log "Pre-flight: el namespace ${NAMESPACE_CHECK} no existe — se creará al hacer helm install."
+  log "  Pero entonces tampoco existirá el secret regcred. Crea el namespace y el secret ANTES de lanzar la meta-campaña:"
+  log "    kubectl create namespace ${NAMESPACE_CHECK}"
+  log "    kubectl create secret docker-registry regcred ... -n ${NAMESPACE_CHECK}"
+  exit 1
+fi
+if ! kubectl get secret regcred -n "${NAMESPACE_CHECK}" >/dev/null 2>&1; then
+  log "Pre-flight FAILED: el secret 'regcred' no existe en el namespace ${NAMESPACE_CHECK}."
+  log "  Los charts lo declaran en values.yaml (imagePullSecretName: regcred) y sin él los pods se quedan en ImagePullBackOff."
+  log ""
+  log "  Crea el secret antes de relanzar:"
+  log "    kubectl create secret docker-registry regcred \\"
+  log "      --docker-server=gitlab-cigip.alc.upv.es:5050 \\"
+  log "      --docker-username='<USUARIO>' \\"
+  log "      --docker-password='<TOKEN>' \\"
+  log "      --docker-email='<EMAIL>' \\"
+  log "      -n ${NAMESPACE_CHECK}"
+  log ""
+  log "  O, si tienes ~/.docker/config.json con login al registry:"
+  log "    kubectl create secret generic regcred \\"
+  log "      --from-file=.dockerconfigjson=\$HOME/.docker/config.json \\"
+  log "      --type=kubernetes.io/dockerconfigjson \\"
+  log "      -n ${NAMESPACE_CHECK}"
+  exit 1
+fi
+log "Pre-flight OK: secret regcred presente en namespace ${NAMESPACE_CHECK}."
+
 run_cycle() {
   local idx=$1
   local regimen=$2   # "warm" o "cold-cold"
