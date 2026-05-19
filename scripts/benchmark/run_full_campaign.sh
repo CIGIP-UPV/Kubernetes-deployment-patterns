@@ -199,12 +199,50 @@ install_pattern() {
   esac
 }
 
-# ── Helper: uninstall a pattern (best-effort) ────────────────────────────────
+# ── Helper: uninstall a pattern (best-effort, but aggressive) ────────────────
+# El uninstall original era demasiado pasivo: si helm uninstall fallaba o solo
+# borraba el release pero dejaba pods huérfanos (porque la release estaba en
+# status=failed con recursos a medias), los ciclos siguientes se chocaban con
+# "release already exists" al instalar. Ahora forzamos también el borrado
+# de pods + PVCs + ConfigMaps + Secrets etiquetados por instancia, y esperamos
+# a que el namespace quede limpio antes de devolver el control.
 uninstall_pattern() {
   local release=$1
-  helm uninstall "${release}" -n "${NAMESPACE}" 2>>"${CAMPAIGN_LOG}" || true
-  kubectl delete pvc -n "${NAMESPACE}" -l "app.kubernetes.io/instance=${release}" \
-    --ignore-not-found=true 2>>"${CAMPAIGN_LOG}" || true
+  helm uninstall "${release}" -n "${NAMESPACE}" --wait --timeout 5m 2>>"${CAMPAIGN_LOG}" || true
+  # Fuerza el borrado de cualquier recurso que helm uninstall haya dejado
+  # huérfano. --force --grace-period=0 evita esperar a que los pods
+  # terminen gracilmente cuando ya están en estado roto.
+  kubectl delete all,pvc,configmap,secret -n "${NAMESPACE}" \
+    -l "app.kubernetes.io/instance=${release}" \
+    --ignore-not-found=true --force --grace-period=0 \
+    2>>"${CAMPAIGN_LOG}" || true
+  # Por si el chart no etiqueta todo con app.kubernetes.io/instance, intentamos
+  # también por prefijo de nombre (típico para PVCs de StatefulSet).
+  kubectl get pvc -n "${NAMESPACE}" -o name 2>/dev/null | \
+    grep -E "/${release}-" | \
+    xargs -r kubectl delete -n "${NAMESPACE}" --ignore-not-found=true \
+      --force --grace-period=0 2>>"${CAMPAIGN_LOG}" || true
+}
+
+# ── Helper: verificar que el namespace está limpio antes de install ──────────
+# Si quedan pods de una release anterior (por un uninstall previo a medias),
+# el helm install fallará. Esperamos hasta 60s a que el namespace se vacíe.
+wait_namespace_empty_for_release() {
+  local release=$1
+  local max_wait=60
+  local waited=0
+  while [ "${waited}" -lt "${max_wait}" ]; do
+    local count
+    count=$(kubectl get pods -n "${NAMESPACE}" -l "app.kubernetes.io/instance=${release}" --no-headers 2>/dev/null | wc -l)
+    if [ "${count}" -eq 0 ]; then
+      return 0
+    fi
+    sleep 5
+    waited=$((waited + 5))
+  done
+  log "    WARNING: tras ${max_wait}s aún quedan pods de ${release} en ${NAMESPACE}"
+  kubectl get pods -n "${NAMESPACE}" -l "app.kubernetes.io/instance=${release}" >> "${CAMPAIGN_LOG}" 2>&1 || true
+  return 1
 }
 
 # ── Main loop ────────────────────────────────────────────────────────────────
@@ -226,10 +264,10 @@ for pattern in ${PATTERNS}; do
   STATUS="ok"
   NOTES=""
 
-  # 1. Cleanup
+  # 1. Cleanup (uninstall + wait until namespace is empty of this release's pods)
   log "  [1/9] Uninstall any leftover release..."
   uninstall_pattern "${RELEASE}"
-  sleep 8
+  wait_namespace_empty_for_release "${RELEASE}"
 
   # 2. Optional cold-cold image purge
   log "  [2/9] (Cold-cold? ${COLD_COLD}) Purging images..."
@@ -246,7 +284,12 @@ for pattern in ${PATTERNS}; do
   if ! install_pattern "${pattern}" "${RELEASE}" >> "${CAMPAIGN_LOG}" 2>&1; then
     STATUS="install_failed"
     NOTES="helm install returned non-zero"
-    log "    INSTALL FAILED — continuing with next pattern"
+    log "    INSTALL FAILED — cleaning up before next pattern"
+    # CRÍTICO: limpiar lo que el install fallido haya dejado a medias antes
+    # de saltar al siguiente patrón. Sin esto, el ciclo siguiente se choca
+    # con recursos huérfanos.
+    uninstall_pattern "${RELEASE}"
+    wait_namespace_empty_for_release "${RELEASE}"
     echo "${pattern},${T_ZERO},,,,,,,,,,,${RUN_DIR},${STATUS},${NOTES}" >> "${COMPARISON_CSV}"
     continue
   fi
@@ -306,7 +349,9 @@ for pattern in ${PATTERNS}; do
   AGG_FILE="${RUN_DIR}/dashboard_aggregate.csv"
   if [ -f "${AGG_FILE}" ]; then
     # CSV header: t_inf_avg_ms,f_fps_avg,t_e2e_avg_ms,j_inf_ms,u_cpu_avg_pct,u_gpu_avg_pct,u_ram_avg_pct
-    AGG=$(tail -1 "${AGG_FILE}")
+    # Python's csv.writer writes CRLF line endings by default (RFC 4180); strip
+    # the trailing \r so it doesn't poison the concatenated comparison row.
+    AGG=$(tail -1 "${AGG_FILE}" | tr -d '\r')
   else
     AGG=",,,,,,"
   fi
@@ -314,13 +359,13 @@ for pattern in ${PATTERNS}; do
   # S_img total: parse from collect_metrics output if available
   S_IMG=""
   if [ -f "${PROJECT_ROOT}/dist/metrics/${pattern}.metrics.csv" ]; then
-    S_IMG=$(tail -1 "${PROJECT_ROOT}/dist/metrics/${pattern}.metrics.csv" | awk -F',' '{print $3}')
+    S_IMG=$(tail -1 "${PROJECT_ROOT}/dist/metrics/${pattern}.metrics.csv" | awk -F',' '{print $3}' | tr -d '\r')
   fi
 
   # T_ready_system: parse first PodScheduled → last Ready from t_ready.csv
   T_READY_SYSTEM=""
   if [ -f "${RUN_DIR}/t_ready.csv" ]; then
-    T_READY_SYSTEM=$(awk -F',' 'NR>1 {if($4>max) max=$4} END {print max}' "${RUN_DIR}/t_ready.csv")
+    T_READY_SYSTEM=$(awk -F',' 'NR>1 {if($4>max) max=$4} END {print max}' "${RUN_DIR}/t_ready.csv" | tr -d '\r')
   fi
 
   echo "${pattern},${T_ZERO},${T_FIN},${T_INSTALL},${T_READY_SYSTEM},${S_IMG},${AGG},${RUN_DIR},${STATUS},${NOTES}" \

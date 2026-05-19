@@ -98,6 +98,48 @@ if ! kubectl get secret regcred -n "${NAMESPACE_CHECK}" >/dev/null 2>&1; then
 fi
 log "Pre-flight OK: secret regcred presente en namespace ${NAMESPACE_CHECK}."
 
+# Guardamos un backup del secret regcred en disco para poder recrearlo
+# entre ciclos cuando el cleanup nuclear borre el namespace.
+REGCRED_BACKUP="${PROJECT_ROOT}/results/_campaigns/.regcred_${META_TS}.yaml"
+kubectl get secret regcred -n "${NAMESPACE_CHECK}" -o yaml | \
+  sed '/resourceVersion:/d; /uid:/d; /creationTimestamp:/d; /namespace:/d' > "${REGCRED_BACKUP}"
+log "Backup del secret regcred guardado en ${REGCRED_BACKUP}"
+
+# ── Helper: limpieza nuclear del namespace entre ciclos ─────────────────────
+# Borra el namespace entero (con todo lo que contenga: pods, PVCs, ConfigMaps,
+# secrets, releases de helm pegadas, lo que sea) y lo recrea con el secret
+# regcred restaurado. Esto garantiza que cada ciclo arranca con el cluster
+# exactamente en el mismo estado.
+nuclear_cleanup_namespace() {
+  local ns="${NAMESPACE_CHECK}"
+  log "  [nuclear] Uninstall de cualquier release en ${ns}..."
+  for r in $(helm list -n "${ns}" -q 2>/dev/null); do
+    helm uninstall "${r}" -n "${ns}" --wait --timeout 5m 2>/dev/null || true
+  done
+  log "  [nuclear] Borrando namespace ${ns} (--force --grace-period=0)..."
+  kubectl delete namespace "${ns}" --wait=true --timeout=180s 2>/dev/null || \
+    kubectl delete namespace "${ns}" --force --grace-period=0 2>/dev/null || true
+
+  # Espera a que el namespace deje de existir realmente
+  local waited=0
+  while kubectl get namespace "${ns}" >/dev/null 2>&1; do
+    if [ "${waited}" -ge 120 ]; then
+      log "  [nuclear] WARNING: namespace ${ns} no se borra después de 120s; intento finalize"
+      kubectl get namespace "${ns}" -o json 2>/dev/null | \
+        sed 's/"finalizers": \[[^]]*\]/"finalizers": []/' | \
+        kubectl replace --raw "/api/v1/namespaces/${ns}/finalize" -f - 2>/dev/null || true
+      break
+    fi
+    sleep 5
+    waited=$((waited + 5))
+  done
+
+  log "  [nuclear] Recreando namespace ${ns} y secret regcred..."
+  kubectl create namespace "${ns}" 2>/dev/null || true
+  kubectl apply -n "${ns}" -f "${REGCRED_BACKUP}" >/dev/null
+  log "  [nuclear] Cleanup completo. Namespace ${ns} listo para el siguiente ciclo."
+}
+
 run_cycle() {
   local idx=$1
   local regimen=$2   # "warm" o "cold-cold"
@@ -112,6 +154,11 @@ run_cycle() {
   log "────────────────────────────────────────────────────────────"
   log " Ciclo ${idx}  (regimen=${regimen})"
   log "────────────────────────────────────────────────────────────"
+
+  # Limpieza nuclear: garantiza que el ciclo arranca con el namespace recién
+  # recreado. Sin esto, recursos huérfanos de ciclos anteriores hacen que
+  # los helm install fallen con "release already exists" o similares.
+  nuclear_cleanup_namespace
 
   local cold_flag="false"
   [ "${regimen}" = "cold-cold" ] && cold_flag="true"
