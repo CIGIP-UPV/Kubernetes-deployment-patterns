@@ -178,9 +178,18 @@ install_pattern() {
         --set camera.device="${CAMERA_DEVICE}"
       ;;
     overlay-canonical)
+      # IMPORTANTE: overlay-canonical se instala SIN --wait, a propósito.
+      # Con --wait, helm espera a que TODOS los pods estén Ready, incluido
+      # overlay-pattern-0 en edgenode01, que tiene que bajar el tarball de
+      # 17 GB del nginx server y descomprimirlo en el Jetson. Eso supera los
+      # 45 min del timeout y helm mata la release entera (context deadline
+      # exceeded). Sin --wait, helm devuelve en cuanto el hook pre-install
+      # (installer Job) termina y se crean los recursos — igual que hace
+      # Rancher de forma asíncrona. La espera real la hace el paso [5/9]
+      # con kubectl wait y un timeout amplio (OVERLAY_READY_TIMEOUT).
       helm install "${release}" "${PROJECT_ROOT}/Patterns/overlay-canonical/helm/ros2-overlay-canonical" \
         -n "${NAMESPACE}" --create-namespace \
-        --timeout "${HELM_TIMEOUT}" --wait \
+        --timeout "${HELM_TIMEOUT}" \
         --set images.base.tag="${IMAGE_TAG}" \
         --set images.overlayPack.tag="${IMAGE_TAG}" \
         --set nodes.cloud.name="${CLOUD_NODE}" \
@@ -295,12 +304,31 @@ for pattern in ${PATTERNS}; do
   fi
 
   # 5. Wait Ready
-  log "  [5/9] kubectl wait Ready (timeout 45m)..."
+  # overlay-canonical necesita más tiempo: como se instala sin --wait, este
+  # es el único punto donde esperamos a que el runtime pod baje y descomprima
+  # el tarball de 17 GB en el edge. Le damos 90m. El resto, 45m.
+  READY_TIMEOUT="45m"
+  if [ "${pattern}" = "overlay-canonical" ]; then
+    READY_TIMEOUT="${OVERLAY_READY_TIMEOUT:-90m}"
+    # Al instalar sin --wait, los pods del StatefulSet tardan unos segundos en
+    # aparecer. Esperamos a que exista al menos un pod (no-installer) antes de
+    # llamar a kubectl wait, que si no fallaría con "no matching resources".
+    log "  [5/9a] Esperando a que aparezcan los pods de ${RELEASE}..."
+    appeared=0
+    for _ in $(seq 1 24); do   # hasta 2 min (24 × 5s)
+      n=$(kubectl get pods -n "${NAMESPACE}" -l "app.kubernetes.io/instance=${RELEASE}" \
+            --no-headers 2>/dev/null | grep -v installer | wc -l)
+      if [ "${n}" -ge 1 ]; then appeared=1; break; fi
+      sleep 5
+    done
+    [ "${appeared}" -eq 0 ] && log "    WARNING: no aparecieron pods de ${RELEASE} en 2 min"
+  fi
+  log "  [5/9] kubectl wait Ready (timeout ${READY_TIMEOUT})..."
   if ! kubectl wait pod -n "${NAMESPACE}" \
         -l "app.kubernetes.io/instance=${RELEASE}" \
-        --for=condition=Ready --timeout=45m >> "${CAMPAIGN_LOG}" 2>&1; then
+        --for=condition=Ready --timeout="${READY_TIMEOUT}" >> "${CAMPAIGN_LOG}" 2>&1; then
     STATUS="ready_timeout"
-    NOTES="kubectl wait timed out at 45m"
+    NOTES="kubectl wait timed out at ${READY_TIMEOUT}"
     log "    READY TIMEOUT — capturing what we have"
   fi
   T_FIN=$(date -u +%Y-%m-%dT%H:%M:%SZ)

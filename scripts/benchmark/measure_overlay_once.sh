@@ -44,6 +44,15 @@ fi
 REPLICA="$1"
 T_ZERO_ARG="${2:-}"
 
+# Validar que REPLICA es un número (1..N). Si no, abortar con mensaje claro
+# en vez de romper más adelante con "value too great for base".
+if ! [[ "${REPLICA}" =~ ^[0-9]+$ ]]; then
+  echo "ERROR: el primer argumento debe ser el NÚMERO de réplica (1..5), no '${REPLICA}'."
+  echo "Uso: $0 <num_replica> [hora_inicio_utc]"
+  echo "Ej:  $0 1 2026-05-20T08:15:00Z"
+  exit 1
+fi
+
 NAMESPACE="${NAMESPACE:-ros2exp}"
 RELEASE="${RELEASE:-overlay-pattern}"
 WARMUP_SECONDS="${WARMUP_SECONDS:-600}"
@@ -66,29 +75,50 @@ log " Salida    : ${RUN_DIR}"
 log "════════════════════════════════════════════════════════════"
 
 # ── 1. Verificar que overlay está desplegado y Ready ────────────────────────
-log "[1/5] Verificando que ${RELEASE} está Ready en ${NAMESPACE}..."
-PODS=$(kubectl get pods -n "${NAMESPACE}" -l "app.kubernetes.io/instance=${RELEASE}" --no-headers 2>/dev/null | wc -l)
-if [ "${PODS}" -eq 0 ]; then
-  log "  ERROR: no hay pods de ${RELEASE} en ${NAMESPACE}."
-  log "  Despliega overlay-canonical desde Rancher (release=${RELEASE}, ns=${NAMESPACE}) y vuelve a lanzar."
-  exit 1
-fi
+# IMPORTANTE: overlay-canonical tiene un Job efímero de pre-install
+# (overlay-pattern-overlay-installer-XXXXX) que copia ~17 GB a la PVC ANTES de
+# que la aplicación real arranque. Ese Job comparte la label
+# app.kubernetes.io/instance, así que NO podemos esperar "cualquier pod" con
+# esa label: matcharía el installer y daríamos por listo algo que aún no lo
+# está. Esperamos específicamente a los pods del StatefulSet de la app:
+# el runtime (overlay-pattern-0) y el dashboard (overlay-pattern-dashboard-0,
+# que expone el rosbridge que necesita el sampler).
+RUNTIME_POD="${RELEASE}-0"
+DASHBOARD_POD="${RELEASE}-dashboard-0"
+
+log "[1/5] Verificando que ${RELEASE} está completamente desplegado en ${NAMESPACE}..."
 kubectl get pods -n "${NAMESPACE}" -l "app.kubernetes.io/instance=${RELEASE}" > "${RUN_DIR}/pods_at_start.txt" 2>&1
 cat "${RUN_DIR}/pods_at_start.txt"
 
-# Esperar a Ready (por si lo lanzaste hace nada). Hasta 10 min.
-if ! kubectl wait pod -n "${NAMESPACE}" \
-      -l "app.kubernetes.io/instance=${RELEASE}" \
-      --for=condition=Ready --timeout=10m 2>&1 | tee -a "${RUN_DIR}/wait.log"; then
-  log "  WARNING: no todos los pods llegaron a Ready en 10 min. Continúo de todos modos."
+# Si solo existe el pod installer (la app real aún no se ha creado), abortar
+# con un mensaje claro: hay que esperar a que termine el pre-install.
+if ! kubectl get pod "${DASHBOARD_POD}" -n "${NAMESPACE}" >/dev/null 2>&1; then
+  log "  ERROR: el pod del dashboard (${DASHBOARD_POD}) todavía no existe."
+  log "  Probablemente overlay sigue en fase de pre-install (Job overlay-installer"
+  log "  copiando los ~17 GB a la PVC). Espera en Rancher a que TODOS los pods"
+  log "  estén verdes (overlay-pattern-0, overlay-pattern-dashboard-0,"
+  log "  overlay-pattern-overlay-server-...) y vuelve a lanzar el script."
+  log "  Esta carpeta (${RUN_DIR}) puede borrarse."
+  exit 1
 fi
+
+# Esperar a que runtime + dashboard estén Ready (hasta 45 min por si justo
+# acabas de pulsar Install y el pre-install todavía está en marcha).
+log "  Esperando a que ${RUNTIME_POD} y ${DASHBOARD_POD} estén Ready (timeout 45m)..."
+kubectl wait "pod/${RUNTIME_POD}"   -n "${NAMESPACE}" --for=condition=Ready --timeout=45m 2>&1 | tee -a "${RUN_DIR}/wait.log" || \
+  log "  WARNING: ${RUNTIME_POD} no llegó a Ready en 45m."
+kubectl wait "pod/${DASHBOARD_POD}" -n "${NAMESPACE}" --for=condition=Ready --timeout=45m 2>&1 | tee -a "${RUN_DIR}/wait.log" || \
+  log "  WARNING: ${DASHBOARD_POD} no llegó a Ready en 45m."
 
 # ── 2. T_install / T_ready ──────────────────────────────────────────────────
 log "[2/5] Calculando T_install y T_ready_system..."
 
-# T_ready_system: ventana desde el primer PodScheduled al último Ready (segundos).
+# T_ready_system: ventana desde el primer PodScheduled al último Ready
+# (segundos), EXCLUYENDO el pod installer (efímero, no es parte de la app).
 kubectl get pods -n "${NAMESPACE}" -l "app.kubernetes.io/instance=${RELEASE}" \
-  -o json > "${RUN_DIR}/pods.json" 2>/dev/null
+  -o json 2>/dev/null | \
+  python3 -c "import json,sys; d=json.load(sys.stdin); d['items']=[p for p in d['items'] if 'installer' not in p['metadata']['name']]; json.dump(d,sys.stdout)" \
+  > "${RUN_DIR}/pods.json"
 
 python3 - "${RUN_DIR}/pods.json" "${T_ZERO_ARG}" > "${RUN_DIR}/timing.txt" <<'PYEOF'
 import json, sys, datetime
