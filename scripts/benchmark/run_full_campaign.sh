@@ -110,6 +110,18 @@ log "============================================================"
 echo "pattern,t_zero,t_fin,t_install_e2e_s,t_ready_system_s,s_img_total_gb,t_inf_avg_ms,f_fps_pub,t_e2e_avg_ms,j_inf_ms,u_cpu_avg_pct,u_gpu_avg_pct,u_ram_avg_pct,run_dir,status,notes" > "${COMPARISON_CSV}"
 
 # ── Helper: optionally purge containerd images on each node ─────────────────
+# Los nodos se acceden por FQDN porque kb2 NO resuelve los hostnames cortos
+# del cluster (edgenode01, worker1-kb2). Mapeo confirmado:
+#   K8s node    IP             FQDN para SSH                 usuario
+#   edgenode01  158.42.104.206 edgenode01.cigip.upv.es       anakin
+#   kb2 (CP)    158.42.104.15  kb1.cigip.upv.es              administrador
+#   worker1-kb2 158.42.104.103 worker1-kb2.cigip.upv.es      administrador
+# Configurable por env var PURGE_HOSTS (lista separada por espacios de
+# user@fqdn). Requiere ademas: claves SSH (ssh-copy-id) y sudo NOPASSWD para
+# k3s en cada nodo (/etc/sudoers.d/k3s-nopasswd con
+# "<user> ALL=(ALL) NOPASSWD: /usr/local/bin/k3s").
+PURGE_HOSTS="${PURGE_HOSTS:-anakin@edgenode01.cigip.upv.es administrador@worker1-kb2.cigip.upv.es administrador@kb1.cigip.upv.es}"
+
 purge_node_images() {
   if [ "${COLD_COLD}" != "true" ]; then
     return 0
@@ -122,12 +134,20 @@ purge_node_images() {
       # Each pattern uses a different set of images. We purge ALL pattern-related
       # images to play it safe — pulls happen on next install only for the ones
       # that the chart actually uses.
-      for host_user in anakin@edgenode01 administrador@worker1-kb2 administrador@kb2; do
+      for host_user in ${PURGE_HOSTS}; do
         log "    purging on ${host_user}..."
+        # Verificamos primero acceso SSH + sudo no interactivo; si falla, lo
+        # registramos como ERROR (no WARNING silencioso) porque sin purga el
+        # cold-cold NO es frio de verdad y el T_install no seria fiable.
+        if ! ssh -o BatchMode=yes -o ConnectTimeout=8 "${host_user}" 'sudo -n k3s ctr images list >/dev/null 2>&1'; then
+          log "    ERROR: no se pudo purgar en ${host_user} (SSH o sudo NOPASSWD fallan). El cold-cold NO sera fiable en este nodo."
+          continue
+        fi
         ssh -o BatchMode=yes -o ConnectTimeout=8 "${host_user}" \
           "sudo k3s ctr images list -q | grep -E 'patrones-kubernetes/(ros2-base|ros2-overlay-pack|ros2-component-host|ros2-monolithic|ros2-camera|ros2-yolo|ros2-llava|ros2-voxtral|ros2-dashboard)' | xargs -r sudo k3s ctr images rm; sudo k3s crictl rmi --prune" \
-          >> "${CAMPAIGN_LOG}" 2>&1 || \
-          log "    WARNING: ssh to ${host_user} failed (skipping)"
+          >> "${CAMPAIGN_LOG}" 2>&1 && \
+          log "    purga OK en ${host_user}" || \
+          log "    WARNING: la purga en ${host_user} devolvio error"
       done
       ;;
   esac
