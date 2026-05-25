@@ -178,6 +178,15 @@ class LlavaNode(Node):
 
         # ── State ────────────────────────────────────────────────────
         self.current_frame: PILImage.Image | None = None
+        # On-demand frame capture: the steady-state image callback keeps only
+        # the RAW latest message (a cheap pointer assignment). The expensive
+        # decode (cv_bridge + cv2 + PIL) is deferred to inference time — see
+        # _decode_latest_frame. This avoids LLaVA contending for the Python GIL
+        # on every camera frame, which is critical in the in-process patterns
+        # (monolithic, overlay, dynamic) where LLaVA shares one process with
+        # YOLO: a per-frame decode here dragged YOLO throughput down to ~3 fps
+        # even while LLaVA was idle.
+        self._latest_img_msg: Image | None = None
         self.is_processing = False
         self.last_yolo_trigger = 0.0
         self._yolo_interval = float(self.get_parameter('yolo_trigger_interval_s').value)
@@ -309,13 +318,25 @@ class LlavaNode(Node):
     # ── Callbacks ─────────────────────────────────────────────────────
 
     def _image_cb(self, msg: Image):
-        """Keep the latest camera frame in memory."""
+        """Stash the latest raw frame only (cheap pointer assignment).
+        Decoding is deferred to inference time (see _decode_latest_frame) to
+        avoid per-frame GIL contention with co-located nodes."""
+        self._latest_img_msg = msg
+
+    def _decode_latest_frame(self):
+        """Decode the most recent raw camera message to a PIL image, on demand.
+        Called from _run_inference, so the cost is paid once per inference
+        instead of once per camera frame."""
+        msg = self._latest_img_msg
+        if msg is None:
+            return None
         try:
             bgr = self._bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
             rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-            self.current_frame = PILImage.fromarray(rgb)
+            return PILImage.fromarray(rgb)
         except Exception as e:
             self.get_logger().debug(f'[LLaVA] Image decode error: {e}')
+            return None
 
     def _detection_cb(self, msg: Detection2DArray):
         """YOLO trigger — fires LLaVA when objects are detected."""
@@ -358,6 +379,9 @@ class LlavaNode(Node):
     # ── Inference ─────────────────────────────────────────────────────
 
     def _run_inference(self, question: str):
+        # Decode the latest camera frame on demand (deferred from _image_cb so
+        # the steady-state callback stays cheap and does not starve YOLO).
+        self.current_frame = self._decode_latest_frame()
         if self.current_frame is None:
             self.get_logger().warn('[LLaVA] No frame available yet — skipping.')
             return
