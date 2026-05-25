@@ -357,6 +357,25 @@ for pattern in ${PATTERNS}; do
   T_INSTALL=$((T_FIN_EPOCH - T_ZERO_EPOCH))
   log "  [5/9] T_fin=${T_FIN}  T_install_e2e=${T_INSTALL}s"
 
+  # 5c. Launch the deterministic LLaVA trigger driver in the background,
+  # covering the whole warm-up + sampling window. Without it, LLaVA only fires
+  # when YOLO detects COCO objects in view; an unattended/overnight run sees an
+  # empty or dark scene, LLaVA never fires, and the perception+reasoning
+  # workload degenerates into perception-only (YOLO). The driver makes the
+  # reasoning load identical and reproducible across all four patterns.
+  # Disable with LLAVA_TRIGGER=false; change cadence with LLAVA_TRIGGER_INTERVAL.
+  TRIGGER_PID=""
+  if [ "${LLAVA_TRIGGER:-true}" = "true" ]; then
+    TRIGGER_DURATION=$((WARMUP_SECONDS + SAMPLE_SECONDS + 60))
+    python3 "${PROJECT_ROOT}/scripts/benchmark/llava_trigger_driver.py" \
+            --rosbridge-url "${ROSBRIDGE_URL}" \
+            --interval "${LLAVA_TRIGGER_INTERVAL:-30}" \
+            --duration "${TRIGGER_DURATION}" \
+            >> "${CAMPAIGN_LOG}" 2>&1 &
+    TRIGGER_PID=$!
+    log "  [5c/9] LLaVA trigger driver started (PID ${TRIGGER_PID}, cada ${LLAVA_TRIGGER_INTERVAL:-30}s durante ${TRIGGER_DURATION}s)"
+  fi
+
   # 6. Warm-up
   log "  [6/9] Warm-up: sleeping ${WARMUP_SECONDS}s..."
   sleep "${WARMUP_SECONDS}"
@@ -376,6 +395,13 @@ for pattern in ${PATTERNS}; do
           --duration "${SAMPLE_SECONDS}" \
           --output "${RUN_DIR}/dashboard_samples.csv" \
           >> "${CAMPAIGN_LOG}" 2>&1 || NOTES="${NOTES};dashboard_sampler failed"
+
+  # Stop the LLaVA trigger driver now that the sampling window is over.
+  if [ -n "${TRIGGER_PID}" ]; then
+    kill "${TRIGGER_PID}" 2>/dev/null || true
+    wait "${TRIGGER_PID}" 2>/dev/null || true
+    log "  [8/9] LLaVA trigger driver stopped (PID ${TRIGGER_PID})."
+  fi
 
   # 8.b (dynamic only) C-7 capture
   if [ "${pattern}" = "dynamic-canonical" ]; then
