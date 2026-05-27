@@ -222,3 +222,45 @@ nameOverride: ""
 # 66 chars that "<release>-ros2-overlay-canonical-overlay-installer"
 # would produce for a long release name).
 fullnameOverride: "overlay-pattern"
+
+# ─── Layered overlay delivery (opt-in optimisations) ──────────────────────────
+# When overlay.layered=true, the overlay payload is split into multiple
+# per-layer tarballs on the cloud side (the pre-install Job builds one tarball
+# per entry of overlay.layers) and the edge runtime init container downloads
+# them in parallel, with per-layer idempotency. An OTA update that touches a
+# single layer (e.g. swapping LLaVA weights) only re-ships that layer's tarball,
+# and the edge skips downloading any layer whose marker is already on disk
+# (most useful with overlayMount.kind=hostPath, where layers persist across
+# pod restarts).
+#
+# overlay.pipeline=true (only meaningful with layered=true) drops the Helm
+# pre-install hook annotations on the Job, so the Job and the runtime
+# StatefulSet are scheduled in parallel. The runtime init container then polls
+# the overlay-server for each layer to appear, allowing tarball assembly on the
+# cloud and the edge download to overlap during cold installs.
+#
+# overlay.syncParallelism caps the number of layers downloaded simultaneously
+# by the edge init container.
+#
+# Defaults are off so behaviour is identical to previous releases.
+overlay:
+  layered: false
+  pipeline: false
+  syncParallelism: 4
+  layers:
+    - name: deps
+      paths:
+        - install
+        - python-deps
+        - system-libs
+        - models
+        - huggingface_cache/version.txt
+      marker: install/setup.bash
+    - name: llava
+      paths:
+        - huggingface_cache/models--llava-hf--llava-1.5-7b-hf
+      marker: huggingface_cache/models--llava-hf--llava-1.5-7b-hf/snapshots
+    - name: voxtral
+      paths:
+        - huggingface_cache/models--mistralai--Voxtral-Mini-3B-2507
+      marker: huggingface_cache/models--mistralai--Voxtral-Mini-3B-2507/snapshots

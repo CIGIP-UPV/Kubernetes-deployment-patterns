@@ -120,35 +120,97 @@ spec:
               VERSION={{ include "ros2-overlay-canonical.overlayVersion" . | quote }}
               OVERLAY_SVC="${FULLNAME}-{{ .Values.overlayServer.service.name }}.${NS}.svc.cluster.local"
               PORT={{ .Values.overlayServer.service.port | default 80 }}
-              URL="http://${OVERLAY_SVC}:${PORT}/overlay/${VERSION}.tar"
               TARGET=/opt/overlay
+              TIMEOUT={{ .Values.overlaySync.timeoutSeconds | default 1800 }}
 
+              # Helper: HTTP HEAD probe — returns 0 if URL is reachable with 200.
+              probe_url() {
+                curl -fsI --max-time 5 "$1" -o /dev/null
+              }
+
+              # Helper: poll a URL until it becomes reachable. Used in
+              # overlay.pipeline=true mode where the pre-install Job runs in
+              # parallel with this init container, so a layer tarball may not
+              # exist yet at this container's start time.
+              wait_for_url() {
+                local url=$1
+                local label=${2:-$url}
+                local max_wait=${TIMEOUT}
+                local waited=0
+                while ! probe_url "${url}"; do
+                  if [ "${waited}" -ge "${max_wait}" ]; then
+                    echo "[sync] FATAL: ${label} did not become available within ${max_wait} s"
+                    exit 1
+                  fi
+                  sleep 5
+                  waited=$((waited + 5))
+                  if [ $((waited % 30)) -eq 0 ]; then
+                    echo "[sync]   still waiting for ${label} (${waited}/${max_wait}s)"
+                  fi
+                done
+              }
+
+              mkdir -p "${TARGET}"
+
+              {{- if .Values.overlay.layered }}
+              # ── Layered mode: per-layer idempotency + parallel downloads ──
+              PARALLEL={{ .Values.overlay.syncParallelism | default 4 }}
+              echo "[sync] Layered mode (parallelism=${PARALLEL})"
+
+              # fetch_layer: skip if marker exists on disk; otherwise wait for
+              # the layer's tarball to be served, then stream curl|tar into
+              # ${TARGET}. The set -e + pipefail at top of script causes the
+              # entire init container to fail if any layer fails.
+              fetch_layer() {
+                local name=$1
+                local marker=$2
+                if [ -e "${TARGET}/${marker}" ]; then
+                  echo "[sync] Layer ${name}: marker '${marker}' present, skipping"
+                  return 0
+                fi
+                local url="http://${OVERLAY_SVC}:${PORT}/overlay/${VERSION}-${name}.tar"
+                echo "[sync] Layer ${name}: waiting for ${url}"
+                wait_for_url "${url}" "layer ${name}"
+                echo "[sync] Layer ${name}: downloading + extracting"
+                curl -fSL --max-time ${TIMEOUT} "${url}" \
+                  | tar -xf - -C "${TARGET}"
+                echo "[sync] Layer ${name}: done"
+              }
+
+              # Schedule layers with bounded parallelism. Each batch of
+              # ${PARALLEL} layers is awaited before launching the next batch,
+              # which prevents saturating the edge node when len(layers) is
+              # larger than the LAN can stream concurrently.
+              PIDS=""
+              N=0
+              {{- range .Values.overlay.layers }}
+              fetch_layer "{{ .name }}" "{{ .marker }}" &
+              PIDS="${PIDS} $!"
+              N=$((N + 1))
+              if [ "${N}" -ge "${PARALLEL}" ]; then
+                for pid in ${PIDS}; do wait "${pid}"; done
+                PIDS=""
+                N=0
+              fi
+              {{- end }}
+              for pid in ${PIDS}; do wait "${pid}"; done
+              echo "[sync] All layers synced"
+              {{- else }}
+              # ── Legacy single-tarball mode ─────────────────────────────────
+              URL="http://${OVERLAY_SVC}:${PORT}/overlay/${VERSION}.tar"
               echo "[sync] Source: ${URL}"
               echo "[sync] Target: ${TARGET}"
-
-              # If overlay is already extracted (idempotent re-run, container
-              # restart), skip. emptyDir is pod-lifetime so this only matters
-              # if init container re-runs on the same pod.
               if [ -f "${TARGET}/install/setup.bash" ]; then
-                echo "[sync] Overlay already extracted at ${TARGET}, skipping download"
+                echo "[sync] Overlay already extracted, skipping download"
                 ls -la "${TARGET}/"
                 exit 0
               fi
-
-              # Validate server is reachable (catches misconfig early)
-              echo "[sync] Probing server availability..."
-              curl -fsI --max-time 10 "http://${OVERLAY_SVC}:${PORT}/" \
-                   -o /dev/null \
-                || { echo "[sync] FATAL: overlay-server unreachable"; exit 1; }
+              echo "[sync] Waiting for overlay-server + tarball availability..."
+              wait_for_url "${URL}" "overlay tarball"
               echo "[sync] Server OK. Downloading + extracting tarball..."
-
-              # Streamed download + extract. set -o pipefail above ensures
-              # that if curl fails mid-stream, the script exits non-zero.
-              # --max-time 1800 = 30 min budget for the full transfer.
-              mkdir -p "${TARGET}"
-              curl -fSL --max-time {{ .Values.overlaySync.timeoutSeconds | default 1800 }} \
-                   "${URL}" \
+              curl -fSL --max-time ${TIMEOUT} "${URL}" \
                 | tar -xf - -C "${TARGET}"
+              {{- end }}
 
               echo "[sync] Extraction complete. Contents:"
               ls -la "${TARGET}/"

@@ -58,10 +58,16 @@ metadata:
   labels:
     {{- include "ros2-overlay-canonical.labels" . | nindent 4 }}
     component: overlay-installer
+  {{- if not .Values.overlay.pipeline }}
   annotations:
     "helm.sh/hook": "pre-install,pre-upgrade"
     "helm.sh/hook-weight": "0"
     "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
+  {{- else }}
+  # overlay.pipeline=true: Job is a regular resource so it runs in parallel
+  # with the runtime StatefulSet (the init container polls the overlay-server
+  # for each layer tarball, overlapping tarball assembly with edge download).
+  {{- end }}
 spec:
   backoffLimit: 2
   ttlSecondsAfterFinished: {{ .Values.preInstallJob.ttlSecondsAfterFinished | default 300 }}
@@ -88,53 +94,91 @@ spec:
             - |
               set -e
               VERSION={{ include "ros2-overlay-canonical.overlayVersion" . | quote }}
-              # Tarball at PVC root (NOT in /pvc/overlay/ subdir). Reason:
-              # the nginx server mounts the PVC at /usr/share/nginx/html/overlay/,
-              # so PVC-root tarballs become /overlay/{version}.tar in URLs and
-              # the default nginx index.html stays intact (probes on / return 200).
-              TARGET=/pvc/${VERSION}.tar
-              TARGET_TMP=/pvc/${VERSION}.tar.tmp
               SOURCE=/opt/overlay
-
               echo "[installer] Carrier version: ${VERSION}"
               echo "[installer] Source content:"
               ls -la ${SOURCE}/
 
-              # Idempotency: if final tarball already exists, skip.
-              # Atomic: tarball is created with .tmp suffix and renamed at end.
-              # The runtime initContainer would never see a partial download.
+              # Helper: build a single tarball for a named layer with the given
+              # space-separated path list (relative to ${SOURCE}). Idempotent:
+              # if /pvc/${VERSION}-${name}.tar already exists, the function
+              # returns early. Atomic: writes to .tmp, then mv.
+              build_layer() {
+                local name=$1
+                local paths=$2
+                local target=/pvc/${VERSION}-${name}.tar
+                local target_tmp=/pvc/${VERSION}-${name}.tar.tmp
+                if [ -f "${target}" ]; then
+                  echo "[installer] Layer ${name}: ${target} already exists, skipping"
+                  ls -lh "${target}"
+                  return 0
+                fi
+                # Filter to paths that actually exist in the carrier filesystem
+                # (some layers may legitimately omit files the carrier doesn't ship).
+                local actual=""
+                for p in ${paths}; do
+                  if [ -e "${SOURCE}/${p}" ]; then
+                    actual="${actual} ${p}"
+                  else
+                    echo "[installer] Layer ${name}: path '${p}' not found, omitting"
+                  fi
+                done
+                if [ -z "${actual}" ]; then
+                  echo "[installer] Layer ${name}: no paths to package, skipping"
+                  return 0
+                fi
+                echo "[installer] Layer ${name}: building tarball with paths:${actual}"
+                tar -cf "${target_tmp}" -C ${SOURCE} ${actual}
+                mv "${target_tmp}" "${target}"
+                echo "[installer] Layer ${name}: done ($(du -sh ${target} | awk '{print $1}'))"
+              }
+
+              {{- if .Values.overlay.layered }}
+              # ── Layered mode ───────────────────────────────────────────────
+              # Build one tarball per layer (defined in values.yaml). When
+              # overlay.pipeline=true (no Helm hook), the runtime init container
+              # polls for each layer in parallel with this Job, so layers
+              # served first start being downloaded by the edge while the
+              # remaining ones are still being packaged.
+              {{- range .Values.overlay.layers }}
+              build_layer "{{ .name }}" "{{ join " " .paths }}"
+              {{- end }}
+              {{- else }}
+              # ── Legacy single-tarball mode ─────────────────────────────────
+              # Tarball at PVC root (NOT in /pvc/overlay/ subdir). Reason:
+              # the nginx server mounts the PVC at /usr/share/nginx/html/overlay/,
+              # so PVC-root tarballs become /overlay/{version}.tar in URLs and
+              # the default nginx index.html stays intact (probes on / return 200).
+              # HuggingFace's snapshot_download cache uses RELATIVE SYMLINKS
+              # (snapshots/HASH/X → ../../blobs/Y). nginx with default config
+              # follows symlinks at HTTP serve time, returning the target's
+              # content. An edge initContainer using `wget -r` would download
+              # the same blob bytes TWICE (once via snapshots/ path, once via
+              # blobs/ path), inflating a 17 GB overlay to ~30 GB on edge. A
+              # tarball preserves symlinks faithfully — a single HTTP GET,
+              # atomic delivery, no duplication.
+              TARGET=/pvc/${VERSION}.tar
+              TARGET_TMP=/pvc/${VERSION}.tar.tmp
               if [ -f "${TARGET}" ]; then
-                echo "[installer] ${TARGET} already exists"
-                echo "[installer] Skipping creation (idempotent re-run)"
-                echo "[installer] Existing tarball size:"
+                echo "[installer] ${TARGET} already exists, skipping (idempotent re-run)"
                 ls -lh "${TARGET}"
                 exit 0
               fi
-
-              # Why tarball instead of cp directory:
-              # The HF cache contains relative symlinks (snapshots/HASH/X →
-              # ../../blobs/Y). nginx serves symlinks as their target's content,
-              # so an init container using `wget -r` over HTTP would receive
-              # the same blob bytes TWICE (once via snapshots/ path, once via
-              # blobs/ path), turning a 17 GB overlay into a 30 GB on edge.
-              # A tarball preserves symlinks faithfully and travels as a single
-              # HTTP GET — faster, atomic, no duplication.
               echo "[installer] Creating tarball ${TARGET_TMP}..."
               echo "[installer] (This will take a few minutes for ~17 GB)"
               tar -cf "${TARGET_TMP}" -C ${SOURCE} .
               echo "[installer] Tarball created. Renaming atomically..."
               mv "${TARGET_TMP}" "${TARGET}"
-
-              echo ""
               echo "[installer] Final tarball:"
               ls -lh "${TARGET}"
+              {{- end }}
+
               echo ""
               echo "[installer] PVC contents:"
               ls -la /pvc/
               echo ""
               echo "[installer] PVC total usage:"
               du -sh /pvc/
-
               echo "[installer] Done."
           volumeMounts:
             - name: overlay-source
