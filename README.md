@@ -57,8 +57,8 @@ Jetson AGX Orin edge node with two amd64 cloud nodes.
 │   └── publish_charts.sh            # push the four Helm charts to the OCI registry
 │
 ├── results/                         # raw measurement data per cycle
-│   ├── _campaigns/                            #   raw rosbridge samples per cycle
-│   │   └── <TS>/<pattern>/                    #     one folder per cycle × pattern
+│   ├── <pattern>/                            #   raw rosbridge samples per cycle
+│   │   └── summary.csv                  #     one folder per cycle × pattern
 │   ├── overlay_incremental_warm/
 │   │   └── 20260527-122308/measurements.csv   # 5-cycle rollout-restart, 73.6 ± 0.5 s
 │   └── dynamic-canonical/load-unload/
