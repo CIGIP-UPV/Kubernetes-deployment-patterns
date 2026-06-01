@@ -1,2 +1,0 @@
-pattern,timestamp,s_img_total_gb,t_sched_avg_s,l_net_kb2_ms,l_net_edge_ms,c_cfg_files,t_ci_s,t_ready_s,eta_start,r_deploy
-microservices,2026-05-04T11:32:39Z,41.24,,4.706,4.674,0,,0.75,,

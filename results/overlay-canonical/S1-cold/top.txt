@@ -1,6 +1,0 @@
-# Captured 2026-05-06T08:32:16Z (kubectl top pod -n ros2exp -l app.kubernetes.io/instance=over-pattern)
-# Just after Ready — minimal warmup time, models freshly loaded into VRAM
-NAME                                                              CPU(cores)   MEMORY(bytes)
-over-pattern-ros2-overlay-canonical-0                             1395m        16617Mi
-over-pattern-ros2-overlay-canonical-dashboard-0                   219m         111Mi
-over-pattern-ros2-overlay-canonical-overlay-server-7fd498ctrjxm   1m           14Mi

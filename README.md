@@ -47,25 +47,7 @@ Jetson AGX Orin edge node with two amd64 cloud nodes.
 │   ├── aggregate_meta_campaign.sh   #     mean/stdev/min/max per pattern × regime
 │   └── measure_overlay_incremental_warm.sh
 │
-├── paper/                           # ready-to-paste LaTeX artifacts
-│   ├── results_tables.tex           #   final tables of Section IV
-│   ├── IV_B_overlay_paragraph.tex   #   the overlay-incremental paragraph
-│   ├── related_work.tex             #   Section II as published
-│   └── article_revision.docx        #   Section III+ in tracked-changes form
-│
-├── dist/metrics/                    # aggregated measurement data (CSV)
-│   ├── meta_campaign_<TS>.csv               # raw, one row per cycle × pattern
-│   └── meta_campaign_<TS>_summary.csv       # mean ± std per pattern × regime
-│
-├── results/                         # raw measurement data
-│   ├── _campaigns/<TS>/             #   one directory per cycle of the campaign
-│   │   └── <pattern>/               #     per-pattern artifacts of that cycle
-│   └── overlay_incremental_warm/<TS>/measurements.csv
-│
 ├── dashboard/                       # standalone HTML dashboard (rosbridge UI)
-├── docs/                            # supplementary documentation
-│   ├── REPRODUCIBILITY.md           #   exact commands to replicate the campaign
-│   └── JETSON_NOTES.md              #   non-obvious Jetson + K3s issues we hit
 ├── LICENSE                          # Apache 2.0
 └── CITATION.cff                     # citation metadata for Zenodo / GitHub
 ```
@@ -79,13 +61,7 @@ Jetson AGX Orin edge node with two amd64 cloud nodes.
 | **Dynamic loading**    | One `component_container_isolated` host that loads the four nodes as plugins on demand.     | 30.02 GB        | 30 GB         |
 | **Overlay workspaces** | Immutable 2.24 GB base + 25 GB mutable carrier extracted on edge from a cloud-side server.  | 27.54 GB        | 25 GB         |
 
-Section III of the article describes each pattern in detail and
-Section IV reports the empirical comparison.
-
 ## How to reproduce the campaign
-
-See [`docs/REPRODUCIBILITY.md`](docs/REPRODUCIBILITY.md) for the exact
-commands. In short:
 
 1. Provision a K3s cluster matching the topology in Table 1 (one Jetson
    AGX Orin edge node, two amd64 cloud nodes).
@@ -116,20 +92,6 @@ commands. In short:
    bash scripts/benchmark/aggregate_meta_campaign.sh "$SUM"
    ```
 
-7. (Optional) Reproduce the overlay-canonical *incremental warm*
-   measurement that requires the chart's design-intent configuration:
-
-   ```bash
-   helm upgrade --install overlay-pattern \
-     Patterns/overlay-canonical/helm/ros2-overlay-canonical/ -n ros2exp \
-     --set overlay.layered=true --set overlay.pipeline=true \
-     --set overlayMount.kind=hostPath
-   kubectl wait --for=condition=Ready pod/overlay-pattern-0 -n ros2exp \
-     --timeout=30m
-
-   N=5 PAUSE_BETWEEN=60 \
-     bash scripts/benchmark/measure_overlay_incremental_warm.sh
-   ```
 
 ## Pre-built images
 
@@ -143,11 +105,6 @@ byte-for-byte equivalent images on any host with NVIDIA Container
 Toolkit support.
 
 ## Workload
-
-The benchmark workload corresponds to the use case described in
-Section III.A of the article: automated inspection and classification
-of post-consumer textile garments in a circular-economy workflow.
-Three AI capabilities run concurrently:
 
 - **YOLOv8-nano** for real-time garment detection.
 - **LLaVA-1.5-7B** in FP16 for vision–language reasoning, triggered
@@ -171,8 +128,9 @@ preferred citation key for the dataset.
 ## Authors
 
 Miguel Ángel Mateo-Casalí ([ORCID](https://orcid.org/0000-0001-5086-9378)),
+Francisco Fraile ([ORCID](https://orcid.org/0000-0003-0852-8953)),
 Andrés Boza ([ORCID](https://orcid.org/0000-0002-5429-0416)),
-Francisco Fraile ([ORCID](https://orcid.org/0000-0003-0852-8953))
+Daniel González El Yachouti ([ORCID](https://orcid.org/0009-0005-5163-0509))
 — Centro de Investigación en Gestión e Ingeniería de Producción
 (CIGIP), Universitat Politècnica de València, Spain.
 

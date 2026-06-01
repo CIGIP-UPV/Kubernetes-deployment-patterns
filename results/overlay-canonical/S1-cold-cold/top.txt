@@ -1,5 +1,0 @@
-# Captured 2026-05-06T09:04:29Z (just after Ready, models freshly loaded)
-NAME                                                              CPU(cores)   MEMORY(bytes)
-over-pattern-ros2-overlay-canonical-0                             1804m        16504Mi
-over-pattern-ros2-overlay-canonical-dashboard-0                   50m          100Mi
-over-pattern-ros2-overlay-canonical-overlay-server-7fd498c8thsl   1m           44Mi

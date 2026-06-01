@@ -1,4 +1,0 @@
-pod,podscheduled,ready,delta_s,node
-over-pattern-ros2-overlay-canonical-overlay-server-7fd498c9qtd6,2026-05-06T07:36:41Z,2026-05-06T07:36:43Z,2,worker1-kb2
-over-pattern-ros2-overlay-canonical-dashboard-0,2026-05-06T07:37:06Z,2026-05-06T07:38:15Z,69,kb2
-over-pattern-ros2-overlay-canonical-0,2026-05-06T07:38:41Z,2026-05-06T07:39:21Z,40,edgenode01

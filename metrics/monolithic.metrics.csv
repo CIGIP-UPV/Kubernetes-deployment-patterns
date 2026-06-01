@@ -1,3 +1,0 @@
-pattern,timestamp,s_img_total_gb,t_sched_avg_s,l_net_kb2_ms,l_net_edge_ms,c_cfg_files,t_ci_s,t_ready_s,eta_start,r_deploy
-monolithic,2026-04-30T12:04:44Z,30.01,,19.115,18.709,0,,0.1,,
-monolithic,2026-05-04T11:11:14Z,30.01,,4.202,7.865,0,,0.76,,

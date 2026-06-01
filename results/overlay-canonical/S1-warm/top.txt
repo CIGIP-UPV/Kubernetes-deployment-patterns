@@ -1,5 +1,0 @@
-# Captured 2026-05-06T07:46:00Z (kubectl top pod -n ros2exp)
-NAME                                                              CPU(cores)   MEMORY(bytes)
-over-pattern-ros2-overlay-canonical-0                             1347m        17270Mi
-over-pattern-ros2-overlay-canonical-dashboard-0                   213m         111Mi
-over-pattern-ros2-overlay-canonical-overlay-server-7fd498c9qtd6   1m           13Mi

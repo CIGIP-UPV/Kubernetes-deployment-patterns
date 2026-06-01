@@ -25,3 +25,11 @@ __pycache__/
 
 # OS-specific
 Thumbs.db
+node_modules/
+mega_final.log
+mega_meta.log
+prueba_meta.log
+runtime_meta.log
+overlay_inc_warm*.log
+overlay_meta.log
+results/_campaigns/.regcred_*.yaml
