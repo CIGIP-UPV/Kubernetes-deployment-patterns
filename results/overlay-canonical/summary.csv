@@ -1,0 +1,18 @@
+metric,unit,mean,std,n,regime,source,table_or_figure_in_paper
+T_install,s,71.0,0.5,5,warm with opts (layered+pipeline+hostPath),campaign 20260601-081148,Figure 3 / Table 4
+T_install,s,754.0,,3,cold-cold with opts (layered+pipeline+hostPath),campaign 20260601-081148,Figure 3 / Table 4
+T_install,s,932.0,,1,first deployment on pristine edge (caveat - hostPath empty),campaign 20260601-081148,Section V-B caveat
+T_install_incremental_warm,s,73.6,0.5,5,rollout-restart with all layers cached on hostPath,results/overlay_incremental_warm/20260527-122308/measurements.csv,Section V-B
+T_inf,ms,29.10,0.27,5,warm steady state,mega-campaign 20260526-065922,Figure 4 / Table 3
+f_FPS,fps,20.17,0.27,5,warm steady state,mega-campaign 20260526-065922,Figure 4 / Table 3
+T_e2e,ms,61.09,1.09,5,warm steady state,mega-campaign 20260526-065922,Figure 4 / Table 3
+J_inf,ms,3.44,0.26,5,warm steady state,mega-campaign 20260526-065922,Figure 4 / Table 3
+U_CPU,%,39.05,0.67,5,warm steady state,mega-campaign 20260526-065922,Figure 4 / Table 3
+U_GPU,%,76.49,3.62,5,warm steady state,mega-campaign 20260526-065922,Figure 4 / Table 3
+U_RAM,%,30.98,0.38,5,warm steady state,mega-campaign 20260526-065922,Figure 4 / Table 3
+S_img_base,GB,2.24,,1,immutable base image (ros2-base),build of ros2-base,Figure 2
+S_img_carrier,GB,25.05,,1,mutable carrier image (ros2-overlay-pack),build of ros2-overlay-pack,Figure 2
+S_img_total,GB,27.54,,1,base + carrier,packaging,Figure 2
+OTA_payload_carrier_full,GB,25.05,,1,recurring update without layered opt,packaging,Figure 2
+OTA_payload_layer_llava,GB,14.00,,1,recurring update with layered opt - LLaVA weight swap,packaging,Figure 2 / Section V-A
+OTA_payload_layer_yolo,GB,0.05,,1,recurring update with layered opt - YOLOv8-nano weight swap,packaging,Figure 2 / Section V-A

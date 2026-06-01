@@ -19,7 +19,8 @@ Jetson AGX Orin edge node with two amd64 cloud nodes.
 
 ```
 .
-├── Models/                          # source code of the five container images
+├── Models/                          # source code of the container images
+│   ├── ros2_base/                   #   minimal ROS 2 + CUDA L4T base image
 │   ├── ros2_cam_ws/                 #   camera driver
 │   ├── ros2_yolo_ws/                #   YOLOv8-nano detector (GPU)
 │   ├── ros2_llava_ws/               #   LLaVA-1.5-7B vision–language (GPU)
@@ -27,27 +28,46 @@ Jetson AGX Orin edge node with two amd64 cloud nodes.
 │   ├── ros2_monolithic_ws/          #   monolithic carrier (4 nodes in one image)
 │   ├── ros2_overlay_pack/           #   overlay-canonical carrier (deps + models)
 │   ├── ros2_component_host/         #   dynamic-loader host (component_container)
-│   ├── ros2_base/                   #   minimal ROS 2 + CUDA L4T base image
 │   ├── ros2_dashboard/              #   web control panel (rosbridge + nginx)
 │   ├── cusparselt_stub.c            #   stub for libcusparseLt.so.0 on Jetson
 │   └── patch_torchvision_jetson.py  #   torchvision NMS / Triton patches
 │
-├── Patterns/                        # the four Helm charts (chart versions 1.0.0)
+├── Patterns/                        # the four Helm charts (chart version 1.0.0)
 │   ├── monolithic/
 │   ├── microservices/
 │   ├── dynamic-canonical/
 │   └── overlay-canonical/
 │
-├── scripts/benchmark/               # automated measurement campaign
-│   ├── run_n_campaigns.sh           #   wrapper: N warm + M cold-cold replicas
-│   ├── run_full_campaign.sh         #     core campaign (4 patterns in series)
-│   ├── sample_dashboard_metrics.py  #     rosbridge sampler (runtime metrics)
-│   ├── llava_trigger_driver.py      #     deterministic /llava/trigger publisher
-│   ├── fix_comparison_csv.sh        #     post-hoc cleaner of comparison.csv
-│   ├── aggregate_meta_campaign.sh   #     mean/stdev/min/max per pattern × regime
-│   └── measure_overlay_incremental_warm.sh
+├── scripts/
+│   ├── benchmark/                   # automated measurement campaign
+│   │   ├── run_n_campaigns.sh             # wrapper: N warm + M cold-cold replicas
+│   │   ├── run_full_campaign.sh           #   core campaign (4 patterns in series)
+│   │   ├── capture_pattern_run.sh         #     per-pattern install + sample driver
+│   │   ├── sample_dashboard_metrics.py    #     rosbridge sampler (runtime metrics)
+│   │   ├── llava_trigger_driver.py        #     deterministic /llava/trigger publisher
+│   │   ├── trigger_test.py                #     quick-check of the trigger pipeline
+│   │   ├── ros_latency_probe.py           #     end-to-end latency probe
+│   │   ├── collect_metrics.sh             #     post-cycle metric collector
+│   │   ├── fix_comparison_csv.sh          #     post-hoc cleaner of comparison.csv
+│   │   ├── aggregate_meta_campaign.sh     #     mean ± std per pattern × regime
+│   │   ├── capture_dynamic_load_unload.sh #     per-module hot-swap timing
+│   │   ├── measure_overlay_once.sh        #     single overlay install (manual)
+│   │   └── measure_overlay_incremental_warm.sh
+│   ├── prepare_release.sh           # Zenodo / GitHub release cleanup (dry-run by default)
+│   └── publish_charts.sh            # push the four Helm charts to the OCI registry
+│
+├── results/                         # raw measurement data per cycle
+│   ├── _campaigns/                            #   raw rosbridge samples per cycle
+│   │   └── <TS>/<pattern>/                    #     one folder per cycle × pattern
+│   ├── overlay_incremental_warm/
+│   │   └── 20260527-122308/measurements.csv   # 5-cycle rollout-restart, 73.6 ± 0.5 s
+│   └── dynamic-canonical/load-unload/
+│       └── load_unload_per_module.csv         # per-module hot-swap latencies (Table 5)
 │
 ├── dashboard/                       # standalone HTML dashboard (rosbridge UI)
+│   └── index.html
+│
+├── README.md                        # this file
 ├── LICENSE                          # Apache 2.0
 └── CITATION.cff                     # citation metadata for Zenodo / GitHub
 ```
@@ -128,9 +148,9 @@ preferred citation key for the dataset.
 ## Authors
 
 Miguel Ángel Mateo-Casalí ([ORCID](https://orcid.org/0000-0001-5086-9378)),
+Daniel González El Yachouti ([ORCID](https://orcid.org/0009-0005-5163-0509)),
 Francisco Fraile ([ORCID](https://orcid.org/0000-0003-0852-8953)),
-Andrés Boza ([ORCID](https://orcid.org/0000-0002-5429-0416)),
-Daniel González El Yachouti ([ORCID](https://orcid.org/0009-0005-5163-0509))
+Andrés Boza ([ORCID](https://orcid.org/0000-0002-5429-0416))
 — Centro de Investigación en Gestión e Ingeniería de Producción
 (CIGIP), Universitat Politècnica de València, Spain.
 

@@ -1,0 +1,13 @@
+metric,unit,mean,std,n,regime,source,table_or_figure_in_paper
+T_install,s,104.5,1.0,4,warm (trimmed; 1 outlier excluded due to containerd cache eviction),mega-campaign 20260526-065922,Figure 3 / Table 4
+T_install,s,649.0,6.1,3,cold-cold,mega-campaign 20260526-065922,Figure 3 / Table 4
+T_inf,ms,28.59,0.63,5,warm steady state,mega-campaign 20260526-065922,Figure 4 / Table 3
+f_FPS,fps,20.64,0.59,5,warm steady state,mega-campaign 20260526-065922,Figure 4 / Table 3
+T_e2e,ms,79.87,1.07,5,warm steady state,mega-campaign 20260526-065922,Figure 4 / Table 3
+J_inf,ms,3.87,0.22,5,warm steady state,mega-campaign 20260526-065922,Figure 4 / Table 3
+U_CPU,%,35.99,0.24,5,warm steady state,mega-campaign 20260526-065922,Figure 4 / Table 3
+U_GPU,%,77.80,3.77,5,warm steady state,mega-campaign 20260526-065922,Figure 4 / Table 3
+U_RAM,%,50.87,0.35,5,warm steady state,mega-campaign 20260526-065922,Figure 4 / Table 3
+S_img,GB,47.25,,1,packaging (sum of 5 service images),build of ros2 microservices,Figure 2
+OTA_payload_min,GB,5.00,,1,recurring update (camera service only),packaging,Figure 2
+OTA_payload_max,GB,19.00,,1,recurring update (Voxtral service - worst case),packaging,Figure 2

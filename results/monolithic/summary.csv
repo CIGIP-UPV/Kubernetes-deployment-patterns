@@ -1,0 +1,12 @@
+metric,unit,mean,std,n,regime,source,table_or_figure_in_paper
+T_install,s,69.0,3.0,4,warm (trimmed; 1 outlier excluded due to containerd cache eviction),mega-campaign 20260526-065922,Figure 3 / Table 4
+T_install,s,538.7,9.8,3,cold-cold,mega-campaign 20260526-065922,Figure 3 / Table 4
+T_inf,ms,28.68,0.11,5,warm steady state,mega-campaign 20260526-065922,Figure 4 / Table 3
+f_FPS,fps,20.40,0.08,5,warm steady state,mega-campaign 20260526-065922,Figure 4 / Table 3
+T_e2e,ms,60.45,0.59,5,warm steady state,mega-campaign 20260526-065922,Figure 4 / Table 3
+J_inf,ms,3.78,0.10,5,warm steady state,mega-campaign 20260526-065922,Figure 4 / Table 3
+U_CPU,%,36.30,0.26,5,warm steady state,mega-campaign 20260526-065922,Figure 4 / Table 3
+U_GPU,%,75.16,1.09,5,warm steady state,mega-campaign 20260526-065922,Figure 4 / Table 3
+U_RAM,%,31.48,0.35,5,warm steady state,mega-campaign 20260526-065922,Figure 4 / Table 3
+S_img,GB,30.01,,1,packaging,build of ros2-monolithic image,Figure 2
+OTA_payload,GB,30.00,,1,recurring update,packaging,Figure 2
