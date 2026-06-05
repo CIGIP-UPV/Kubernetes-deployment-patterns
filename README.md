@@ -27,7 +27,7 @@ Jetson AGX Orin edge node with two amd64 cloud nodes.
 │   ├── ros2_llava_ws/               #   LLaVA-1.5-7B vision–language (GPU)
 │   ├── ros2_voxtral_ws/             #   Voxtral-Mini-3B voice interaction
 │   ├── ros2_monolithic_ws/          #   monolithic carrier (4 nodes in one image)
-│   ├── ros2_overlay_pack/           #   overlay carrier (deps + models)
+│   ├── ros2_overlay_pack/           #   overlay-canonical carrier (deps + models)
 │   ├── ros2_component_host/         #   dynamic-loader host (component_container)
 │   ├── ros2_dashboard/              #   web control panel (rosbridge + nginx)
 │   ├── cusparselt_stub.c            #   stub for libcusparseLt.so.0 on Jetson
@@ -36,8 +36,8 @@ Jetson AGX Orin edge node with two amd64 cloud nodes.
 ├── Patterns/                        # the four Helm charts (chart version 1.0.0)
 │   ├── monolithic/
 │   ├── microservices/
-│   ├── dynamic-loader/
-│   └── overlay/
+│   ├── dynamic-canonical/
+│   └── overlay-canonical/
 │
 ├── scripts/
 │   ├── benchmark/                   # automated measurement campaign
@@ -55,13 +55,15 @@ Jetson AGX Orin edge node with two amd64 cloud nodes.
 │   │   ├── measure_overlay_once.sh        #     single overlay install (manual)
 │   │   └── measure_overlay_incremental_warm.sh
 │   ├── prepare_release.sh           # Zenodo / GitHub release cleanup (dry-run by default)
-│   └── publish_charts.sh            # publish the four Helm charts to the GitHub Pages Helm repo
+│   └── publish_charts.sh            # push the four Helm charts to the OCI registry
 │
 ├── results/                         # raw measurement data per cycle
 │   ├── _campaigns/                            #   raw rosbridge samples per cycle
 │   │   └── <TS>/<pattern>/                    #     one folder per cycle × pattern
-│   └── dynamic-loader/load-unload/
-│       └── load_unload_per_module.csv         # per-module hot-swap latencies (Section V-E)
+│   ├── overlay_incremental_warm/
+│   │   └── 20260527-122308/measurements.csv   # 5-cycle rollout-restart, 73.6 ± 0.5 s
+│   └── dynamic-canonical/load-unload/
+│       └── load_unload_per_module.csv         # per-module hot-swap latencies (Table 5)
 │
 ├── dashboard/                       # standalone HTML dashboard (rosbridge UI)
 │   └── index.html
@@ -77,13 +79,13 @@ Jetson AGX Orin edge node with two amd64 cloud nodes.
 |------------------------|---------------------------------------------------------------------------------------------|-----------------|---------------|
 | **Monolithic**         | Single 30 GB image bundling ROS 2 runtime, all four AI nodes and Python deps.               | 30.01 GB        | 30 GB         |
 | **Microservices**      | Five separate images, one pod per service, communicate via CycloneDDS.                      | 47.25 GB        | 5–19 GB       |
-| **Dynamic loading**    | One `component_container_isolated` host that loads the four nodes as plugins on demand.     | 29.77 GB        | 30 GB         |
-| **Overlay workspaces** | Immutable 2.24 GB base + 25.05 GB mutable carrier extracted on edge from a cloud-side server. | 27.54 GB        | 25.05 GB      |
+| **Dynamic loading**    | One `component_container_isolated` host that loads the four nodes as plugins on demand.     | 30.02 GB        | 30 GB         |
+| **Overlay workspaces** | Immutable 2.24 GB base + 25 GB mutable carrier extracted on edge from a cloud-side server.  | 27.54 GB        | 25 GB         |
 
 ## How to reproduce the campaign
 
-1. Provision a K3s cluster matching the topology described in Section
-   IV-B (one Jetson AGX Orin edge node, two amd64 cloud nodes).
+1. Provision a K3s cluster matching the topology in Table 1 (one Jetson
+   AGX Orin edge node, two amd64 cloud nodes).
 2. Set up SSH and passwordless `sudo k3s` between the control-plane
    node and the three cluster nodes (needed for the cold-cold image
    purge between cycles).
@@ -95,7 +97,7 @@ Jetson AGX Orin edge node with two amd64 cloud nodes.
 5. Run the multi-replicate campaign:
 
    ```bash
-   PATTERNS="monolithic microservices overlay dynamic-loader" \
+   PATTERNS="monolithic microservices overlay-canonical dynamic-canonical" \
      N_WARM=5 N_COLD=3 \
      nohup bash scripts/benchmark/run_n_campaigns.sh > mega.log 2>&1 &
    ```
@@ -125,13 +127,13 @@ Toolkit support.
 
 ## Workload
 
-- **YOLOv8-nano** for real-time object detection.
+- **YOLOv8-nano** for real-time garment detection.
 - **LLaVA-1.5-7B** in FP16 for vision–language reasoning, triggered
   every 30 s during the warm-up and sampling windows via a
   deterministic external publisher (see
   `scripts/benchmark/llava_trigger_driver.py`).
-- **Voxtral-Mini-3B** for voice interaction (loaded in memory; in this
-  campaign it is not driving a live audio device).
+- **Voxtral-Mini-3B** for voice interaction (Phase 1 in this paper:
+  loaded in memory, not actively driving an audio device).
 
 The four deployment patterns receive identical workloads and identical
 ROS 2 application code; they differ only in how the four nodes are
@@ -141,16 +143,16 @@ packaged and started.
 
 Please cite both the article and this repository. The repository's
 `CITATION.cff` is set up so that GitHub and Zenodo render the citation
-metadata automatically. The archived artifact is citable via its Zenodo
-DOI: [10.5281/zenodo.20492495](https://doi.org/10.5281/zenodo.20492495).
+metadata automatically; the Zenodo DOI generated upon archival is the
+preferred citation key for the dataset.
 
 ## Authors
 
 Miguel Ángel Mateo-Casalí ([ORCID](https://orcid.org/0000-0001-5086-9378)),
 Daniel González El Yachouti ([ORCID](https://orcid.org/0009-0005-5163-0509)),
-Andrés Boza ([ORCID](https://orcid.org/0000-0002-5429-0416)),
-Francisco Fraile ([ORCID](https://orcid.org/0000-0003-0852-8953))
-— Research Centre for Production Management and Engineering
+Francisco Fraile ([ORCID](https://orcid.org/0000-0003-0852-8953)),
+Andrés Boza ([ORCID](https://orcid.org/0000-0002-5429-0416))
+— Centro de Investigación en Gestión e Ingeniería de Producción
 (CIGIP), Universitat Politècnica de València, Spain.
 
 Corresponding author: **mmateo@cigip.upv.es**.
