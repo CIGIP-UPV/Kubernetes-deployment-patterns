@@ -1,5 +1,34 @@
 apiVersion: v1
 entries:
+  dynamic-loader:
+  - annotations:
+      catalog.cattle.io/timeout: 30m
+    apiVersion: v2
+    appVersion: humble
+    created: "2026-06-05T12:15:29.114132623Z"
+    description: 'Dynamic Module Loading pattern for ROS 2 robotics on Kubernetes.  Realizes
+      the ROS 2 dynamic composition theory:   - A long-lived component_container_isolated
+      process exposes     LoadNode / UnloadNode services.   - Plugins (camera, yolo,
+      llava, voxtral) are registered via     `rclpy_components` entry_points and loaded
+      INTO the container''s     process on demand — true intra-process composition,
+      not subprocess     spawning.   - A FastAPI orchestrator container (sibling in
+      the same pod) calls     those services via HTTP API, exposing /load, /unload,
+      /list to     the dashboard.  This realisation uses true intra-process composition
+      through rclpy_components and the standard ROS 2 LoadNode / UnloadNode service
+      contract, instead of spawning a subprocess per loaded module. '
+    digest: 77b288bc5a934fd973b3ec82f86a5b835a620c55b69ca7a06bf1d4c1881ace8c
+    keywords:
+    - ros2
+    - dynamic-composition
+    - rclpy-components
+    maintainers:
+    - email: mmateo@cigip.upv.es
+      name: Miguel-Angel-Mateo-Casali
+    name: dynamic-loader
+    type: application
+    urls:
+    - https://cigip-upv.github.io/Kubernetes-deployment-patterns/charts/dynamic-loader-1.0.0.tgz
+    version: 1.0.0
   ros2-dynamic-canonical:
   - annotations:
       catalog.cattle.io/timeout: 30m
@@ -33,10 +62,10 @@ entries:
   ros2-microservices:
   - apiVersion: v2
     appVersion: humble
-    created: "2026-05-27T11:07:39.303004438Z"
+    created: "2026-06-05T12:15:29.115292954Z"
     description: Microservices ROS 2 pattern with decoupled camera, YOLO, LLaVA, and
       Voxtral services
-    digest: 53a11cbe9f134cb528c2e4c8011a612e933fc2bb7bd2aee6e9ee5430a7af69f0
+    digest: 6878132e6733a3fe8d8a4f8899b4bb5887f1ee7601e0cda46bbf6e4f3431ae19
     keywords:
     - ros2
     - microservices
@@ -52,10 +81,10 @@ entries:
   ros2-monolithic:
   - apiVersion: v2
     appVersion: humble
-    created: "2026-05-27T11:07:39.303970354Z"
+    created: "2026-06-05T12:15:29.116258181Z"
     description: Monolithic ROS 2 pattern with camera + YOLO + LLaVA + Voxtral in
       a single runtime container
-    digest: bd3e4acaef92babe7df8fa5a4b34b29466a3f1f7680967d23ce7adfa60349a5e
+    digest: 4c47d04b6567c8dffff5fd24017fb01c061332985c655e22e7d35397de8e5381
     keywords:
     - ros2
     - monolithic
@@ -67,6 +96,35 @@ entries:
     type: application
     urls:
     - https://cigip-upv.github.io/Kubernetes-deployment-patterns/charts/ros2-monolithic-1.0.0.tgz
+    version: 1.0.0
+  ros2-overlay:
+  - annotations:
+      catalog.cattle.io/timeout: 45m
+    apiVersion: v2
+    appVersion: humble
+    created: "2026-06-05T12:15:29.117607717Z"
+    description: 'Overlay Workspaces pattern for ROS 2 robotics on Kubernetes.  Realizes
+      the OTA cloud-edge delivery model from the paper:   - ros2-base (immutable platform:
+      ROS 2 + camera driver + CUDA)   - ros2-overlay-pack (mutable AI layer: ML stack
+      + nodes + models)     delivered as an OCI carrier image, extracted by a Helm
+      pre-install Job     to a PVC on the cloud node, and synced via HTTP from an
+      nginx sidecar     to the edge node''s runtime pod via initContainer.  This realisation
+      strictly separates immutable base from mutable overlay so that AI updates only
+      re-publish the overlay-pack carrier (~25 GB), keeping the ROS 2 base image (~2.2
+      GB) intact across releases. '
+    digest: 1885c24c145f77248346b71d5728177835f95ce4f0f24f608c5ee6683ad74f62
+    keywords:
+    - ros2
+    - overlay
+    - cloud-edge
+    - ota
+    maintainers:
+    - email: mmateo@cigip.upv.es
+      name: Miguel-Angel-Mateo-Casali
+    name: ros2-overlay
+    type: application
+    urls:
+    - https://cigip-upv.github.io/Kubernetes-deployment-patterns/charts/ros2-overlay-1.0.0.tgz
     version: 1.0.0
   ros2-overlay-canonical:
   - annotations:
@@ -98,4 +156,4 @@ entries:
     urls:
     - https://cigip-upv.github.io/Kubernetes-deployment-patterns/charts/ros2-overlay-canonical-1.0.0.tgz
     version: 1.0.0
-generated: "2026-05-27T11:07:39.300592217Z"
+generated: "2026-06-05T12:15:29.112969535Z"
