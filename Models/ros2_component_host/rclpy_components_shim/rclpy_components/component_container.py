@@ -250,7 +250,7 @@ def main(argv=None):
 
     rclpy.init(args=argv)
 
-    # Allow the canonical -r __node:= override from ROS args.
+    # Allow the -r __node:= override from ROS args.
     container_name = known.name
     # rclpy.init already strips --ros-args; but the remap of __node is
     # already applied to the NEW Node when it's instantiated with the

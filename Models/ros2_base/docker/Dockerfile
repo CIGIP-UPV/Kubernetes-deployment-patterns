@@ -1,5 +1,5 @@
 # =============================================================================
-#  ros2-base — Canonical Overlay Pattern Base Image
+#  ros2-base — Overlay Pattern Base Image
 #  ROS 2 Humble | Camera driver | CUDA hardware abstraction (Jetson L4T)
 #
 #  Per the Overlay Workspaces theory ("the base layer can be a proven read-only
@@ -22,7 +22,7 @@
 #
 #  Consumed by:
 #    1) ros2-overlay-pack (FROM ros2-base, adds ML stack + AI nodes + models)
-#    2) Patterns/overlay-canonical StatefulSet (uses this image directly,
+#    2) Patterns/overlay StatefulSet (uses this image directly,
 #       mounts the overlay artifacts at /opt/overlay via emptyDir)
 # =============================================================================
 ARG ROS_DISTRO=humble
@@ -145,8 +145,8 @@ RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
     colcon build --symlink-install --packages-select camera_driver_pkg
 
 # ── Resource monitor (CPU/RAM/GPU/I/O/Power telemetry for the dashboard) ─────
-# Standalone script — both canonical patterns (overlay-canonical runtime and
-# dynamic-canonical component-host) launch it as a background process. It
+# Standalone script — both patterns (overlay runtime and
+# dynamic-loader component-host) launch it as a background process. It
 # publishes /node/cpu_percent, /node/memory_percent, /node/gpu_percent,
 # /node/io_read_mbs, /node/io_write_mbs, and /node/power_mw (Jetson tegrastats).
 # Same script as the one in ros2-monolithic / ros2-yolo / ros2-llava / ros2-voxtral.
@@ -164,6 +164,6 @@ RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /etc/bash.bashrc && \
 # This image is consumed in two ways:
 #   1) `FROM ros2-base` in ros2-overlay-pack: the overlay-pack defines its own
 #      entrypoint (which is just `cp` for the carrier role, see Dockerfile).
-#   2) Direct use by the StatefulSet of overlay-canonical: the Helm chart
+#   2) Direct use by the StatefulSet of overlay: the Helm chart
 #      provides command + args that source base+overlay setup.bash and launch
 #      the four ROS 2 nodes in background.

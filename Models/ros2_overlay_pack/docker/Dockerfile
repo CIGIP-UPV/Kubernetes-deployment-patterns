@@ -1,5 +1,5 @@
 # =============================================================================
-#  ros2-overlay-pack — OCI carrier image for the canonical Overlay Pattern
+#  ros2-overlay-pack — OCI carrier image for the Overlay Pattern
 #
 #  Per the Overlay Workspaces theory of the paper, this image contains the
 #  MUTABLE overlay layer: AI nodes + ML runtime + model weights. It is the
@@ -21,7 +21,7 @@
 #    /opt/overlay/huggingface_cache/   ← LLaVA + Voxtral model weights
 #    /opt/overlay/models/yolov8n.pt    ← YOLOv8 weights
 #
-#  At runtime (StatefulSet of overlay-canonical):
+#  At runtime (StatefulSet of overlay):
 #    export PYTHONPATH=/opt/overlay/python-deps:${PYTHONPATH}
 #    source /opt/ros/humble/setup.bash
 #    source /opt/base_ws/install/setup.bash
@@ -297,7 +297,7 @@ RUN echo "[build] Overlay artifact summary:" && \
 #   ["sh", "-c", "cp -av /opt/overlay/. /pvc/overlay/$VERSION/"]
 FROM busybox:1.36
 
-LABEL purpose="OCI carrier — overlay artifacts for ROS 2 canonical Overlay pattern"
+LABEL purpose="OCI carrier — overlay artifacts for ROS 2 Overlay pattern"
 LABEL not-runnable-as-service="true"
 
 COPY --from=builder /opt/overlay /opt/overlay

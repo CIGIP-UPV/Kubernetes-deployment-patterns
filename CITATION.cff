@@ -10,20 +10,20 @@ authors:
   - family-names: "Mateo-Casalí"
     given-names: "Miguel Ángel"
     email: mmateo@cigip.upv.es
-    affiliation: "Centro de Investigación en Gestión e Ingeniería de Producción (CIGIP), Universitat Politècnica de València"
+    affiliation: "Research Centre for Production Management and Engineering (CIGIP), Universitat Politècnica de València"
     orcid: "https://orcid.org/0000-0001-5086-9378"
   - family-names: "González El Yachouti"
     given-names: "Daniel"
-    affiliation: "Centro de Investigación en Gestión e Ingeniería de Producción (CIGIP), Universitat Politècnica de València"
+    affiliation: "Research Centre for Production Management and Engineering (CIGIP), Universitat Politècnica de València"
     orcid: "https://orcid.org/0009-0005-5163-0509"
-  - family-names: "Fraile"
-    given-names: "Francisco"
-    affiliation: "Centro de Investigación en Gestión e Ingeniería de Producción (CIGIP), Universitat Politècnica de València"
-    orcid: "https://orcid.org/0000-0003-0852-8953"
   - family-names: "Boza"
     given-names: "Andrés"
-    affiliation: "Centro de Investigación en Gestión e Ingeniería de Producción (CIGIP), Universitat Politècnica de València"
+    affiliation: "Research Centre for Production Management and Engineering (CIGIP), Universitat Politècnica de València"
     orcid: "https://orcid.org/0000-0002-5429-0416"
+  - family-names: "Fraile"
+    given-names: "Francisco"
+    affiliation: "Research Centre for Production Management and Engineering (CIGIP), Universitat Politècnica de València"
+    orcid: "https://orcid.org/0000-0003-0852-8953"
 repository-code: "https://github.com/CIGIP-UPV/Kubernetes-deployment-patterns"
 url: "https://github.com/CIGIP-UPV/Kubernetes-deployment-patterns"
 abstract: >-
@@ -50,6 +50,7 @@ keywords:
 license: Apache-2.0
 version: 1.0.0
 date-released: "2026-05-27"
+doi: "10.5281/zenodo.20492495"
 preferred-citation:
   type: article
   title: >-
@@ -62,12 +63,12 @@ preferred-citation:
     - family-names: "González El Yachouti"
       given-names: "Daniel"
       orcid: "https://orcid.org/0009-0005-5163-0509"
-    - family-names: "Fraile"
-      given-names: "Francisco"
-      orcid: "https://orcid.org/0000-0003-0852-8953"
     - family-names: "Boza"
       given-names: "Andrés"
       orcid: "https://orcid.org/0000-0002-5429-0416"
+    - family-names: "Fraile"
+      given-names: "Francisco"
+      orcid: "https://orcid.org/0000-0003-0852-8953"
   journal: IEEE Access
   year: 2026
   doi: ""

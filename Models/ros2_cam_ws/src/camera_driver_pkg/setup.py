@@ -18,12 +18,12 @@ setup(
     license='Apache-2.0',
     entry_points={
         # Standalone use: `ros2 run camera_driver_pkg camera_driver`
-        # Used by monolithic, microservices, overlay-canonical patterns.
+        # Used by monolithic, microservices, overlay patterns.
         'console_scripts': [
             'camera_driver = camera_driver_pkg.driver:main',
         ],
         # Component composition: loaded by rclpy_components container at runtime.
-        # Used by dynamic-canonical pattern. Same class, different invocation.
+        # Used by dynamic-loader pattern. Same class, different invocation.
         'rclpy_components': [
             'camera_driver_pkg::CameraDriver = camera_driver_pkg.driver:CameraDriver',
         ],

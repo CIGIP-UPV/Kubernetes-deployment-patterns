@@ -46,16 +46,16 @@ jobs:
           # Four deployment patterns analysed in the IEEE Access submission
           helm lint Patterns/monolithic/helm
           helm lint Patterns/microservices/helm/ros2-microservices
-          helm lint Patterns/overlay-canonical/helm/ros2-overlay-canonical
-          helm lint Patterns/dynamic-canonical/helm/ros2-dynamic-canonical
+          helm lint Patterns/overlay/helm/ros2-overlay
+          helm lint Patterns/dynamic-loader/helm/dynamic-loader
 
       - name: Package charts
         run: |
           mkdir -p dist/charts
           helm package Patterns/monolithic/helm -d dist/charts
           helm package Patterns/microservices/helm/ros2-microservices -d dist/charts
-          helm package Patterns/overlay-canonical/helm/ros2-overlay-canonical -d dist/charts
-          helm package Patterns/dynamic-canonical/helm/ros2-dynamic-canonical -d dist/charts
+          helm package Patterns/overlay/helm/ros2-overlay -d dist/charts
+          helm package Patterns/dynamic-loader/helm/dynamic-loader -d dist/charts
 
       - name: Checkout gh-pages (merge existing index)
         run: |

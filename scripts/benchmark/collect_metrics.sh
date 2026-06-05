@@ -45,7 +45,7 @@ T_READY="${4:-}"
 
 if [ -z "${PATTERN}" ]; then
   echo "Usage: $0 <pattern> [release] [namespace] [t_ready_sec]"
-  echo "Patterns: monolithic | microservices | overlay-canonical | dynamic-canonical"
+  echo "Patterns: monolithic | microservices | overlay | dynamic-loader"
   exit 1
 fi
 
@@ -65,10 +65,10 @@ case "${PATTERN}" in
   microservices)
     IMAGES=("ros2-camera" "ros2-yolo" "ros2-llava" "ros2-voxtral" "ros2-dashboard")
     ;;
-  overlay-canonical)
+  overlay)
     IMAGES=("ros2-base" "ros2-overlay-pack" "ros2-dashboard")
     ;;
-  dynamic-canonical)
+  dynamic-loader)
     IMAGES=("ros2-component-host" "ros2-dashboard")
     ;;
   *)
@@ -189,8 +189,8 @@ if command -v git >/dev/null 2>&1 && [ -d "${PROJECT_ROOT}/.git" ]; then
     case "${PATTERN}" in
       monolithic)        chart_dir="Patterns/monolithic/helm" ;;
       microservices)     chart_dir="Patterns/microservices/helm/ros2-microservices" ;;
-      overlay-canonical) chart_dir="Patterns/overlay-canonical/helm/ros2-overlay-canonical" ;;
-      dynamic-canonical) chart_dir="Patterns/dynamic-canonical/helm/ros2-dynamic-canonical" ;;
+      overlay) chart_dir="Patterns/overlay/helm/ros2-overlay" ;;
+      dynamic-loader) chart_dir="Patterns/dynamic-loader/helm/dynamic-loader" ;;
     esac
     diff_stat=$(git diff --stat "${last_tag}" -- "${chart_dir}" 2>/dev/null | tail -1 || echo "")
     if [ -n "${diff_stat}" ]; then

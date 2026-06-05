@@ -51,7 +51,7 @@ fi
 
 echo "pattern,t_zero,t_fin,t_install_e2e_s,t_ready_system_s,s_img_total_gb,t_inf_avg_ms,f_fps_pub,t_e2e_avg_ms,j_inf_ms,u_cpu_avg_pct,u_gpu_avg_pct,u_ram_avg_pct,run_dir,status,notes" > "${OUT}"
 
-for pattern in monolithic microservices overlay-canonical dynamic-canonical; do
+for pattern in monolithic microservices overlay dynamic-loader; do
   PDIR="${CAMPAIGN_DIR}/${pattern}"
   [ -d "${PDIR}" ] || continue
 

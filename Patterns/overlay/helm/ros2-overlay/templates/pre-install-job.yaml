@@ -1,0 +1,191 @@
+{{- /*
+overlay-installer Job — produces a tarball of the overlay artifacts in the
+overlay-source PVC, ready to be served by the nginx sidecar over HTTP.
+
+EXECUTION FLOW:
+  1. Helm install begins.
+  2. pre-install hooks run, sorted by hook-weight ASCENDING:
+       weight=-1  → overlay-source PVC is created (Pending until consumer)
+       weight=0   → THIS Job is created
+  3. Job pod schedules on kb2 (nodeSelector). local-path-provisioner sees
+     the consumer, creates the underlying volume on kb2's filesystem, BINDS
+     the PVC.
+  4. Job pod's container starts:
+        image: ros2-overlay-pack (busybox carrier with /opt/overlay/)
+        command: tar -cf /pvc/overlay/{version}.tar -C /opt/overlay .
+  5. Job exits successfully → hook-delete-policy cleans the Job pod.
+  6. Helm proceeds with regular templates: nginx, StatefulSet, etc.
+
+WHY TARBALL (instead of plain `cp -av` to a directory):
+  HuggingFace's snapshot_download cache uses RELATIVE SYMLINKS
+  (snapshots/HASH/X → ../../blobs/Y). nginx with default config follows
+  symlinks at HTTP serve time, returning the target's content. An edge
+  initContainer using `wget -r` would download the same blob TWICE
+  (once via snapshots/, once via blobs/), inflating the 17 GB overlay to
+  ~30 GB on edge. A tarball preserves the symlinks faithfully — a single
+  HTTP GET, atomic delivery, no duplication.
+
+ATOMICITY:
+  The tarball is created with a .tmp suffix and renamed only when complete.
+  An nginx-served partial file would never be visible to the runtime pod.
+
+IDEMPOTENCY:
+  If /pvc/overlay/{version}.tar already exists, the Job exits early.
+  Re-runs on `helm upgrade` with the same Chart.Version are no-ops.
+
+ROLLBACK:
+  When Chart.Version changes (1.0.0 → 1.1.0), a new tarball
+  /pvc/overlay/1.1.0.tar is created alongside the existing 1.0.0.tar.
+  `helm rollback` switches the StatefulSet to point at the previous
+  tarball, which is still in the PVC — no re-download needed.
+
+  Caveat: PVC must be sized for as many simultaneous versions as you
+  want for rollback. With overlay ~17 GB and PVC at 30 GB (default),
+  one simultaneous version is comfortable; for two-version coexistence
+  bump overlaySource.size in values.yaml to ≥ 40 GB.
+
+NODE PINNING:
+  nodeSelector: kubernetes.io/hostname: <cloud node>. This is REQUIRED
+  because local-path-provisioner uses WaitForFirstConsumer mode — the PVC
+  binds to whichever node first consumes it. If this Job ran on the wrong
+  node, the PVC would land there, and the nginx server (also nodeSelector
+  cloud) couldn't access the same PVC.
+*/}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "ros2-overlay.fullname" . }}-overlay-installer
+  labels:
+    {{- include "ros2-overlay.labels" . | nindent 4 }}
+    component: overlay-installer
+  {{- if not .Values.overlay.pipeline }}
+  annotations:
+    "helm.sh/hook": "pre-install,pre-upgrade"
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
+  {{- else }}
+  # overlay.pipeline=true: Job is a regular resource so it runs in parallel
+  # with the runtime StatefulSet (the init container polls the overlay-server
+  # for each layer tarball, overlapping tarball assembly with edge download).
+  {{- end }}
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: {{ .Values.preInstallJob.ttlSecondsAfterFinished | default 300 }}
+  template:
+    metadata:
+      labels:
+        {{- include "ros2-overlay.labels" . | nindent 8 }}
+        component: overlay-installer
+    spec:
+      restartPolicy: OnFailure
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.nodes.cloud.name }}
+      {{- if .Values.imagePullSecretName }}
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecretName }}
+      {{- end }}
+      containers:
+        - name: overlay-installer
+          image: "{{ .Values.images.overlayPack.repository }}:{{ .Values.images.overlayPack.tag }}"
+          imagePullPolicy: {{ .Values.images.overlayPack.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              VERSION={{ include "ros2-overlay.overlayVersion" . | quote }}
+              SOURCE=/opt/overlay
+              echo "[installer] Carrier version: ${VERSION}"
+              echo "[installer] Source content:"
+              ls -la ${SOURCE}/
+
+              # Helper: build a single tarball for a named layer with the given
+              # space-separated path list (relative to ${SOURCE}). Idempotent:
+              # if /pvc/${VERSION}-${name}.tar already exists, the function
+              # returns early. Atomic: writes to .tmp, then mv.
+              build_layer() {
+                local name=$1
+                local paths=$2
+                local target=/pvc/${VERSION}-${name}.tar
+                local target_tmp=/pvc/${VERSION}-${name}.tar.tmp
+                if [ -f "${target}" ]; then
+                  echo "[installer] Layer ${name}: ${target} already exists, skipping"
+                  ls -lh "${target}"
+                  return 0
+                fi
+                # Filter to paths that actually exist in the carrier filesystem
+                # (some layers may legitimately omit files the carrier doesn't ship).
+                local actual=""
+                for p in ${paths}; do
+                  if [ -e "${SOURCE}/${p}" ]; then
+                    actual="${actual} ${p}"
+                  else
+                    echo "[installer] Layer ${name}: path '${p}' not found, omitting"
+                  fi
+                done
+                if [ -z "${actual}" ]; then
+                  echo "[installer] Layer ${name}: no paths to package, skipping"
+                  return 0
+                fi
+                echo "[installer] Layer ${name}: building tarball with paths:${actual}"
+                tar -cf "${target_tmp}" -C ${SOURCE} ${actual}
+                mv "${target_tmp}" "${target}"
+                echo "[installer] Layer ${name}: done ($(du -sh ${target} | awk '{print $1}'))"
+              }
+
+              {{- if .Values.overlay.layered }}
+              # ── Layered mode ───────────────────────────────────────────────
+              # Build one tarball per layer (defined in values.yaml). When
+              # overlay.pipeline=true (no Helm hook), the runtime init container
+              # polls for each layer in parallel with this Job, so layers
+              # served first start being downloaded by the edge while the
+              # remaining ones are still being packaged.
+              {{- range .Values.overlay.layers }}
+              build_layer "{{ .name }}" "{{ join " " .paths }}"
+              {{- end }}
+              {{- else }}
+              # ── Legacy single-tarball mode ─────────────────────────────────
+              # Tarball at PVC root (NOT in /pvc/overlay/ subdir). Reason:
+              # the nginx server mounts the PVC at /usr/share/nginx/html/overlay/,
+              # so PVC-root tarballs become /overlay/{version}.tar in URLs and
+              # the default nginx index.html stays intact (probes on / return 200).
+              # HuggingFace's snapshot_download cache uses RELATIVE SYMLINKS
+              # (snapshots/HASH/X → ../../blobs/Y). nginx with default config
+              # follows symlinks at HTTP serve time, returning the target's
+              # content. An edge initContainer using `wget -r` would download
+              # the same blob bytes TWICE (once via snapshots/ path, once via
+              # blobs/ path), inflating a 17 GB overlay to ~30 GB on edge. A
+              # tarball preserves symlinks faithfully — a single HTTP GET,
+              # atomic delivery, no duplication.
+              TARGET=/pvc/${VERSION}.tar
+              TARGET_TMP=/pvc/${VERSION}.tar.tmp
+              if [ -f "${TARGET}" ]; then
+                echo "[installer] ${TARGET} already exists, skipping (idempotent re-run)"
+                ls -lh "${TARGET}"
+                exit 0
+              fi
+              echo "[installer] Creating tarball ${TARGET_TMP}..."
+              echo "[installer] (This will take a few minutes for ~17 GB)"
+              tar -cf "${TARGET_TMP}" -C ${SOURCE} .
+              echo "[installer] Tarball created. Renaming atomically..."
+              mv "${TARGET_TMP}" "${TARGET}"
+              echo "[installer] Final tarball:"
+              ls -lh "${TARGET}"
+              {{- end }}
+
+              echo ""
+              echo "[installer] PVC contents:"
+              ls -la /pvc/
+              echo ""
+              echo "[installer] PVC total usage:"
+              du -sh /pvc/
+              echo "[installer] Done."
+          volumeMounts:
+            - name: overlay-source
+              mountPath: /pvc
+          resources:
+            {{- toYaml .Values.preInstallJob.resources | nindent 12 }}
+      volumes:
+        - name: overlay-source
+          persistentVolumeClaim:
+            claimName: {{ include "ros2-overlay.fullname" . }}-{{ .Values.overlaySource.pvcName }}

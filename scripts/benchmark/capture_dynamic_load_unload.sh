@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # =============================================================================
-# capture_dynamic_load_unload.sh — C-7 metric for dynamic-canonical
+# capture_dynamic_load_unload.sh — C-7 metric for dynamic-loader
 # =============================================================================
-# Measures load/unload latency per module for the dynamic-canonical pattern.
+# Measures load/unload latency per module for the dynamic-loader pattern.
 # This is the diferenciador del paper: dynamic supports hot-swap of components
 # (no need to restart the pod), and we want to quantify how fast.
 #
 # Calls the orchestrator FastAPI inside the runtime pod via `kubectl exec`,
 # so it works without exposing the API to the LAN.
 #
-# Output: results/dynamic-canonical/load-unload/
+# Output: results/dynamic-loader/load-unload/
 #   - load_unload_per_module.csv  (one row per module: name, load_s, unload_s)
 #   - summary.md
 #
@@ -18,7 +18,7 @@
 #       [release=dynamic-pattern] [namespace=ros2exp]
 #
 # Pre-requisites:
-#   - dynamic-canonical chart deployed (orchestrator + component-host running)
+#   - dynamic-loader chart deployed (orchestrator + component-host running)
 #   - Bootstrap Job has already loaded `camera` (or load it manually first)
 # =============================================================================
 set -euo pipefail
@@ -27,13 +27,13 @@ RELEASE="${1:-dynamic-pattern}"
 NAMESPACE="${2:-ros2exp}"
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-OUT_DIR="${PROJECT_ROOT}/results/dynamic-canonical/load-unload"
+OUT_DIR="${PROJECT_ROOT}/results/dynamic-loader/load-unload"
 mkdir -p "${OUT_DIR}"
 
 CSV="${OUT_DIR}/load_unload_per_module.csv"
 SUMMARY="${OUT_DIR}/summary.md"
 
-RUNTIME_POD="${RELEASE}-ros2-dynamic-canonical-0"
+RUNTIME_POD="${RELEASE}-0"
 ORCH_URL="http://localhost:5000"
 
 # Find the orchestrator container by name (it's a sidecar in the runtime pod).
@@ -50,7 +50,7 @@ declare -A MODULE_PARAMS=(
 MODULES_ORDER=(yolo llava voxtral)
 
 echo "============================================================"
-echo " Capturing dynamic-canonical C-7: load/unload latency"
+echo " Capturing dynamic-loader C-7: load/unload latency"
 echo " Pod=${RUNTIME_POD}  Namespace=${NAMESPACE}"
 echo " Output → ${OUT_DIR}"
 echo "============================================================"
@@ -103,7 +103,7 @@ done
 
 # ── Write summary ──────────────────────────────────────────────────
 {
-  echo "# dynamic-canonical — C-7 load/unload latency"
+  echo "# dynamic-loader — C-7 load/unload latency"
   echo ""
   echo "_Captured: $(date -u +%Y-%m-%dT%H:%M:%SZ)_"
   echo ""
@@ -127,8 +127,8 @@ done
   echo "|---------|------------------------|"
   echo "| monolithic | ~15-25 min (rebuild image + push + pull + boot) |"
   echo "| microservices | ~5-10 min (rebuild ONE microservice + push + pull) |"
-  echo "| overlay-canonical | ~16 min cold-cold, ~2.5 min cold-ish (re-extract overlay) |"
-  echo "| **dynamic-canonical** | **load_s + unload_s seconds** ⭐ |"
+  echo "| overlay | ~16 min cold-cold, ~2.5 min cold-ish (re-extract overlay) |"
+  echo "| **dynamic-loader** | **load_s + unload_s seconds** ⭐ |"
   echo ""
   echo "## Files in this run"
   echo ""

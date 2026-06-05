@@ -7,7 +7,7 @@
 # outliers).
 #
 # Cada campaña interna llama a run_full_campaign.sh, que recorre los 4
-# patrones (monolithic, microservices, overlay-canonical, dynamic-canonical)
+# patrones (monolithic, microservices, overlay, dynamic-loader)
 # con metodología uniforme (10 min warmup + 3 min muestreo).
 #
 # Resultados:

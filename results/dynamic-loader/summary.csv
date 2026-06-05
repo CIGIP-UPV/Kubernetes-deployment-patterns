@@ -1,0 +1,17 @@
+metric,unit,mean,std,n,regime,source,table_or_figure_in_paper
+T_install,s,174.6,2.4,5,warm,mega-campaign 20260526-065922,Figure 3
+T_install,s,625.0,2.7,3,cold-cold,mega-campaign 20260526-065922,Figure 3
+T_inf,ms,244.75,26.34,5,warm steady state with LLaVA trigger every 30s,mega-campaign 20260526-065922,Figure 4
+f_FPS,fps,3.51,0.36,5,warm steady state,mega-campaign 20260526-065922,Figure 4
+T_e2e,ms,298.50,27.85,5,warm steady state,mega-campaign 20260526-065922,Table 3
+J_inf,ms,43.36,5.62,5,warm steady state,mega-campaign 20260526-065922,Figure 4
+U_CPU,%,21.90,0.69,5,warm steady state,mega-campaign 20260526-065922,Figure 4
+U_GPU,%,28.11,2.30,5,warm steady state (starved due to GIL+CUDA contention),mega-campaign 20260526-065922,Figure 4
+U_RAM,%,29.90,0.44,5,warm steady state,mega-campaign 20260526-065922,Figure 4
+S_img,GB,29.77,,1,packaging (ros2-component-host image),build of ros2-component-host,Figure 2
+OTA_payload,GB,30.00,,1,recurring update,packaging,Figure 2
+hot_swap_camera,s,0.78,,1,per-module load via LoadNode service,manual measurement,Section V-E (H2)
+hot_swap_yolo,s,20.34,,1,per-module load via LoadNode service,manual measurement,Section V-E (H2)
+hot_swap_llava,s,31.10,,1,per-module load via LoadNode service (14 GB FP16 weights),manual measurement,Section V-E (H2)
+hot_swap_voxtral,s,4.55,,1,per-module load via LoadNode service,manual measurement,Section V-E (H2)
+hot_swap_total_sequential,s,56.77,,1,sum of the four per-module loads,manual measurement,Section V-E (H2)

@@ -1,0 +1,222 @@
+{{- /*
+Runtime StatefulSet for the Dynamic Module Loading pattern.
+
+Pod has TWO containers — same image, different command:
+
+  • component-host: ros2 run rclpy_components component_container_isolated
+      Hosts the rclpy plugins. Exposes /ComponentManager/_container/{load,unload,list}.
+      All ROS 2 nodes (camera, yolo, llava, voxtral) load INTO this process.
+  • orchestrator: uvicorn FastAPI app
+      HTTP API on port 5000. Translates POST /load → service call to
+      component-host's LoadNode service.
+
+Both share network namespace (localhost), GPU access, mounts, etc.
+
+The pod has GPU, runs on edgenode01, mounts /dev/video0 if mountVideoDevice.
+*/}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "dynamic-loader.fullname" . }}
+  labels:
+    {{- include "dynamic-loader.labels" . | nindent 4 }}
+    pattern: dynamic-loader
+    component: runtime
+spec:
+  serviceName: {{ include "dynamic-loader.fullname" . }}-peers
+  replicas: {{ .Values.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ include "dynamic-loader.name" . }}-runtime
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        {{- include "dynamic-loader.labels" . | nindent 8 }}
+        app: {{ include "dynamic-loader.name" . }}-runtime
+        pattern: dynamic-loader
+        component: runtime
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.nodes.edge.name }}
+      {{- if .Values.imagePullSecretName }}
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecretName }}
+      {{- end }}
+      {{- if .Values.gpu.runtimeClassName }}
+      runtimeClassName: {{ .Values.gpu.runtimeClassName }}
+      {{- end }}
+      containers:
+        # ── 1) Component host: rclpy_components container ──
+        - name: component-host
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode) }}
+          securityContext:
+            privileged: true
+          {{- end }}
+          env:
+            - name: ROS_DOMAIN_ID
+              value: {{ .Values.ros.domainId | quote }}
+            - name: RMW_IMPLEMENTATION
+              value: {{ .Values.ros.rmwImplementation | quote }}
+            - name: ROS_LOCALHOST_ONLY
+              value: {{ .Values.ros.localhostOnly | quote }}
+            {{- if .Values.cyclonedds.enabled }}
+            - name: CYCLONEDDS_URI
+              value: "file:///etc/cyclonedds/cyclonedds.xml"
+            {{- end }}
+            - name: HF_HOME
+              value: "/opt/huggingface_cache"
+            - name: HF_HUB_CACHE
+              value: "/opt/huggingface_cache"
+            - name: TRANSFORMERS_CACHE
+              value: "/opt/huggingface_cache"
+            - name: HF_HUB_OFFLINE
+              value: "1"
+            - name: TRANSFORMERS_OFFLINE
+              value: "1"
+            {{- if .Values.gpu.enabled }}
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: {{ .Values.gpu.visibleDevices | default "all" | quote }}
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: {{ .Values.gpu.driverCapabilities | default "compute,utility" | quote }}
+            {{- end }}
+          command: ["/bin/bash", "-lc"]
+          args:
+            - |
+              set -e
+              echo "[host] Sourcing ROS 2 + workspaces..."
+              source /opt/ros/humble/setup.bash
+              source /opt/base_ws/install/setup.bash
+              source /opt/component_ws/install/setup.bash
+
+              echo "[host] Starting resource_monitor for dashboard telemetry..."
+              python3 /opt/scripts/resource_monitor.py &
+              RESMON_PID=$!
+
+              echo "[host] Available rclpy_components plugins:"
+              ros2 component types | grep -E '(camera_driver_pkg|yolo_detector_pkg|llava_pkg|voxtral_pkg)' || true
+              echo "[host] Starting component_container_isolated as '{{ .Values.componentHost.containerName }}'..."
+              # The container name {{ .Values.componentHost.containerName }} becomes
+              # the prefix of the LoadNode/UnloadNode services, e.g.:
+              #   /ComponentManager/_container/load_node
+              ros2 run rclpy_components component_container_isolated \
+                   --ros-args -r __node:={{ .Values.componentHost.containerName }} &
+              HOST_PID=$!
+
+              # Forward TERM to children so the pod terminates cleanly.
+              trap 'kill -TERM ${HOST_PID} ${RESMON_PID} 2>/dev/null; wait' TERM INT
+              wait -n ${HOST_PID} ${RESMON_PID}
+              echo "[host] One process exited — pod will restart"
+              exit 1
+          resources:
+            {{- if and .Values.gpu.enabled .Values.gpu.requestGpuResource }}
+            limits:
+              nvidia.com/gpu: {{ .Values.gpu.count | default 1 }}
+              {{- with .Values.componentHost.resources.limits }}
+              memory: {{ .memory }}
+              cpu: {{ .cpu }}
+              {{- end }}
+            requests:
+              {{- with .Values.componentHost.resources.requests }}
+              memory: {{ .memory }}
+              cpu: {{ .cpu }}
+              {{- end }}
+            {{- end }}
+          volumeMounts:
+            {{- if .Values.cyclonedds.enabled }}
+            - name: cyclonedds
+              mountPath: /etc/cyclonedds
+              readOnly: true
+            {{- end }}
+            {{- if and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode) }}
+            - name: video-device
+              mountPath: {{ .Values.camera.device }}
+            {{- end }}
+            {{- if .Values.gpu.enabled }}
+            # Sysfs hostPath so resource_monitor.py can read Jetson GPU load
+            # (/sys/devices/platform/gpu.0/load) inside the container.
+            - name: sys-devices-platform
+              mountPath: /sys/devices/platform
+              readOnly: true
+            {{- end }}
+
+        # ── 2) Orchestrator: FastAPI ──
+        - name: orchestrator
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: ROS_DOMAIN_ID
+              value: {{ .Values.ros.domainId | quote }}
+            - name: RMW_IMPLEMENTATION
+              value: {{ .Values.ros.rmwImplementation | quote }}
+            - name: ROS_LOCALHOST_ONLY
+              value: {{ .Values.ros.localhostOnly | quote }}
+            {{- if .Values.cyclonedds.enabled }}
+            - name: CYCLONEDDS_URI
+              value: "file:///etc/cyclonedds/cyclonedds.xml"
+            {{- end }}
+            - name: COMPONENT_CONTAINER_NAME
+              # Must match componentHost.containerName so the orchestrator
+              # builds the correct service paths (e.g. /<container>/_container/load_node).
+              value: {{ .Values.componentHost.containerName | quote }}
+            - name: ORCHESTRATOR_PORT
+              value: {{ .Values.orchestrator.port | quote }}
+          ports:
+            - name: api
+              containerPort: {{ .Values.orchestrator.port }}
+              protocol: TCP
+          command: ["/bin/bash", "-lc"]
+          args:
+            - |
+              set -e
+              source /opt/ros/humble/setup.bash
+              source /opt/base_ws/install/setup.bash
+              source /opt/component_ws/install/setup.bash
+              echo "[orchestrator] Starting FastAPI on port ${ORCHESTRATOR_PORT}"
+              cd /opt/orchestrator
+              exec python3 orchestrator.py
+          resources:
+            {{- toYaml .Values.orchestrator.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: api
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: api
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          volumeMounts:
+            {{- if .Values.cyclonedds.enabled }}
+            - name: cyclonedds
+              mountPath: /etc/cyclonedds
+              readOnly: true
+            {{- end }}
+
+      volumes:
+        {{- if .Values.cyclonedds.enabled }}
+        - name: cyclonedds
+          configMap:
+            name: {{ include "dynamic-loader.fullname" . }}-cyclonedds
+            items:
+              - key: cyclonedds.xml
+                path: cyclonedds.xml
+        {{- end }}
+        {{- if and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode) }}
+        - name: video-device
+          hostPath:
+            path: {{ .Values.camera.device }}
+            type: CharDevice
+        {{- end }}
+        {{- if .Values.gpu.enabled }}
+        # Jetson sysfs paths used by resource_monitor.py to read GPU load.
+        - name: sys-devices-platform
+          hostPath:
+            path: /sys/devices/platform
+            type: Directory
+        {{- end }}

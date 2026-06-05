@@ -1,20 +1,20 @@
 # =============================================================================
-#  ros2-component-host — Canonical Dynamic Module Loading host image
+#  ros2-component-host — Dynamic Module Loading host image
 #
 #  Per the Dynamic Module Loading theory of the paper, this image is the
 #  HOST PROCESS that loads/unloads ROS 2 components on demand via the
 #  rclpy_components container_isolated. NOT a process orchestrator (which
-#  was the previous non-canonical implementation) — components run IN the
+#  was the previous implementation) — components run IN the
 #  same process as the container, sharing memory.
 #
-#  Image purpose: serve TWO containers in the dynamic-canonical pod:
+#  Image purpose: serve TWO containers in the dynamic-loader pod:
 #    1) component-host: runs `ros2 run rclpy_components component_container_isolated`
 #                       Plugins discovered via setuptools entry_point
 #                       'rclpy_components'.
 #    2) orchestrator:   runs FastAPI app that calls the host's services
 #                       (LoadNode, UnloadNode, ListNodes) on demand.
 #
-#  Both containers share the same image — the dynamic-canonical chart
+#  Both containers share the same image — the dynamic-loader chart
 #  defines different `command` overrides for each.
 #
 #  FROM ros2-base inherits:

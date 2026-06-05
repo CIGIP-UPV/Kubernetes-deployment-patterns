@@ -25,12 +25,12 @@ TMP_DIR=$(mktemp -d)
 
 # Chart paths (relative to PROJECT_ROOT)
 # The four deployment patterns analysed in the IEEE Access submission:
-#   monolithic, microservices, overlay-canonical, dynamic-canonical
+#   monolithic, microservices, overlay, dynamic-loader
 CHARTS=(
   "Patterns/monolithic/helm"
   "Patterns/microservices/helm/ros2-microservices"
-  "Patterns/overlay-canonical/helm/ros2-overlay-canonical"
-  "Patterns/dynamic-canonical/helm/ros2-dynamic-canonical"
+  "Patterns/overlay/helm/ros2-overlay"
+  "Patterns/dynamic-loader/helm/dynamic-loader"
 )
 
 cd "${PROJECT_ROOT}"

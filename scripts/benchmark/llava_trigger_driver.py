@@ -38,7 +38,7 @@ def main():
     p.add_argument("--duration", type=float, default=840.0,
                    help="Total run time in seconds (warmup + sampling + margin).")
     p.add_argument("--prompt", default=(
-        "A factory robot inspects post-consumer textile garments on a conveyor. "
+        "A factory robot inspects items on an industrial inspection conveyor. "
         "Describe the scene and report any safety concerns."))
     a = p.parse_args()
 

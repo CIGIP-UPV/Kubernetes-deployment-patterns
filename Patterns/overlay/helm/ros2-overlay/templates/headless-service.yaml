@@ -1,0 +1,25 @@
+{{- /*
+Headless service for the runtime StatefulSet's pod-specific DNS.
+
+publishNotReadyAddresses: true makes DNS resolve as soon as the pod has
+an IP, NOT only when Ready. This avoids the deadlock pattern documented
+in PLAN section 41 (initContainers waiting for each other's DNS while
+none can reach Ready).
+*/}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ros2-overlay.fullname" . }}-peers
+  labels:
+    {{- include "ros2-overlay.labels" . | nindent 4 }}
+    pattern: overlay
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ include "ros2-overlay.name" . }}-runtime
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: dds
+      port: 7400
+      protocol: UDP

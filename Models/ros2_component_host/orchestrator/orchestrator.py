@@ -1,9 +1,9 @@
 """
-FastAPI orchestrator for the canonical Dynamic Module Loading pattern.
+FastAPI orchestrator for the Dynamic Module Loading pattern.
 
 Replaces the previous subprocess.Popen approach (process spawning) with
 ROS 2 service calls to /ComponentManager/{load_node, unload_node, list_nodes}.
-This realizes the canonical ROS 2 dynamic composition pattern from the
+This realizes the ROS 2 dynamic composition pattern from the
 paper: components are LOADED INTO THE SAME PROCESS (the component
 container running in a sibling container of the same pod), not spawned
 as separate processes.

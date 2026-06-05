@@ -8,7 +8,7 @@
 #
 # Per pattern the script does:
 #   1. Uninstall any previous Helm release with the same name.
-#   2. Delete leftover PVCs (only relevant for overlay-canonical).
+#   2. Delete leftover PVCs (only relevant for overlay).
 #   3. (Optional) SSH into the nodes and purge the containerd images so the
 #      run is a true cold-cold (env COLD_COLD=true; needs SSH keys).
 #   4. helm install with values that pin the camera and LLaVA settings.
@@ -18,7 +18,7 @@
 #      capture_pattern_run.sh.
 #   8. Sample rosbridge topics for SAMPLE_SECONDS via
 #      sample_dashboard_metrics.py and dump CSV.
-#   9. (dynamic-canonical only) Capture C-7 unload/load latency via
+#   9. (dynamic-loader only) Capture C-7 unload/load latency via
 #      capture_dynamic_load_unload.sh.
 #  10. Aggregate via collect_metrics.sh.
 #  11. (Default) leave the deployment running so a human can inspect; set
@@ -30,7 +30,7 @@
 #   nohup bash scripts/benchmark/run_full_campaign.sh > campaign.log 2>&1 &
 #
 # Environment variables (all optional):
-#   PATTERNS              Space-separated subset, default "monolithic microservices overlay-canonical dynamic-canonical"
+#   PATTERNS              Space-separated subset, default "monolithic microservices overlay dynamic-loader"
 #   NAMESPACE             Default ros2exp
 #   WARMUP_SECONDS        Default 600 (10 min). Wait after Ready before sampling.
 #   SAMPLE_SECONDS        Default 180 (3 min). Sample window for dashboard metrics.
@@ -63,12 +63,12 @@ set -uo pipefail
 
 # ── Defaults ────────────────────────────────────────────────────────────────
 NAMESPACE="${NAMESPACE:-ros2exp}"
-PATTERNS="${PATTERNS:-monolithic microservices overlay-canonical dynamic-canonical}"
+PATTERNS="${PATTERNS:-monolithic microservices overlay dynamic-loader}"
 WARMUP_SECONDS="${WARMUP_SECONDS:-600}"
 SAMPLE_SECONDS="${SAMPLE_SECONDS:-180}"
 ROSBRIDGE_URL="${ROSBRIDGE_URL:-ws://158.42.104.15:31407}"
 CAMERA_DEVICE="${CAMERA_DEVICE:-/dev/video1}"
-# Cloud node for overlay-canonical's pre-install Job, PVC and nginx
+# Cloud node for overlay's pre-install Job, PVC and nginx
 # overlay-server. Default kb2; set to worker1-kb2 if kb2 is short on disk
 # (the overlay-pack image is ~26 GB and the PVC is ~30 GB, peak combined
 # usage during the install is ~70 GB).
@@ -99,7 +99,7 @@ log "============================================================"
 log " Campaign starting (id=${TS})"
 log " Patterns      : ${PATTERNS}"
 log " Namespace     : ${NAMESPACE}"
-log " Cloud node    : ${CLOUD_NODE} (overlay-canonical Job + PVC + nginx)"
+log " Cloud node    : ${CLOUD_NODE} (overlay Job + PVC + nginx)"
 log " Warmup        : ${WARMUP_SECONDS} s"
 log " Sample window : ${SAMPLE_SECONDS} s"
 log " Cold-cold     : ${COLD_COLD}"
@@ -130,7 +130,7 @@ purge_node_images() {
   log "  [cold-cold] Purging containerd images on cluster nodes..."
 
   case "${pattern}" in
-    monolithic|microservices|overlay-canonical|dynamic-canonical)
+    monolithic|microservices|overlay|dynamic-loader)
       # Each pattern uses a different set of images. We purge ALL pattern-related
       # images to play it safe — pulls happen on next install only for the ones
       # that the chart actually uses.
@@ -156,15 +156,15 @@ purge_node_images() {
 # ── Helper: short release name for each pattern ────────────────────────────
 # Kubernetes label values cap at 63 chars. Helm-generated Job names follow
 # the format "<release>-<chart>-<suffix>", so a long release name overflows
-# the limit (e.g. "overlay-canonical-pattern-ros2-overlay-canonical-overlay-
+# the limit (e.g. "overlay-pattern-ros2-overlay-overlay-
 # installer" = 66 chars). We use the same short release names as the
 # Rancher deployments to stay safely under the cap.
 release_name_for() {
   case "$1" in
     monolithic)         echo "monolithic-pattern" ;;
     microservices)      echo "microservices-pattern" ;;
-    overlay-canonical)  echo "overlay-pattern" ;;
-    dynamic-canonical)  echo "dynamic-pattern" ;;
+    overlay)  echo "overlay-pattern" ;;
+    dynamic-loader)  echo "dynamic-pattern" ;;
     *)                  echo "$1-pattern" ;;
   esac
 }
@@ -175,8 +175,8 @@ install_pattern() {
   local release=$2
 
   # Helm's default --timeout for pre-install/post-install hooks is 5 min,
-  # which is too short for overlay-canonical (26 GB image pull + 17 GB
-  # cp to PVC during the pre-install Job) and dynamic-canonical (32 GB
+  # which is too short for overlay (26 GB image pull + 17 GB
+  # cp to PVC during the pre-install Job) and dynamic-loader (32 GB
   # pull + bootstrap Job loading 4 plugins). We bump to 45m to match
   # the catalog.cattle.io/timeout already declared in those charts'
   # Chart.yaml annotations.
@@ -197,8 +197,8 @@ install_pattern() {
         --set image.tag="${IMAGE_TAG}" \
         --set camera.device="${CAMERA_DEVICE}"
       ;;
-    overlay-canonical)
-      # IMPORTANTE: overlay-canonical se instala SIN --wait, a propósito.
+    overlay)
+      # IMPORTANTE: overlay se instala SIN --wait, a propósito.
       # Con --wait, helm espera a que TODOS los pods estén Ready, incluido
       # overlay-pattern-0 en edgenode01, que tiene que bajar el tarball de
       # 17 GB del nginx server y descomprimirlo en el Jetson. Eso supera los
@@ -207,7 +207,7 @@ install_pattern() {
       # (installer Job) termina y se crean los recursos — igual que hace
       # Rancher de forma asíncrona. La espera real la hace el paso [5/9]
       # con kubectl wait y un timeout amplio (OVERLAY_READY_TIMEOUT).
-      helm install "${release}" "${PROJECT_ROOT}/Patterns/overlay-canonical/helm/ros2-overlay-canonical" \
+      helm install "${release}" "${PROJECT_ROOT}/Patterns/overlay/helm/ros2-overlay" \
         -n "${NAMESPACE}" --create-namespace \
         --timeout "${HELM_TIMEOUT}" \
         --set images.base.tag="${IMAGE_TAG}" \
@@ -215,8 +215,8 @@ install_pattern() {
         --set nodes.cloud.name="${CLOUD_NODE}" \
         --set camera.device="${CAMERA_DEVICE}"
       ;;
-    dynamic-canonical)
-      helm install "${release}" "${PROJECT_ROOT}/Patterns/dynamic-canonical/helm/ros2-dynamic-canonical" \
+    dynamic-loader)
+      helm install "${release}" "${PROJECT_ROOT}/Patterns/dynamic-loader/helm/dynamic-loader" \
         -n "${NAMESPACE}" --create-namespace \
         --timeout "${HELM_TIMEOUT}" --wait \
         --set image.tag="${IMAGE_TAG}" \
@@ -324,11 +324,11 @@ for pattern in ${PATTERNS}; do
   fi
 
   # 5. Wait Ready
-  # overlay-canonical necesita más tiempo: como se instala sin --wait, este
+  # overlay necesita más tiempo: como se instala sin --wait, este
   # es el único punto donde esperamos a que el runtime pod baje y descomprima
   # el tarball de 17 GB en el edge. Le damos 90m. El resto, 45m.
   READY_TIMEOUT="45m"
-  if [ "${pattern}" = "overlay-canonical" ]; then
+  if [ "${pattern}" = "overlay" ]; then
     READY_TIMEOUT="${OVERLAY_READY_TIMEOUT:-90m}"
     # Al instalar sin --wait, los pods del StatefulSet tardan unos segundos en
     # aparecer. Esperamos a que exista al menos un pod (no-installer) antes de
@@ -404,7 +404,7 @@ for pattern in ${PATTERNS}; do
   fi
 
   # 8.b (dynamic only) C-7 capture
-  if [ "${pattern}" = "dynamic-canonical" ]; then
+  if [ "${pattern}" = "dynamic-loader" ]; then
     log "  [8b/9] Capturing C-7 load/unload latency..."
     bash "${PROJECT_ROOT}/scripts/benchmark/capture_dynamic_load_unload.sh" \
          "${RELEASE}" "${NAMESPACE}" \

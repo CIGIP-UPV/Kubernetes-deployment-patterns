@@ -2,7 +2,7 @@
 # =============================================================================
 # capture_pattern_run.sh — Cold-start T_ready capture for the paper
 # =============================================================================
-# Wraps a clean Helm install of one of the canonical patterns and captures:
+# Wraps a clean Helm install of one of the patterns and captures:
 #
 #   - T_ready_per_pod      (PodScheduled → Ready, from .status.conditions)
 #   - T_ready_total_system (first PodScheduled → last Ready of all release pods)
@@ -21,13 +21,13 @@
 #   scripts/benchmark/capture_pattern_run.sh <pattern> <scenario> [release] [namespace]
 #
 #   Examples:
-#     # S1 cold-start of overlay-canonical (FPS=10)
-#     scripts/benchmark/capture_pattern_run.sh overlay-canonical S1 \
+#     # S1 cold-start of overlay (FPS=10)
+#     scripts/benchmark/capture_pattern_run.sh overlay S1 \
 #         over-pattern ros2exp
 #
 #     # Same pattern, S2 (FPS=20) — assumes pod has been kubectl-deleted to
 #     # force restart so we can re-time everything cleanly.
-#     scripts/benchmark/capture_pattern_run.sh overlay-canonical S2 \
+#     scripts/benchmark/capture_pattern_run.sh overlay S2 \
 #         over-pattern ros2exp
 #
 # Pre-requisites for a TRUE cold-start measurement (run on each node):
@@ -56,7 +56,7 @@ NAMESPACE="${4:-ros2exp}"
 
 if [ -z "${PATTERN}" ]; then
   echo "Usage: $0 <pattern> <scenario> [release=over-pattern] [namespace=ros2exp]"
-  echo "  Patterns: monolithic | microservices | overlay-canonical | dynamic-canonical"
+  echo "  Patterns: monolithic | microservices | overlay | dynamic-loader"
   echo "  Scenario: S1 (FPS=10) | S2 (FPS=20) | S3 (FPS=30)"
   exit 1
 fi
@@ -159,11 +159,11 @@ echo "[5/6] kubectl top pod (steady state)..."
 } > "${OUT_DIR}/top.txt"
 cat "${OUT_DIR}/top.txt"
 
-# ── Overlay size on edge (only meaningful for overlay-canonical) ──────────
-if [ "${PATTERN}" = "overlay-canonical" ]; then
+# ── Overlay size on edge (only meaningful for overlay) ──────────
+if [ "${PATTERN}" = "overlay" ]; then
   echo ""
   echo "[5b/6] Overlay extracted size on edge..."
-  RUNTIME_POD=$(echo "${PODS}" | tr ' ' '\n' | grep -E '^.*-canonical-0$' | head -1)
+  RUNTIME_POD=$(echo "${PODS}" | tr ' ' '\n' | grep -E "^${RELEASE}-0$" | head -1)
   if [ -n "${RUNTIME_POD}" ]; then
     kubectl -n "${NAMESPACE}" exec "${RUNTIME_POD}" -c overlay-runtime \
       -- du -sh /opt/overlay /opt/overlay/python-deps /opt/overlay/huggingface_cache 2>/dev/null \

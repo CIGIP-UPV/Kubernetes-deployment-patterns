@@ -75,8 +75,8 @@ voxtral:
   nodeHostname: ""
   nodeSelector: {}
   # Pin to edge (Jetson) — voxtral lives on the edge alongside the other robot
-  # nodes. Even in Phase 1 (no GPU), keep it on arm64 to avoid stranding on
-  # cloud nodes that don't have the nvidia runtime registered.
+  # nodes. Keep it on arm64 even when scheduled without GPU, to avoid stranding
+  # on cloud nodes that don't have the nvidia runtime registered.
   nodeArch: "arm64"
   tolerations: []
   affinity: {}

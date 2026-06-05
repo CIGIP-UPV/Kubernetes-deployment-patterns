@@ -47,7 +47,7 @@ log "Pre-flight: comprobando que overlay-pattern está en ${NAMESPACE}..."
 if ! helm list -n "${NAMESPACE}" -q | grep -q "^${RELEASE}$"; then
   log "ERROR: release '${RELEASE}' no encontrado en ${NAMESPACE}."
   log "  Instala overlay primero:"
-  log "    helm upgrade --install ${RELEASE} Patterns/overlay-canonical/helm/ros2-overlay-canonical/ -n ${NAMESPACE}"
+  log "    helm upgrade --install ${RELEASE} Patterns/overlay/helm/ros2-overlay/ -n ${NAMESPACE}"
   log "  y espera a que llegue a Running antes de relanzar este script."
   exit 1
 fi

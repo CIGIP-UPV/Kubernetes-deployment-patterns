@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # =============================================================================
-# measure_overlay_once.sh — Mide una réplica de overlay-canonical desplegado
+# measure_overlay_once.sh — Mide una réplica de overlay desplegado
 #                          manualmente desde Rancher.
 # =============================================================================
-# overlay-canonical no se puede instalar por `helm install --wait` desde CLI
+# overlay no se puede instalar por `helm install --wait` desde CLI
 # (su Job pre-install excede el deadline del hook). Pero desde Rancher UI sí,
 # porque respeta la anotación catalog.cattle.io/timeout. Este script asume
 # que TÚ ya has desplegado overlay-pattern por Rancher y está Ready, y se
@@ -20,7 +20,7 @@
 #                      del creationTimestamp del primer recurso de la release.
 #
 # Ejemplo:
-#   # 1. En Rancher: Install overlay-canonical, release=overlay-pattern, ns=ros2exp
+#   # 1. En Rancher: Install overlay, release=overlay-pattern, ns=ros2exp
 #   # 2. Cuando esté Ready, anota la hora y lanza:
 #   bash scripts/benchmark/measure_overlay_once.sh 1 2026-05-20T08:15:00Z
 #   # 3. Cuando termine, desinstala en Rancher y repite con replica 2, 3, 4, 5.
@@ -68,14 +68,14 @@ mkdir -p "${RUN_DIR}"
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"; }
 
 log "════════════════════════════════════════════════════════════"
-log " Medición manual de overlay-canonical — réplica ${REPLICA}"
+log " Medición manual de overlay — réplica ${REPLICA}"
 log " Namespace : ${NAMESPACE}"
 log " Release   : ${RELEASE}"
 log " Salida    : ${RUN_DIR}"
 log "════════════════════════════════════════════════════════════"
 
 # ── 1. Verificar que overlay está desplegado y Ready ────────────────────────
-# IMPORTANTE: overlay-canonical tiene un Job efímero de pre-install
+# IMPORTANTE: overlay tiene un Job efímero de pre-install
 # (overlay-pattern-overlay-installer-XXXXX) que copia ~17 GB a la PVC ANTES de
 # que la aplicación real arranque. Ese Job comparte la label
 # app.kubernetes.io/instance, así que NO podemos esperar "cualquier pod" con
@@ -200,7 +200,7 @@ S_IMG=""
 
 COMP="${RUN_DIR}/comparison.csv"
 echo "pattern,t_zero,t_fin,t_install_e2e_s,t_ready_system_s,s_img_total_gb,t_inf_avg_ms,f_fps_pub,t_e2e_avg_ms,j_inf_ms,u_cpu_avg_pct,u_gpu_avg_pct,u_ram_avg_pct,run_dir,status,notes" > "${COMP}"
-echo "overlay-canonical,${T_ZERO},${T_FIN},${T_INSTALL},${T_READY_SYSTEM},${S_IMG},${AGG},${RUN_DIR},${STATUS},rep${REPLICA}" >> "${COMP}"
+echo "overlay,${T_ZERO},${T_FIN},${T_INSTALL},${T_READY_SYSTEM},${S_IMG},${AGG},${RUN_DIR},${STATUS},rep${REPLICA}" >> "${COMP}"
 
 log "════════════════════════════════════════════════════════════"
 log " Réplica ${REPLICA} completada."
