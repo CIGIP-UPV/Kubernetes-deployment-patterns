@@ -1,0 +1,139 @@
+{{- if .Values.dashboard.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "ros2-microservices.fullname" . }}-dashboard
+  labels:
+    {{- include "ros2-microservices.labels" . | nindent 4 }}
+    component: dashboard
+spec:
+  serviceName: {{ include "ros2-microservices.fullname" . }}-dashboard-peers
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ include "ros2-microservices.name" . }}-dashboard
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "ros2-microservices.name" . }}-dashboard
+        component: dashboard
+        pattern: microservices
+        {{- include "ros2-microservices.labels" . | nindent 8 }}
+    spec:
+      {{- if .Values.imagePullSecretName }}
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecretName }}
+      {{- end }}
+      {{- if .Values.dashboard.nodeHostname }}
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.dashboard.nodeHostname }}
+      {{- else if .Values.dashboard.nodeArch }}
+      nodeSelector:
+        kubernetes.io/arch: {{ .Values.dashboard.nodeArch }}
+      {{- end }}
+      # Dashboard is the last pod to start so rosbridge picks up all publishers
+      # at once. We wait for:
+      #   1. DNS of each dependent StatefulSet's pod-0 (camera, yolo, llava,
+      #      voxtral) — CycloneDDS resolves peers once at startup.
+      #   2. A grace period for each node to finish its heavy imports
+      #      (transformers, torch, CUDA) and start publishing.
+      # Dashboard MUST be the last pod to start — when the user opens the
+      # browser, everything else should already be publishing. We wait for
+      # ALL four peer pods' DNS, then a generous grace period (default 60s)
+      # so heavy GPU pods (LLaVA, Voxtral) finish their transformers/torch
+      # /CUDA imports and start publishing topics.
+      #
+      # The cycle that this list previously caused (dashboard waits for
+      # llava/voxtral, llava/voxtral wait for dashboard) is broken at the
+      # service level by `publishNotReadyAddresses: true` on the headless
+      # services — DNS publishes as soon as pods have IPs (during init),
+      # not when they reach Ready. So nslookup here succeeds quickly for
+      # all peers, the actual "wait until everyone publishes" work happens
+      # in the grace period below.
+      initContainers:
+        - name: wait-for-peers
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              FULLNAME="{{ include "ros2-microservices.fullname" . }}"
+              NS="{{ .Release.Namespace }}"
+              PEERS=""
+              {{- if .Values.camera.enabled }}
+              PEERS="$PEERS ${FULLNAME}-camera-0.${FULLNAME}-camera-peers.${NS}.svc.cluster.local"
+              {{- end }}
+              {{- if .Values.yolo.enabled }}
+              PEERS="$PEERS ${FULLNAME}-yolo-0.${FULLNAME}-yolo-peers.${NS}.svc.cluster.local"
+              {{- end }}
+              {{- if .Values.llava.enabled }}
+              PEERS="$PEERS ${FULLNAME}-llava-0.${FULLNAME}-llava-peers.${NS}.svc.cluster.local"
+              {{- end }}
+              {{- if .Values.voxtral.enabled }}
+              PEERS="$PEERS ${FULLNAME}-voxtral-0.${FULLNAME}-voxtral-peers.${NS}.svc.cluster.local"
+              {{- end }}
+              for PEER in $PEERS; do
+                echo "[init] Waiting for DDS peer DNS: $PEER"
+                until nslookup "$PEER" >/dev/null 2>&1; do
+                  echo "[init]   $PEER not resolvable yet, retrying in 3s..."
+                  sleep 3
+                done
+                echo "[init]   $PEER resolved"
+              done
+              GRACE={{ .Values.dashboard.peerReadyGraceSeconds | default 60 }}
+              echo "[init] All peer DNS resolved — waiting ${GRACE}s for nodes to finish loading models and start publishing"
+              sleep "$GRACE"
+              echo "[init] Ready to start rosbridge"
+      containers:
+        - name: dashboard
+          image: "{{ .Values.dashboard.image.repository }}:{{ .Values.dashboard.image.tag }}"
+          imagePullPolicy: {{ .Values.dashboard.image.pullPolicy }}
+          env:
+            - name: ROS_DOMAIN_ID
+              value: {{ .Values.ros.domainId | quote }}
+            - name: RMW_IMPLEMENTATION
+              value: {{ .Values.ros.rmwImplementation | quote }}
+            - name: ROS_LOCALHOST_ONLY
+              value: "0"
+            {{- if .Values.cyclonedds.enabled }}
+            - name: CYCLONEDDS_URI
+              value: "file:///etc/cyclonedds/cyclonedds.xml"
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: ws
+              containerPort: 9090
+              protocol: TCP
+          volumeMounts:
+            - name: dashboard-html
+              mountPath: /dashboard-cm
+              readOnly: true
+            {{- if .Values.cyclonedds.enabled }}
+            - name: cyclonedds
+              mountPath: /etc/cyclonedds
+              readOnly: true
+            {{- end }}
+          resources:
+            {{- toYaml .Values.dashboard.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+      volumes:
+        - name: dashboard-html
+          configMap:
+            name: {{ include "ros2-microservices.fullname" . }}-dashboard-html
+        {{- if .Values.cyclonedds.enabled }}
+        - name: cyclonedds
+          configMap:
+            name: {{ include "ros2-microservices.fullname" . }}-cyclonedds
+            items:
+              - key: cyclonedds.xml
+                path: cyclonedds.xml
+        {{- end }}
+{{- end }}

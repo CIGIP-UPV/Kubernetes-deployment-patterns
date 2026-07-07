@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>rclpy_components</name>
+  <version>0.1.0</version>
+  <description>
+    Minimal local implementation of ros2/rclpy_components for ROS 2 Humble.
+    Provides component_container_isolated executable that hosts rclpy
+    plugins discovered via setuptools entry_points 'rclpy_components'.
+
+    This shim exists because the upstream ros2/rclpy_components is not
+    available as an apt package for Humble (only Iron+) and the iron
+    branch of ros2/rclpy does not contain the subdirectory in the layout
+    expected by the build. By vendoring our own minimal implementation
+    we eliminate the external dependency.
+  </description>
+  <maintainer email="mmateo@cigip.upv.es">Miguel-Angel-Mateo-Casali</maintainer>
+  <license>Apache-2.0</license>
+
+  <depend>rclpy</depend>
+  <depend>composition_interfaces</depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

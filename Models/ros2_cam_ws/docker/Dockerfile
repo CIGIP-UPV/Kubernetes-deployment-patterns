@@ -5,12 +5,19 @@ FROM ros:${ROS_DISTRO}-ros-base
 LABEL authors="miguelangel"
 
 # Paquetes de sistema/ROS necesarios para un paquete Python con OpenCV
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3-pip python3-colcon-common-extensions \
-    ros-${ROS_DISTRO}-cv-bridge ros-${ROS_DISTRO}-image-transport \
-    ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
-    python3-opencv v4l-utils libgl1 \
- && rm -rf /var/lib/apt/lists/*
+# Retry logic: QEMU arm64 emulation may segfault on libc-bin post-install
+RUN for attempt in 1 2 3; do \
+      echo "[apt] Attempt $attempt..." && \
+      apt-get update && \
+      apt-get install -y --no-install-recommends \
+        python3-pip python3-colcon-common-extensions \
+        ros-${ROS_DISTRO}-cv-bridge ros-${ROS_DISTRO}-image-transport \
+        ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
+        python3-opencv v4l-utils libgl1 \
+      && break \
+      || { echo "[apt] Attempt $attempt failed (QEMU?), retrying..."; \
+           apt-get install -f -y || true; sleep 2; }; \
+    done && rm -rf /var/lib/apt/lists/*
 
 # Workspace
 ENV ROS_WS=/opt/ros2_cam_ws

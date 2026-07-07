@@ -1,0 +1,309 @@
+questions:
+  # ── Docker Registry ──────────────────────────────────────────────
+  - variable: imagePullSecretName
+    label: "Image Pull Secret"
+    description: "Name of the Kubernetes secret for pulling images from the GitLab registry"
+    type: string
+    default: "regcred"
+    required: false
+    group: "Container Images"
+
+  - variable: images.base.tag
+    label: "Base Image Tag (ros2-base)"
+    description: "Tag of the immutable base image (ROS 2 + camera + CUDA)"
+    type: string
+    default: "latest"
+    required: true
+    group: "Container Images"
+
+  - variable: images.overlayPack.tag
+    label: "Overlay Pack Image Tag (ros2-overlay-pack)"
+    description: "Tag of the OCI carrier image holding the AI nodes + ML stack + HF models"
+    type: string
+    default: "latest"
+    required: true
+    group: "Container Images"
+
+  # ── Cloud-Edge Topology ──────────────────────────────────────────
+  - variable: nodes.cloud.name
+    label: "Cloud Node"
+    description: "Hostname of the cloud node where PVC, overlay-server (nginx), Job and dashboard run"
+    type: enum
+    default: "kb2"
+    required: true
+    options:
+      - "kb2"
+      - "worker1-kb2"
+    group: "Node Placement"
+
+  - variable: nodes.edge.name
+    label: "Edge Node"
+    description: "Hostname of the edge node where the runtime pod (camera + YOLO + LLaVA + Voxtral) runs"
+    type: enum
+    default: "edgenode01"
+    required: true
+    options:
+      - "edgenode01"
+    group: "Node Placement"
+
+  # ── Overlay Source PVC ───────────────────────────────────────────
+  - variable: overlaySource.size
+    label: "Overlay PVC Size"
+    description: "Size of the cloud-side PVC. Each version of the overlay tarball is ~17 GB. 30Gi covers one version comfortably; bump to 50Gi for two-version coexistence (rollback)"
+    type: enum
+    default: "30Gi"
+    required: true
+    options:
+      - "30Gi"
+      - "50Gi"
+      - "80Gi"
+    group: "Overlay Storage"
+
+  - variable: overlaySource.storageClass
+    label: "PVC Storage Class"
+    description: "K3s default is local-path. Change only if you have a different StorageClass installed (e.g., NFS, Longhorn)"
+    type: string
+    default: "local-path"
+    required: true
+    group: "Overlay Storage"
+
+  # ── Overlay Sync Timeout ─────────────────────────────────────────
+  - variable: overlaySync.timeoutSeconds
+    label: "Overlay Sync Timeout (s)"
+    description: "Max seconds for the edge initContainer to download + extract the ~17 GB tarball. Bump if your LAN is slow"
+    type: enum
+    default: 1800
+    options:
+      - 600
+      - 1200
+      - 1800
+      - 3600
+    group: "Overlay Storage"
+
+  # ── Overlay Mount Backend ────────────────────────────────────────
+  - variable: overlayMount.kind
+    label: "Overlay Mount Backend"
+    description: "Where to extract the 17 GB overlay tarball at runtime. Use 'hostPath' if the kubelet's root filesystem (e.g. Jetson SD card) is small but a larger disk is available elsewhere. Default 'emptyDir' lives on the kubelet root-dir and is pod-lifetime."
+    type: enum
+    default: "emptyDir"
+    required: true
+    options:
+      - "emptyDir"
+      - "hostPath"
+    group: "Overlay Storage"
+
+  - variable: overlayMount.hostPath
+    label: "Overlay HostPath (only when kind=hostPath)"
+    description: "Absolute path on the edge node where the overlay will be extracted. Directory created automatically. Used only when Overlay Mount Backend = hostPath. For Jetson with NVMe SSD: /mnt/ssd/overlay-runtime"
+    type: string
+    default: "/mnt/ssd/overlay-runtime"
+    show_if: "overlayMount.kind=hostPath"
+    group: "Overlay Storage"
+
+  # ── Experiment Scenario ──────────────────────────────────────────
+  - variable: ros.domainId
+    label: "ROS Domain ID"
+    description: "Isolates ROS 2 communication between experiments"
+    type: enum
+    default: "42"
+    required: true
+    options:
+      - "42"
+      - "1"
+      - "2"
+      - "3"
+    group: "Experiment"
+
+  - variable: camera.fps
+    label: "Camera FPS"
+    description: "0 = unlimited (native camera rate). For benchmarks: S1=10, S2=20, S3=30"
+    type: enum
+    default: "0"
+    required: true
+    options:
+      - "0"
+      - "10"
+      - "20"
+      - "30"
+    group: "Experiment"
+
+  # ── Camera ───────────────────────────────────────────────────────
+  - variable: camera.device
+    label: "Camera Device"
+    description: "Path to the camera device on the edge node (e.g. /dev/video0, /dev/video1)"
+    type: string
+    default: "/dev/video1"
+    group: "Camera"
+
+  - variable: camera.syntheticMode
+    label: "Camera Source"
+    description: "true = Synthetic test frames (no hardware) | false = Real camera on edge node"
+    type: boolean
+    default: false
+    group: "Camera"
+
+  # ── YOLO ─────────────────────────────────────────────────────────
+  - variable: yolo.publishDebugImage
+    label: "Publish Debug Image"
+    description: "Publish annotated YOLO detection image (required for dashboard video feed)"
+    type: enum
+    default: "true"
+    options:
+      - "true"
+      - "false"
+    group: "YOLO"
+
+  - variable: yolo.publishMetrics
+    label: "Publish Benchmark Metrics"
+    description: "Enable latency and inference time metrics on ROS topics"
+    type: enum
+    default: "true"
+    options:
+      - "true"
+      - "false"
+    group: "YOLO"
+
+  - variable: yolo.filterClasses
+    label: "Filter Detection Classes"
+    description: "COCO class IDs to detect (empty = all 80). Examples: '0' = person, '0,56,60' = person+chair+screen"
+    type: string
+    default: "0,56,60"
+    group: "YOLO"
+
+  # ── LLaVA — Visual Reasoning ─────────────────────────────────────
+  - variable: llava.enabled
+    label: "Enable LLaVA"
+    description: "Deploy LLaVA-1.5-7b for visual scene understanding and reasoning"
+    type: boolean
+    default: true
+    group: "LLaVA — Razonamiento Visual"
+
+  - variable: llava.triggerOnYolo
+    label: "Trigger on YOLO Detection"
+    description: "Automatically analyze scene when YOLO detects objects"
+    type: boolean
+    default: true
+    show_if: "llava.enabled=true"
+    group: "LLaVA — Razonamiento Visual"
+
+  - variable: llava.yoloTriggerIntervalS
+    label: "YOLO Trigger Interval (s)"
+    description: "Minimum seconds between YOLO-triggered LLaVA inferences (GPU throttle)"
+    type: enum
+    default: 30.0
+    show_if: "llava.enabled=true&&llava.triggerOnYolo=true"
+    options:
+      - 5.0
+      - 8.0
+      - 15.0
+      - 30.0
+    group: "LLaVA — Razonamiento Visual"
+
+  - variable: llava.load4bit
+    label: "4-bit Quantization"
+    description: "Load LLaVA in 4-bit on amd64 (Jetson always uses FP16). Reduces VRAM ~14GB → ~4GB"
+    type: boolean
+    default: true
+    show_if: "llava.enabled=true"
+    group: "LLaVA — Razonamiento Visual"
+
+  - variable: llava.maxNewTokens
+    label: "Max Response Tokens"
+    description: "Maximum tokens LLaVA generates per inference (longer = slower)"
+    type: enum
+    default: 150
+    show_if: "llava.enabled=true"
+    options:
+      - 50
+      - 100
+      - 150
+      - 250
+    group: "LLaVA — Razonamiento Visual"
+
+  # ── Voxtral — Voice Interaction ──────────────────────────────────
+  - variable: voxtral.enabled
+    label: "Enable Voxtral"
+    description: "Deploy Voxtral-Mini-3B for voice interaction (text-mode in this pattern)"
+    type: boolean
+    default: true
+    group: "Voxtral — Interacción por Voz"
+
+  - variable: voxtral.audioMode
+    label: "Audio Mode"
+    description: "FALSE recommended for overlay: transformers 4.48 (LLaVA constraint) lacks VoxtralProcessor (added in 4.54). Voxtral falls back to TEXT_SIMULATION mode automatically. Browser audio still works."
+    type: boolean
+    default: false
+    show_if: "voxtral.enabled=true"
+    group: "Voxtral — Interacción por Voz"
+
+  # ── Dashboard ────────────────────────────────────────────────────
+  - variable: dashboard.enabled
+    label: "Enable Dashboard"
+    description: "Deploy the ROS 2 dashboard for visualization and monitoring"
+    type: boolean
+    default: true
+    group: "Dashboard"
+
+  - variable: dashboard.image.tag
+    label: "Dashboard Image Tag"
+    description: "Docker image tag for the dashboard"
+    type: string
+    default: "latest"
+    show_if: "dashboard.enabled=true"
+    required: true
+    group: "Dashboard"
+
+  - variable: dashboard.nodeHostname
+    label: "Dashboard Node (Cloud)"
+    description: "Hostname of the cloud node where the dashboard runs (empty = scheduler decides)"
+    type: enum
+    default: ""
+    show_if: "dashboard.enabled=true"
+    required: false
+    options:
+      - ""
+      - "kb2"
+      - "worker1-kb2"
+    group: "Dashboard"
+
+  - variable: dashboard.peerReadyGraceSeconds
+    label: "Peer Ready Grace (s)"
+    description: "Seconds the dashboard waits AFTER runtime DNS resolves, before starting rosbridge. Gives time for LLaVA + Voxtral models to load"
+    type: enum
+    default: 60
+    show_if: "dashboard.enabled=true"
+    options:
+      - 30
+      - 60
+      - 90
+      - 120
+    group: "Dashboard"
+
+  - variable: dashboard.service.type
+    label: "Dashboard Service Type"
+    description: "Kubernetes service type for dashboard access"
+    type: enum
+    default: "NodePort"
+    show_if: "dashboard.enabled=true"
+    options:
+      - "NodePort"
+      - "ClusterIP"
+    group: "Dashboard"
+
+  - variable: dashboard.service.httpNodePort
+    label: "Dashboard HTTP NodePort"
+    description: "NodePort for HTTP (leave 0 for auto-assignment)"
+    type: int
+    default: 31406
+    show_if: "dashboard.enabled=true&&dashboard.service.type=NodePort"
+    required: false
+    group: "Dashboard"
+
+  - variable: dashboard.service.wsNodePort
+    label: "Dashboard WebSocket NodePort"
+    description: "NodePort for rosbridge WebSocket (leave 0 for auto-assignment)"
+    type: int
+    default: 31407
+    show_if: "dashboard.enabled=true&&dashboard.service.type=NodePort"
+    required: false
+    group: "Dashboard"

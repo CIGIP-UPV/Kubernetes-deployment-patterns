@@ -1,0 +1,23 @@
+{{- if .Values.llava.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ros2-microservices.fullname" . }}-llava-peers
+  labels:
+    {{- include "ros2-microservices.labels" . | nindent 4 }}
+    component: llava
+spec:
+  clusterIP: None
+  # Publish DNS for non-Ready pods so wait-for-peers initContainers don't
+  # deadlock. Without this, K8s only publishes DNS for Ready pods, but our
+  # initContainers prevent pods from becoming Ready until they can reach
+  # peer DNS — a chicken-and-egg cycle.
+  publishNotReadyAddresses: true
+  selector:
+    app: llava
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: dds
+      port: 7400
+      protocol: UDP
+{{- end }}

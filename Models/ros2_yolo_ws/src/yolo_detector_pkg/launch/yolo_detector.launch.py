@@ -12,7 +12,8 @@ def generate_launch_description():
                 'model_path': 'yolov8n.pt',       # cambia a yolov8s.pt si tienes más GPU
                 'conf': 0.25,
                 'image_topic': '/camera/image_raw',
-                'publish_debug_image': True
+                'publish_debug_image': True,
+                'filter_classes': '',              # '' = todas, '0' = solo personas, '0,16,17' = personas+perros+gatos
             }]
         )
     ])

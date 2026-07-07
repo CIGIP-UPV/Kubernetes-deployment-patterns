@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "dynamic-loader.fullname" . }}-peers
+  labels:
+    {{- include "dynamic-loader.labels" . | nindent 4 }}
+    pattern: dynamic-loader
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ include "dynamic-loader.name" . }}-runtime
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: dds
+      port: 7400
+      protocol: UDP
+---
+# Internal Service for the orchestrator HTTP API (cluster-internal use,
+# e.g., the bootstrap Job and the dashboard browser).
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "dynamic-loader.fullname" . }}-orchestrator-api
+  labels:
+    {{- include "dynamic-loader.labels" . | nindent 4 }}
+    component: orchestrator
+spec:
+  type: {{ if .Values.dashboard.orchestratorApiNodePort }}NodePort{{ else }}ClusterIP{{ end }}
+  selector:
+    app: {{ include "dynamic-loader.name" . }}-runtime
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: api
+      port: {{ .Values.orchestrator.port }}
+      targetPort: api
+      {{- if .Values.dashboard.orchestratorApiNodePort }}
+      nodePort: {{ .Values.dashboard.orchestratorApiNodePort }}
+      {{- end }}
+      protocol: TCP

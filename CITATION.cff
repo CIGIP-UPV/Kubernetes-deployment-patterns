@@ -1,0 +1,74 @@
+cff-version: 1.2.0
+title: >-
+  Analysis of Distributed AI Model Architectures for Cloud-Edge Robotic
+  Systems Utilizing ROS 2 — Reproducibility artifact
+message: >-
+  If you use this software or the experimental campaign data archived
+  alongside it, please cite both the article and this repository.
+type: software
+authors:
+  - family-names: "Mateo-Casalí"
+    given-names: "Miguel Ángel"
+    email: mmateo@cigip.upv.es
+    affiliation: "Research Centre for Production Management and Engineering (CIGIP), Universitat Politècnica de València"
+    orcid: "https://orcid.org/0000-0001-5086-9378"
+  - family-names: "González El Yachouti"
+    given-names: "Daniel"
+    affiliation: "Research Centre for Production Management and Engineering (CIGIP), Universitat Politècnica de València"
+    orcid: "https://orcid.org/0009-0005-5163-0509"
+  - family-names: "Boza"
+    given-names: "Andrés"
+    affiliation: "Research Centre for Production Management and Engineering (CIGIP), Universitat Politècnica de València"
+    orcid: "https://orcid.org/0000-0002-5429-0416"
+  - family-names: "Fraile"
+    given-names: "Francisco"
+    affiliation: "Research Centre for Production Management and Engineering (CIGIP), Universitat Politècnica de València"
+    orcid: "https://orcid.org/0000-0003-0852-8953"
+repository-code: "https://github.com/CIGIP-UPV/Kubernetes-deployment-patterns"
+url: "https://github.com/CIGIP-UPV/Kubernetes-deployment-patterns"
+abstract: >-
+  This repository contains the complete reproducibility artifact for the
+  comparative evaluation of four ROS 2 deployment patterns (monolithic
+  containers, microservices, dynamic module loading, overlay workspaces)
+  on a K3s cluster pairing an NVIDIA Jetson AGX Orin edge node with two
+  amd64 cloud nodes. It includes the Dockerfiles for the five container
+  images, the four Helm charts, the ROS 2 packages for the camera, YOLO,
+  LLaVA and Voxtral nodes, the automated benchmark scripts, and the
+  aggregated and raw measurement data of the multi-replicate campaign
+  reported in the accompanying article.
+keywords:
+  - cloud-edge robotics
+  - ROS 2
+  - Kubernetes
+  - Helm
+  - edge AI
+  - containerised robotics
+  - deployment patterns
+  - NVIDIA Jetson
+  - K3s
+  - reproducibility artifact
+license: Apache-2.0
+version: 1.0.0
+date-released: "2026-05-27"
+doi: "10.5281/zenodo.20492495"
+preferred-citation:
+  type: article
+  title: >-
+    Analysis of Distributed AI Model Architectures for Cloud-Edge Robotic
+    Systems Utilizing ROS 2
+  authors:
+    - family-names: "Mateo-Casalí"
+      given-names: "Miguel Ángel"
+      orcid: "https://orcid.org/0000-0001-5086-9378"
+    - family-names: "González El Yachouti"
+      given-names: "Daniel"
+      orcid: "https://orcid.org/0009-0005-5163-0509"
+    - family-names: "Boza"
+      given-names: "Andrés"
+      orcid: "https://orcid.org/0000-0002-5429-0416"
+    - family-names: "Fraile"
+      given-names: "Francisco"
+      orcid: "https://orcid.org/0000-0003-0852-8953"
+  journal: IEEE Access
+  year: 2026
+  doi: ""

@@ -1,0 +1,19 @@
+{{- if .Values.camera.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ros2-microservices.fullname" . }}-camera-peers
+  labels:
+    {{- include "ros2-microservices.labels" . | nindent 4 }}
+    component: camera
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true   # publish DNS during init to avoid deadlocks
+  selector:
+    app: camera
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: dds
+      port: 7400
+      protocol: UDP
+{{- end }}

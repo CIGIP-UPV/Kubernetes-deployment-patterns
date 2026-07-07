@@ -1,34 +1,54 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-monolithic
-  tag: v1
-  pullPolicy: IfNotPresent
-imagePullSecrets: []
+  repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-monolithic
+  tag: latest
+  pullPolicy: Always
+
+imagePullSecretName: regcred
 
 ros:
   domainId: "42"
   rmwImplementation: rmw_cyclonedds_cpp
   localhostOnly: "0"
 
-network:
-  hostNetwork: true
+nodeHostname: ""
+nodeSelector: {}
+affinity: {}
+tolerations: []
 
 camera:
   device: /dev/video0
   width: 1280
   height: 720
-  fps: 10
+  fps: 0  # 0 = unlimited (native camera rate); >0 = limit to N FPS
   frameId: camera
-  syntheticMode: true
-  mountVideoDevice: false
+  syntheticMode: false
+  mountVideoDevice: true
 
 yolo:
   modelPath: /opt/models/yolov8n.pt
   conf: 0.25
-  publishDebugImage: "false"
+  publishDebugImage: "true"
   publishMetrics: "true"
   startDelaySeconds: 2
+  filterClasses: ""  # "" = all 80 COCO classes, "0" = person only, "0,16,17" = person+dog+cat
+
+llava:
+  enabled: true
+  modelId: llava-hf/llava-1.5-7b-hf
+  triggerOnYolo: true    # Auto-trigger on YOLO detections (parity with microservices); throttled by interval below
+  yoloTriggerIntervalS: 30.0
+  maxNewTokens: 150
+  load4bit: true
+  startDelaySeconds: 15  # wait for YOLO to be ready first
+
+voxtral:
+  enabled: true
+  audioMode: true  # Audio + GPU inference enabled (FP16 on Jetson)
+  # Voxtral-Mini-3B-2507 is the HF-transformers-compatible Voxtral model.
+  # The 4B-Realtime-2602 variant is vLLM-only (no preprocessor_config.json).
+  modelId: mistralai/Voxtral-Mini-3B-2507
 
 topics:
   image: /camera/image_raw
@@ -36,22 +56,73 @@ topics:
   debugImage: /detections/image
   latency: /benchmark/latency_ms
   inference: /benchmark/inference_ms
+  llavaResponse: /llava/response
+  llavaLatency: /llava/metrics_latency_ms
+  llavaInference: /llava/metrics_inference_ms
+  llavaTrigger: /llava/trigger
+  voiceCommand: /voice/command
+  voiceTranscript: /voice/transcript
+  voiceResponse: /voice/response
+  voiceLatency: /voice/metrics_latency_ms
 
-resources:
-  requests:
-    cpu: 1000m
-    memory: 2Gi
-  limits:
-    cpu: 4000m
-    memory: 8Gi
+# ── NVIDIA GPU (Jetson AGX Orin) ──
+gpu:
+  enabled: true
+  runtimeClassName: nvidia         # Pod-level runtimeClass (nvidia-container-runtime)
+  visibleDevices: "all"           # NVIDIA_VISIBLE_DEVICES
+  driverCapabilities: "compute,utility"  # NVIDIA_DRIVER_CAPABILITIES
+  requestGpuResource: true        # Request nvidia.com/gpu in resource limits
+  count: 1                        # Number of GPUs to request
+
+resources: {}
+
+# ── HuggingFace cache (DISABLED — models baked into image) ──
+# LLaVA and Voxtral weights are now BAKED INTO the Docker image at build time
+# via snapshot_download. Mounting a hostPath at /opt/huggingface_cache hides
+# the in-image cache and breaks `from_pretrained(local_files_only=True)` with
+# "No local files found". Re-enable only to override with a checkpoint stored
+# on the edge node (must populate the hostPath manually).
+hfCache:
+  enabled: false
+  hostPath: /var/lib/ros2exp/hf_cache   # edgenode01 filesystem
+  mountPath: /opt/huggingface_cache     # matches hf_cache_dir param in *_node.py
+  type: DirectoryOrCreate
+
+# ── CycloneDDS Unicast (cloud-edge communication) ──
+cyclonedds:
+  enabled: true
+  allowMulticast: "false"
+  extraPeers: []  # Additional peer addresses (e.g., other charts' StatefulSets)
+
+# ── Dashboard (cloud-side observability) ──
+dashboard:
+  enabled: true
+  pattern: monolithic  # rendered into dashboard.html via Helm `replace` of __PATTERN__
+  # Seconds to wait in the init container after the main pod DNS resolves,
+  # before rosbridge starts. Monolithic loads everything in one pod, so this
+  # is the time for LLaVA + Voxtral to finish transformers/torch/CUDA imports.
+  peerReadyGraceSeconds: 60
+  image:
+    repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard
+    tag: latest
+    pullPolicy: Always
+  nodeHostname: ""  # Pin to cloud node (e.g., worker1-kb2)
+  resources: {}
+  service:
+    type: NodePort
+    httpNodePort: 31406
+    wsNodePort: 31407
+
+benchmark:
+  enabled: false
+  durationSeconds: 120
+  initialWaitSeconds: 60
+  httpPort: 9999
+  ttlSecondsAfterFinished: 3600
 
 securityContext:
   runAsNonRoot: false
   allowPrivilegeEscalation: false
-
-nodeSelector: {}
-affinity: {}
-tolerations: []
 
 service:
   enabled: false
@@ -59,4 +130,9 @@ service:
   port: 8080
 
 nameOverride: ""
-fullnameOverride: ""
+# fullnameOverride pins all resource names to a stable, short prefix
+# regardless of the Helm release name used at install time. This keeps
+# resource names predictable for the IEEE Access reproducibility scripts
+# (results/, dist/metrics/) and well below the K8s 63-character label limit
+# even with the longest sub-resource suffix (e.g. -benchmark-HHMMSS).
+fullnameOverride: "monolithic-pattern"

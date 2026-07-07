@@ -1,0 +1,211 @@
+{{- if .Values.voxtral.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "ros2-microservices.fullname" . }}-voxtral
+  labels:
+    {{- include "ros2-microservices.labels" . | nindent 4 }}
+    pattern: microservices
+    component: voxtral
+spec:
+  serviceName: {{ include "ros2-microservices.fullname" . }}-voxtral-peers
+  replicas: 1
+  selector:
+    matchLabels:
+      app: voxtral
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        {{- include "ros2-microservices.labels" . | nindent 8 }}
+        app: voxtral
+        component: voxtral
+        pattern: microservices
+    spec:
+      {{- if .Values.imagePullSecretName }}
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecretName }}
+      {{- end }}
+      {{- if .Values.voxtral.nodeHostname }}
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.voxtral.nodeHostname }}
+      {{- else if .Values.voxtral.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.voxtral.nodeSelector | nindent 8 }}
+      {{- else if .Values.voxtral.nodeArch }}
+      nodeSelector:
+        kubernetes.io/arch: {{ .Values.voxtral.nodeArch }}
+      {{- end }}
+      {{- if .Values.voxtral.affinity }}
+      affinity:
+        {{- toYaml .Values.voxtral.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.voxtral.tolerations }}
+      tolerations:
+        {{- toYaml .Values.voxtral.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if and .Values.voxtral.gpu.enabled .Values.gpu.runtimeClassName }}
+      runtimeClassName: {{ .Values.gpu.runtimeClassName }}
+      {{- end }}
+      # ── Wait for DDS peers to be DNS-resolvable before Voxtral starts.
+      # Same rationale as in llava-statefulset.yaml: CycloneDDS resolves
+      # the unicast peer list ONCE at startup; if a peer's headless-service
+      # DNS isn't ready, that peer is permanently flagged "unknown address"
+      # and DDS never re-tries. Block on camera/yolo/dashboard DNS first.
+      initContainers:
+        - name: wait-for-peers
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              FULLNAME="{{ include "ros2-microservices.fullname" . }}"
+              NS="{{ .Release.Namespace }}"
+              PEERS=""
+              {{- if .Values.camera.enabled }}
+              PEERS="$PEERS ${FULLNAME}-camera-0.${FULLNAME}-camera-peers.${NS}.svc.cluster.local"
+              {{- end }}
+              {{- if .Values.yolo.enabled }}
+              PEERS="$PEERS ${FULLNAME}-yolo-0.${FULLNAME}-yolo-peers.${NS}.svc.cluster.local"
+              {{- end }}
+              {{- if .Values.dashboard.enabled }}
+              PEERS="$PEERS ${FULLNAME}-dashboard-0.${FULLNAME}-dashboard-peers.${NS}.svc.cluster.local"
+              {{- end }}
+              for PEER in $PEERS; do
+                echo "[init] Waiting for DDS peer DNS: $PEER"
+                until nslookup "$PEER" >/dev/null 2>&1; do
+                  echo "[init]   $PEER not resolvable yet, retrying in 3s..."
+                  sleep 3
+                done
+                echo "[init]   $PEER resolved"
+              done
+              echo "[init] All peers resolved — starting Voxtral"
+      containers:
+        - name: voxtral
+          image: "{{ .Values.images.voxtral.repository }}:{{ .Values.images.voxtral.tag }}"
+          imagePullPolicy: {{ .Values.images.voxtral.pullPolicy }}
+          env:
+            - name: ROS_DOMAIN_ID
+              value: {{ .Values.ros.domainId | quote }}
+            - name: RMW_IMPLEMENTATION
+              value: {{ .Values.ros.rmwImplementation | quote }}
+            - name: ROS_LOCALHOST_ONLY
+              value: {{ .Values.ros.localhostOnly | quote }}
+            - name: VOXTRAL_AUDIO_MODE
+              value: {{ .Values.voxtral.audioMode | quote }}
+            - name: VOXTRAL_MODEL_ID
+              value: {{ .Values.voxtral.modelId | quote }}
+            - name: VOICE_COMMAND_TOPIC
+              value: {{ .Values.topics.voiceCommand | quote }}
+            - name: VOICE_TRANSCRIPT_TOPIC
+              value: {{ .Values.topics.voiceTranscript | quote }}
+            - name: VOICE_RESPONSE_TOPIC
+              value: {{ .Values.topics.voiceResponse | quote }}
+            - name: VOICE_LATENCY_TOPIC
+              value: {{ .Values.topics.voiceLatency | quote }}
+            {{- if and .Values.voxtral.gpu.enabled .Values.gpu.enabled }}
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: {{ .Values.gpu.visibleDevices | default "all" | quote }}
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: {{ .Values.gpu.driverCapabilities | default "compute,utility" | quote }}
+            {{- end }}
+            {{- if .Values.cyclonedds.enabled }}
+            - name: CYCLONEDDS_URI
+              value: "file:///etc/cyclonedds/cyclonedds.xml"
+            {{- end }}
+            {{- if .Values.hfCache.enabled }}
+            - name: HF_HOME
+              value: {{ .Values.hfCache.mountPath | quote }}
+            - name: TRANSFORMERS_CACHE
+              value: {{ .Values.hfCache.mountPath | quote }}
+            - name: HF_HUB_CACHE
+              value: {{ .Values.hfCache.mountPath | quote }}
+            {{- end }}
+          command: ["/bin/bash", "-lc"]
+          args:
+            - |
+              set -e
+              source /opt/ros/humble/setup.bash
+              if [ -f /opt/ros_ws/install/setup.bash ]; then
+                source /opt/ros_ws/install/setup.bash
+              fi
+              ros2 run voxtral_pkg voxtral_node --ros-args \
+                -p audio_mode:=${VOXTRAL_AUDIO_MODE} \
+                -p model_id:="${VOXTRAL_MODEL_ID}" \
+                -p command_topic:="${VOICE_COMMAND_TOPIC}" \
+                -p transcript_topic:="${VOICE_TRANSCRIPT_TOPIC}" \
+                -p response_topic:="${VOICE_RESPONSE_TOPIC}" \
+                -p latency_topic:="${VOICE_LATENCY_TOPIC}" &
+              VOXTRAL_PID=$!
+              python3 /opt/scripts/resource_monitor.py &
+              MONITOR_PID=$!
+              wait -n ${VOXTRAL_PID} ${MONITOR_PID}
+              exit 1
+          resources:
+            {{- if and .Values.voxtral.gpu.enabled .Values.gpu.enabled .Values.gpu.requestGpuResource }}
+            limits:
+              nvidia.com/gpu: {{ .Values.gpu.count | default 1 }}
+            {{- end }}
+            {{- with .Values.voxtral.resources }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          volumeMounts:
+            {{- if .Values.cyclonedds.enabled }}
+            - name: cyclonedds
+              mountPath: /etc/cyclonedds
+              readOnly: true
+            {{- end }}
+            {{- if and .Values.voxtral.gpu.enabled .Values.gpu.enabled }}
+            - name: sys-devices-platform
+              mountPath: /sys/devices/platform
+              readOnly: true
+            {{- end }}
+            {{- if .Values.hfCache.enabled }}
+            - name: hf-cache
+              mountPath: {{ .Values.hfCache.mountPath }}
+            {{- end }}
+          startupProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  pgrep -f voxtral_node >/dev/null
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 18
+          livenessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  pgrep -f voxtral_node >/dev/null
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+      {{- if or .Values.cyclonedds.enabled (and .Values.voxtral.gpu.enabled .Values.gpu.enabled) .Values.hfCache.enabled }}
+      volumes:
+        {{- if .Values.cyclonedds.enabled }}
+        - name: cyclonedds
+          configMap:
+            name: {{ include "ros2-microservices.fullname" . }}-cyclonedds
+            items:
+              - key: cyclonedds.xml
+                path: cyclonedds.xml
+        {{- end }}
+        {{- if and .Values.voxtral.gpu.enabled .Values.gpu.enabled }}
+        - name: sys-devices-platform
+          hostPath:
+            path: /sys/devices/platform
+            type: Directory
+        {{- end }}
+        {{- if .Values.hfCache.enabled }}
+        - name: hf-cache
+          hostPath:
+            path: {{ .Values.hfCache.hostPath }}
+            type: {{ .Values.hfCache.type | default "DirectoryOrCreate" }}
+        {{- end }}
+      {{- end }}
+{{- end }}

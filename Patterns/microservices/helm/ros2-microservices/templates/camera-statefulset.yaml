@@ -1,0 +1,113 @@
+{{- if .Values.camera.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "ros2-microservices.fullname" . }}-camera
+  labels:
+    {{- include "ros2-microservices.labels" . | nindent 4 }}
+    pattern: microservices
+    component: camera
+spec:
+  serviceName: {{ include "ros2-microservices.fullname" . }}-camera-peers
+  replicas: 1
+  selector:
+    matchLabels:
+      app: camera
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        {{- include "ros2-microservices.labels" . | nindent 8 }}
+        app: camera
+        component: camera
+        pattern: microservices
+    spec:
+      {{- if .Values.imagePullSecretName }}
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecretName }}
+      {{- end }}
+      {{- if .Values.camera.nodeHostname }}
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.camera.nodeHostname }}
+      {{- else if .Values.camera.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.camera.nodeSelector | nindent 8 }}
+      {{- else if .Values.camera.nodeArch }}
+      nodeSelector:
+        kubernetes.io/arch: {{ .Values.camera.nodeArch }}
+      {{- end }}
+      {{- if .Values.camera.affinity }}
+      affinity:
+        {{- toYaml .Values.camera.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.camera.tolerations }}
+      tolerations:
+        {{- toYaml .Values.camera.tolerations | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: camera
+          image: "{{ .Values.images.camera.repository }}:{{ .Values.images.camera.tag }}"
+          imagePullPolicy: {{ .Values.images.camera.pullPolicy }}
+          {{- if and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode) }}
+          securityContext:
+            privileged: true
+          {{- end }}
+          env:
+            - name: ROS_DOMAIN_ID
+              value: {{ .Values.ros.domainId | quote }}
+            - name: RMW_IMPLEMENTATION
+              value: {{ .Values.ros.rmwImplementation | quote }}
+            - name: ROS_LOCALHOST_ONLY
+              value: {{ .Values.ros.localhostOnly | quote }}
+            {{- if .Values.cyclonedds.enabled }}
+            - name: CYCLONEDDS_URI
+              value: "file:///etc/cyclonedds/cyclonedds.xml"
+            {{- end }}
+          command: ["/bin/bash", "-lc"]
+          args:
+            - |
+              set -e
+              source /opt/ros/humble/setup.bash
+              if [ -f /opt/ros2_cam_ws/install/setup.bash ]; then
+                source /opt/ros2_cam_ws/install/setup.bash
+              fi
+              ros2 run camera_driver_pkg camera_driver --ros-args \
+                -p device:={{ .Values.camera.device | quote }} \
+                -p width:={{ .Values.camera.width }} \
+                -p height:={{ .Values.camera.height }} \
+                -p fps:={{ .Values.camera.fps }} \
+                -p frame_id:={{ .Values.camera.frameId | quote }} \
+                -p synthetic_mode:={{ .Values.camera.syntheticMode | quote }} \
+                -p image_topic:={{ .Values.topics.image | quote }}
+          resources:
+            {{- toYaml .Values.camera.resources | nindent 12 }}
+          {{- if or .Values.cyclonedds.enabled (and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode)) }}
+          volumeMounts:
+            {{- if and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode) }}
+            - name: video-device
+              mountPath: {{ .Values.camera.device }}
+            {{- end }}
+            {{- if .Values.cyclonedds.enabled }}
+            - name: cyclonedds
+              mountPath: /etc/cyclonedds
+              readOnly: true
+            {{- end }}
+          {{- end }}
+      {{- if or .Values.cyclonedds.enabled (and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode)) }}
+      volumes:
+        {{- if and .Values.camera.mountVideoDevice (not .Values.camera.syntheticMode) }}
+        - name: video-device
+          hostPath:
+            path: {{ .Values.camera.device }}
+            type: CharDevice
+        {{- end }}
+        {{- if .Values.cyclonedds.enabled }}
+        - name: cyclonedds
+          configMap:
+            name: {{ include "ros2-microservices.fullname" . }}-cyclonedds
+            items:
+              - key: cyclonedds.xml
+                path: cyclonedds.xml
+        {{- end }}
+      {{- end }}
+{{- end }}

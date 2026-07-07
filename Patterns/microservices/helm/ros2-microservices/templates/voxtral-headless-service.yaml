@@ -1,0 +1,19 @@
+{{- if .Values.voxtral.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ros2-microservices.fullname" . }}-voxtral-peers
+  labels:
+    {{- include "ros2-microservices.labels" . | nindent 4 }}
+    component: voxtral
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true   # publish DNS during init to avoid deadlocks
+  selector:
+    app: voxtral
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: dds
+      port: 7400
+      protocol: UDP
+{{- end }}

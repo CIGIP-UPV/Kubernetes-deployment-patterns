@@ -1,0 +1,94 @@
+# =============================================================================
+# CI/CD Pipeline: Publish Helm charts to gh-pages
+# =============================================================================
+# Docker images are now built locally (from the laptop) and pushed to the
+# GitLab Container Registry manually. This workflow only packages the Helm
+# charts and publishes them to gh-pages so Rancher picks up new versions.
+#
+# Triggers:
+#   - Automatic on push to main when any Patterns/ file changes.
+#   - Manual via workflow_dispatch from the Actions tab.
+# =============================================================================
+
+name: Publish Helm Charts
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Patterns/**'
+      - '.github/workflows/**'
+  workflow_dispatch: {}
+
+jobs:
+  # =========================================================================
+  # Publish Helm charts to GitHub Pages (gh-pages branch)
+  # =========================================================================
+  publish-charts:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.16.4'
+
+      - name: Lint charts
+        run: |
+          # Four deployment patterns analysed in the IEEE Access submission
+          helm lint Patterns/monolithic/helm
+          helm lint Patterns/microservices/helm/ros2-microservices
+          helm lint Patterns/overlay/helm/ros2-overlay
+          helm lint Patterns/dynamic-loader/helm/dynamic-loader
+
+      - name: Package charts
+        run: |
+          mkdir -p dist/charts
+          helm package Patterns/monolithic/helm -d dist/charts
+          helm package Patterns/microservices/helm/ros2-microservices -d dist/charts
+          helm package Patterns/overlay/helm/ros2-overlay -d dist/charts
+          helm package Patterns/dynamic-loader/helm/dynamic-loader -d dist/charts
+
+      - name: Checkout gh-pages (merge existing index)
+        run: |
+          git fetch origin gh-pages:gh-pages || true
+          if git show gh-pages:charts/index.yaml > /tmp/old-index.yaml 2>/dev/null; then
+            echo "Merging with existing index.yaml..."
+            helm repo index dist/charts \
+              --url https://cigip-upv.github.io/Kubernetes-deployment-patterns/charts \
+              --merge /tmp/old-index.yaml
+          else
+            echo "No existing index.yaml, creating fresh..."
+            helm repo index dist/charts \
+              --url https://cigip-upv.github.io/Kubernetes-deployment-patterns/charts
+          fi
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist/charts
+          destination_dir: charts
+          keep_files: true
+          enable_jekyll: false
+
+      - name: Summary
+        run: |
+          echo "### Helm Charts Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Chart | Version |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|---------|" >> $GITHUB_STEP_SUMMARY
+          for tgz in dist/charts/*.tgz; do
+            name=$(basename "$tgz" .tgz)
+            echo "| ${name} | published |" >> $GITHUB_STEP_SUMMARY
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Refresh the repository in Rancher to see the new versions." >> $GITHUB_STEP_SUMMARY

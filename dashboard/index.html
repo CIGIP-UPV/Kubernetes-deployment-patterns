@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CIGIP — ROS 2 Detection Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="lib/roslib.min.js"></script>
+<style>
+  :root {
+    --cigip-red: #9B1B30;
+    --cigip-red-dark: #7A1526;
+    --cigip-red-light: #C62040;
+    --cigip-red-bg: rgba(155,27,48,0.06);
+    --cigip-red-border: rgba(155,27,48,0.18);
+    --bg: #FAFAFA;
+    --card: #FFFFFF;
+    --border: #E8E8EC;
+    --border-strong: #D0D0D8;
+    --text: #1A1A2E;
+    --text-secondary: #555568;
+    --muted: #8888A0;
+    --success: #1B873F;
+    --success-bg: rgba(27,135,63,0.08);
+    --warn: #C67F17;
+    --warn-bg: rgba(198,127,23,0.08);
+    --error: #DC2626;
+    --error-bg: rgba(220,38,38,0.06);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--cigip-red);
+    padding: 0 28px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    height: 56px;
+    box-shadow: 0 2px 8px rgba(154,27,48,0.25);
+    position: relative;
+    z-index: 10;
+  }
+  header .logo-group { display: flex; align-items: center; gap: 14px; }
+  header .logo-mark {
+    width: 32px; height: 32px;
+    background: rgba(255,255,255,0.18);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 11px; color: #fff; letter-spacing: 1px;
+  }
+  header .logo-text { display: flex; flex-direction: column; line-height: 1.15; }
+  header .logo-title { font-size: 15px; font-weight: 700; color: #fff; letter-spacing: 0.3px; }
+  header .logo-sub { font-size: 10px; font-weight: 400; color: rgba(255,255,255,0.7); }
+  header .separator { width: 1px; height: 28px; background: rgba(255,255,255,0.2); }
+  header .nav-label {
+    font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.9);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  header .status {
+    margin-left: auto; display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: rgba(255,255,255,0.85); font-weight: 500;
+  }
+  header .status .conn-url {
+    font-size: 10px; color: rgba(255,255,255,0.5);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .dot.live { background: #4ADE80; box-shadow: 0 0 8px rgba(74,222,128,0.5); animation: pulse 1.8s infinite; }
+  .dot.connecting { background: #FCD34D; box-shadow: 0 0 6px rgba(252,211,77,0.4); animation: pulse 1.8s infinite; }
+  .dot.off { background: #F87171; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  /* ── Page Layout ── */
+  .page { padding: 16px; max-width: 1200px; margin: 0 auto; }
+
+  /* ── Video Panel ── */
+  .video-panel {
+    background: #000; border: 1px solid var(--border); border-radius: 10px;
+    overflow: hidden; position: relative;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    aspect-ratio: 16 / 9; max-height: 60vh;
+    margin-bottom: 16px;
+  }
+  .video-panel canvas { width: 100%; height: 100%; display: block; }
+  .video-overlay {
+    position: absolute; top: 14px; left: 14px;
+    background: rgba(26,26,46,0.85); backdrop-filter: blur(8px);
+    padding: 8px 14px; border-radius: 8px;
+    font-size: 12px; color: #fff; font-family: 'JetBrains Mono', monospace;
+  }
+  .video-overlay .fps { font-size: 20px; font-weight: 700; color: #4ADE80; }
+  .video-overlay .fps-label { color: rgba(255,255,255,0.6); }
+  .video-overlay .res { font-size: 10px; color: rgba(255,255,255,0.45); margin-top: 2px; }
+
+  .waiting-overlay {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; background: #1A1A2E; z-index: 5;
+    transition: opacity 0.5s;
+  }
+  .waiting-overlay.hidden { opacity: 0; pointer-events: none; }
+  .waiting-icon {
+    width: 64px; height: 64px;
+    border: 3px solid rgba(155,27,48,0.3); border-top-color: var(--cigip-red);
+    border-radius: 50%; animation: spin 1.2s linear infinite; margin-bottom: 20px;
+  }
+  .waiting-overlay.disconnected .waiting-icon { border-top-color: #F87171; animation: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .waiting-text { color: rgba(255,255,255,0.7); font-size: 14px; font-weight: 500; }
+  .waiting-sub { color: rgba(255,255,255,0.35); font-size: 11px; margin-top: 8px; font-family: 'JetBrains Mono', monospace; }
+
+  .footer-strip {
+    position: absolute; bottom: 14px; right: 14px;
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(26,26,46,0.75); backdrop-filter: blur(8px);
+    padding: 6px 12px; border-radius: 6px;
+    font-size: 10px; color: rgba(255,255,255,0.5); z-index: 6;
+  }
+  .footer-strip .upv-badge {
+    background: var(--cigip-red); color: #fff; padding: 2px 6px;
+    border-radius: 3px; font-weight: 700; font-size: 9px; letter-spacing: 0.5px;
+  }
+
+  /* ── Grid Rows ── */
+  .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .row-1 { margin-bottom: 16px; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .card h3 {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 1.8px;
+    color: var(--muted); margin-bottom: 14px; font-weight: 600;
+    padding-bottom: 8px; border-bottom: 2px solid var(--cigip-red);
+  }
+
+  /* ── Metrics Grid (YOLO / LLaVA) ── */
+  .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .metric {
+    background: var(--cigip-red-bg); border: 1px solid var(--cigip-red-border);
+    border-radius: 8px; padding: 12px 10px; text-align: center;
+  }
+  .metric .value {
+    font-size: 22px; font-weight: 700; color: var(--cigip-red);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .metric .label {
+    font-size: 9px; color: var(--text-secondary); margin-top: 4px;
+    text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500;
+  }
+
+  /* ── Detection List ── */
+  .det-list { height: 105px; overflow-y: auto; margin-top: 14px; }
+  .det-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 13px;
+  }
+  .det-item:last-child { border-bottom: none; }
+  .det-color { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+  .det-class { flex: 1; font-weight: 600; color: var(--text); }
+  .det-conf { color: var(--cigip-red); font-weight: 700; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .det-empty { color: var(--muted); font-size: 12px; text-align: center; padding: 12px 0; }
+
+  /* ── LLaVA Response ── */
+  .llava-response {
+    margin-top: 14px; padding: 14px; border-radius: 8px;
+    background: rgba(155,27,48,0.04); border: 1px solid rgba(155,27,48,0.1);
+    font-size: 13px; color: var(--text-secondary); line-height: 1.5;
+    min-height: 60px; font-style: italic;
+  }
+  .llava-response.has-response { font-style: normal; color: var(--text); }
+
+  /* ── Voxtral ── */
+  .voxtral-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px; }
+  .voxtral-field label {
+    display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--muted); font-weight: 600; margin-bottom: 6px;
+  }
+  .voxtral-field .text-display {
+    background: #F8F8FA; border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px 12px; font-size: 13px; min-height: 38px;
+    font-family: 'JetBrains Mono', monospace; color: var(--text);
+  }
+  .voxtral-field .text-display.placeholder { color: var(--muted); font-style: italic; font-family: 'Inter', sans-serif; }
+  .voxtral-input-row { display: flex; gap: 10px; }
+  .voxtral-input-row input {
+    flex: 1; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 13px; font-family: 'Inter', sans-serif; outline: none;
+    transition: border-color 0.2s;
+  }
+  .voxtral-input-row input:focus { border-color: var(--cigip-red); }
+  .voxtral-input-row button {
+    padding: 10px 20px; background: var(--cigip-red); color: #fff; border: none;
+    border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: background 0.2s;
+  }
+  .voxtral-input-row button:hover { background: var(--cigip-red-dark); }
+
+  /* ── Resource Bars ── */
+  .resource-bar { margin-bottom: 10px; }
+  .resource-bar:last-child { margin-bottom: 0; }
+  .resource-bar .bar-header {
+    display: flex; justify-content: space-between;
+    font-size: 11px; margin-bottom: 5px; font-weight: 500; color: var(--text-secondary);
+  }
+  .resource-bar .bar-header span:last-child { font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+  .resource-bar .bar-track { height: 7px; background: #EEEEF2; border-radius: 4px; overflow: hidden; }
+  .resource-bar .bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+  .bar-fill.cpu { background: var(--cigip-red); }
+  .bar-fill.mem { background: var(--cigip-red-light); }
+  .bar-fill.gpu { background: var(--success); }
+
+  /* ── Benchmark Table ── */
+  .bench-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 0; font-size: 12px; border-bottom: 1px solid #F4F4F6;
+  }
+  .bench-row:last-child { border-bottom: none; }
+  .bench-row .key { color: var(--muted); font-weight: 500; }
+  .bench-row .val { font-weight: 600; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text); }
+
+  /* ── Config ── */
+  .config-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 0; font-size: 12px; border-bottom: 1px solid #F4F4F6;
+  }
+  .config-row:last-child { border-bottom: none; }
+  .config-row .key { color: var(--muted); font-weight: 500; }
+  .config-row .val { color: var(--cigip-red); font-weight: 600; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+
+  /* ── Uptime ── */
+  .uptime {
+    font-size: 10px; color: var(--muted); text-align: center;
+    padding-top: 4px; font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #D0D0D8; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-group">
+    <div class="logo-mark">CIGIP</div>
+    <div class="logo-text">
+      <span class="logo-title">ROS 2 Detection Dashboard</span>
+      <span class="logo-sub">Universitat Politècnica de València</span>
+    </div>
+  </div>
+  <div class="separator"></div>
+  <div class="nav-label">Kubernetes Deployment Patterns</div>
+  <div class="status">
+    <span class="dot connecting" id="statusDot"></span>
+    <span id="statusText">CONNECTING</span>
+    <span class="conn-url" id="headerUrl"></span>
+  </div>
+</header>
+
+<div class="page">
+  <!-- Video Panel -->
+  <div class="video-panel">
+    <canvas id="videoCanvas"></canvas>
+    <div class="waiting-overlay" id="waitingOverlay">
+      <div class="waiting-icon"></div>
+      <div class="waiting-text" id="waitingText">Connecting to rosbridge...</div>
+      <div class="waiting-sub" id="waitingSub"></div>
+    </div>
+    <div class="video-overlay" id="videoOverlay" style="display:none">
+      <div><span class="fps" id="fpsDisplay">0.0</span> <span class="fps-label">FPS</span></div>
+      <div class="res" id="resDisplay">-- &times; --</div>
+    </div>
+    <div class="footer-strip">
+      <span class="upv-badge">UPV</span>
+      <span>CIGIP &mdash; I+D+i Cloud-Edge Robotics</span>
+    </div>
+  </div>
+
+  <!-- YOLO + LLaVA Row -->
+  <div class="row-2">
+    <!-- YOLO Card -->
+    <div class="card">
+      <h3>YOLO &mdash; Detection</h3>
+      <div class="metrics-grid">
+        <div class="metric">
+          <div class="value" id="metLatency">--</div>
+          <div class="label">Latency (ms)</div>
+        </div>
+        <div class="metric">
+          <div class="value" id="metInference">--</div>
+          <div class="label">Inference (ms)</div>
+        </div>
+        <div class="metric">
+          <div class="value" id="metDetections">0</div>
+          <div class="label">Detections</div>
+        </div>
+        <div class="metric">
+          <div class="value" id="metPersons">0</div>
+          <div class="label">Persons</div>
+        </div>
+      </div>
+      <div class="det-list" id="detList">
+        <div class="det-empty">No detections in this frame</div>
+      </div>
+    </div>
+
+    <!-- LLaVA Card -->
+    <div class="card">
+      <h3>LLaVA &mdash; Visual Reasoning</h3>
+      <div class="metrics-grid">
+        <div class="metric">
+          <div class="value" id="llavaLatency">--</div>
+          <div class="label">Latency (ms)</div>
+        </div>
+        <div class="metric">
+          <div class="value" id="llavaInference">--</div>
+          <div class="label">Inference (ms)</div>
+        </div>
+      </div>
+      <div class="llava-response" id="llavaResponse">Awaiting visual analysis...</div>
+    </div>
+  </div>
+
+  <!-- Voxtral Row -->
+  <div class="row-1">
+    <div class="card">
+      <h3>Voxtral &mdash; Voice Interaction</h3>
+      <div class="voxtral-grid">
+        <div class="voxtral-field">
+          <label>Operator Command</label>
+          <div class="text-display placeholder" id="voxtralCommand">Awaiting operator input...</div>
+        </div>
+        <div class="voxtral-field">
+          <label>System Response</label>
+          <div class="text-display placeholder" id="voxtralResponse">Awaiting response...</div>
+        </div>
+      </div>
+      <div class="voxtral-input-row">
+        <input type="text" id="voxtralInput" placeholder="Enter a command to send to /voice/command...">
+        <button id="voxtralSend">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resources + Benchmark + Config Row -->
+  <div class="row-3">
+    <!-- Node Resources -->
+    <div class="card">
+      <h3>Node Resources</h3>
+      <div class="resource-bar">
+        <div class="bar-header"><span>CPU</span><span id="cpuVal">--</span></div>
+        <div class="bar-track"><div class="bar-fill cpu" id="cpuBar" style="width:0%"></div></div>
+      </div>
+      <div class="resource-bar">
+        <div class="bar-header"><span>Memory</span><span id="memVal">--</span></div>
+        <div class="bar-track"><div class="bar-fill mem" id="memBar" style="width:0%"></div></div>
+      </div>
+      <div class="resource-bar">
+        <div class="bar-header"><span>GPU</span><span id="gpuVal">--</span></div>
+        <div class="bar-track"><div class="bar-fill gpu" id="gpuBar" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <!-- Benchmark Metrics -->
+    <div class="card">
+      <h3>Benchmark Metrics</h3>
+      <div class="bench-row"><span class="key">T_inf (avg)</span><span class="val" id="bmInfAvg">--</span></div>
+      <div class="bench-row"><span class="key">f_FPS</span><span class="val" id="bmFps">--</span></div>
+      <div class="bench-row"><span class="key">J_inf (jitter)</span><span class="val" id="bmJitter">--</span></div>
+      <div class="bench-row"><span class="key">U_CPU (avg)</span><span class="val" id="bmCpuAvg">--</span></div>
+      <div class="bench-row"><span class="key">U_CPU (max)</span><span class="val" id="bmCpuMax">--</span></div>
+      <div class="bench-row"><span class="key">U_GPU (avg)</span><span class="val" id="bmGpuAvg">--</span></div>
+      <div class="bench-row"><span class="key">U_GPU (max)</span><span class="val" id="bmGpuMax">--</span></div>
+    </div>
+
+    <!-- Configuration -->
+    <div class="card">
+      <h3>Configuration</h3>
+      <div class="config-row"><span class="key">Pattern</span><span class="val" id="cfgPattern">--</span></div>
+      <div class="config-row"><span class="key">Namespace</span><span class="val" id="cfgNamespace">--</span></div>
+      <div class="config-row"><span class="key">Edge Node</span><span class="val" id="cfgNode">--</span></div>
+      <div class="config-row"><span class="key">ROS Domain</span><span class="val" id="cfgDomain">--</span></div>
+      <div class="config-row"><span class="key">YOLO Model</span><span class="val" id="cfgModel">--</span></div>
+      <div class="config-row"><span class="key">Confidence</span><span class="val" id="cfgConf">--</span></div>
+      <div class="config-row"><span class="key">Rosbridge</span><span class="val" id="cfgRosbridge">--</span></div>
+    </div>
+  </div>
+
+  <div class="uptime" id="uptimeDisplay">Dashboard uptime: --</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+//  CIGIP-UPV — ROS 2 Detection Dashboard
+//  Real data via rosbridge WebSocket
+// ═══════════════════════════════════════════════════════════════════
+
+const COCO_NAMES = {
+  0:'person',1:'bicycle',2:'car',3:'motorcycle',4:'airplane',5:'bus',6:'train',
+  7:'truck',8:'boat',9:'traffic light',10:'fire hydrant',11:'stop sign',
+  12:'parking meter',13:'bench',14:'bird',15:'cat',16:'dog',17:'horse',
+  18:'sheep',19:'cow',20:'elephant',21:'bear',22:'zebra',23:'giraffe',
+  24:'backpack',25:'umbrella',26:'handbag',27:'tie',28:'suitcase',29:'frisbee',
+  30:'skis',31:'snowboard',32:'sports ball',33:'kite',34:'baseball bat',
+  35:'baseball glove',36:'skateboard',37:'surfboard',38:'tennis racket',
+  39:'bottle',40:'wine glass',41:'cup',42:'fork',43:'knife',44:'spoon',
+  45:'bowl',46:'banana',47:'apple',48:'sandwich',49:'orange',50:'broccoli',
+  51:'carrot',52:'hot dog',53:'pizza',54:'donut',55:'cake',56:'chair',
+  57:'couch',58:'potted plant',59:'bed',60:'dining table',61:'toilet',
+  62:'tv',63:'laptop',64:'mouse',65:'remote',66:'keyboard',67:'cell phone',
+  68:'microwave',69:'oven',70:'toaster',71:'sink',72:'refrigerator',73:'book',
+  74:'clock',75:'vase',76:'scissors',77:'teddy bear',78:'hair drier',79:'toothbrush'
+};
+
+const PALETTE = [
+  '#C62040','#2563EB','#D97706','#7C3AED','#0891B2',
+  '#059669','#EA580C','#6D28D9','#B45309','#0D9488',
+];
+
+// ── URL Parameters ──
+const params = new URLSearchParams(window.location.search);
+const imageTopicName      = params.get('image_topic')      || '/detections/image/compressed';
+const latencyTopicName    = params.get('latency_topic')     || '/benchmark/latency_ms';
+const inferenceTopicName  = params.get('inference_topic')   || '/benchmark/inference_ms';
+const detectionTopicName  = params.get('detection_topic')   || '/detections';
+const llavaResponseTopic  = params.get('llava_response')    || '/llava/response';
+const llavaLatencyTopic   = params.get('llava_latency')     || '/llava/metrics_latency_ms';
+const llavaInferenceTopic = params.get('llava_inference')    || '/llava/metrics_inference_ms';
+const voiceCommandTopic   = params.get('voice_command')     || '/voice/command';
+const voiceResponseTopic  = params.get('voice_response')    || '/voice/response';
+const voiceTranscriptTopic= params.get('voice_transcript')  || '/voice/transcript';
+
+// Auto-detect rosbridge WebSocket port
+const rosbridgePort = params.get('rosbridge_port') ||
+  (window.location.port && window.location.port !== '8080'
+    ? String(parseInt(window.location.port) + 1)
+    : '9090');
+
+const cfgPattern       = params.get('pattern')    || 'monolithic';
+const cfgNamespace     = params.get('namespace')   || 'ros2exp';
+const cfgNodeName      = params.get('node')        || 'edgenode01';
+const cfgDomainId      = params.get('domain_id')   || '42';
+const cfgModelName     = params.get('model')       || 'yolov8n.pt';
+const cfgConfThreshold = params.get('conf')        || '0.25';
+
+// ── Populate config panel ──
+document.getElementById('cfgPattern').textContent   = cfgPattern;
+document.getElementById('cfgNamespace').textContent  = cfgNamespace;
+document.getElementById('cfgNode').textContent       = cfgNodeName;
+document.getElementById('cfgDomain').textContent     = cfgDomainId;
+document.getElementById('cfgModel').textContent      = cfgModelName;
+document.getElementById('cfgConf').textContent       = cfgConfThreshold;
+
+const rosbridgeUrl = `ws://${window.location.hostname}:${rosbridgePort}`;
+document.getElementById('cfgRosbridge').textContent = rosbridgeUrl;
+document.getElementById('headerUrl').textContent    = rosbridgeUrl;
+document.getElementById('waitingSub').textContent   = rosbridgeUrl;
+
+// ── Dashboard start time ──
+const startTime = new Date();
+
+// ── Canvas Setup ──
+const canvas = document.getElementById('videoCanvas');
+const ctx = canvas.getContext('2d');
+let W, H;
+
+function resize() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  W = canvas.width = rect.width;
+  H = canvas.height = rect.height;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ── Benchmark Accumulators ──
+const bmInfSamples = [];
+const bmCpuSamples = [];
+const bmGpuSamples = [];
+let bmCpuMax = 0;
+let bmGpuMax = 0;
+let gpuDataReceived = false;
+
+// ═══════════════════════════════════════════════════════════════════
+//  ROSBRIDGE CONNECTION
+// ═══════════════════════════════════════════════════════════════════
+
+let ros = null;
+let reconnectTimer = null;
+let isConnected = false;
+let hasReceivedImage = false;
+let framesInWindow = 0;
+let lastFpsUpdate = Date.now();
+
+// Filters out auto-trigger LLaVA descriptions from the Voxtral SYSTEM RESPONSE.
+let awaitingVoxtralResponse = false;
+
+function setConnectionState(state) {
+  const dot = document.getElementById('statusDot');
+  const statusTxt = document.getElementById('statusText');
+  const overlay = document.getElementById('waitingOverlay');
+  const waitTxt = document.getElementById('waitingText');
+
+  if (state === 'connected') {
+    dot.className = 'dot live';
+    statusTxt.textContent = 'CONNECTED';
+    isConnected = true;
+  } else if (state === 'connecting') {
+    dot.className = 'dot connecting';
+    statusTxt.textContent = 'CONNECTING';
+    overlay.classList.remove('hidden', 'disconnected');
+    waitTxt.textContent = 'Connecting to rosbridge...';
+    isConnected = false;
+  } else {
+    dot.className = 'dot off';
+    statusTxt.textContent = 'DISCONNECTED';
+    overlay.classList.remove('hidden');
+    overlay.classList.add('disconnected');
+    waitTxt.textContent = 'Connection lost — retrying...';
+    isConnected = false;
+    hasReceivedImage = false;
+    document.getElementById('videoOverlay').style.display = 'none';
+  }
+}
+
+function initRosConnection() {
+  setConnectionState('connecting');
+  ros = new ROSLIB.Ros({ url: rosbridgeUrl });
+
+  ros.on('connection', () => {
+    console.log('[dashboard] ROS connected to', rosbridgeUrl);
+    setConnectionState('connected');
+    subscribeToTopics();
+  });
+  ros.on('error', () => { setConnectionState('disconnected'); scheduleReconnect(); });
+  ros.on('close', () => { setConnectionState('disconnected'); scheduleReconnect(); });
+}
+
+function scheduleReconnect() {
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+  reconnectTimer = setTimeout(() => initRosConnection(), 5000);
+}
+
+function subscribeToTopics() {
+  // ── Image (CompressedImage) ──
+  new ROSLIB.Topic({
+    ros, name: imageTopicName,
+    messageType: 'sensor_msgs/msg/CompressedImage',
+    throttle_rate: 200
+  }).subscribe(function(msg) {
+    if (!isConnected) return;
+    if (!hasReceivedImage) {
+      hasReceivedImage = true;
+      document.getElementById('waitingOverlay').classList.add('hidden');
+      document.getElementById('videoOverlay').style.display = 'block';
+    }
+    drawLiveImage(msg);
+    framesInWindow++;
+  });
+
+  // ── YOLO Latency ──
+  new ROSLIB.Topic({ ros, name: latencyTopicName, messageType: 'std_msgs/msg/Float32' })
+    .subscribe(function(msg) {
+      if (!isConnected) return;
+      document.getElementById('metLatency').textContent = msg.data.toFixed(1);
+    });
+
+  // ── YOLO Inference ──
+  new ROSLIB.Topic({ ros, name: inferenceTopicName, messageType: 'std_msgs/msg/Float32' })
+    .subscribe(function(msg) {
+      if (!isConnected) return;
+      document.getElementById('metInference').textContent = msg.data.toFixed(1);
+      bmInfSamples.push(msg.data);
+    });
+
+  // ── YOLO Detections ──
+  new ROSLIB.Topic({ ros, name: detectionTopicName, messageType: 'vision_msgs/msg/Detection2DArray' })
+    .subscribe(function(msg) {
+      if (!isConnected) return;
+      const dets = msg.detections;
+      let personCount = 0;
+      const detItems = [];
+      for (const d of dets) {
+        if (d.results && d.results.length > 0) {
+          const hyp = d.results[0].hypothesis;
+          const cls = parseInt(hyp.class_id) || 0;
+          const conf = hyp.score || 0;
+          const name = COCO_NAMES[cls] || `class_${cls}`;
+          if (cls === 0) personCount++;
+          detItems.push({ name, conf, cls });
+        }
+      }
+      document.getElementById('metDetections').textContent = detItems.length;
+      document.getElementById('metPersons').textContent = personCount;
+      if (detItems.length === 0) {
+        document.getElementById('detList').innerHTML = '<div class="det-empty">No detections in this frame</div>';
+      } else {
+        document.getElementById('detList').innerHTML = detItems.map(d => `
+          <div class="det-item">
+            <div class="det-color" style="background:${PALETTE[d.cls % PALETTE.length]}"></div>
+            <span class="det-class">${d.name}</span>
+            <span class="det-conf">${(d.conf*100).toFixed(0)}%</span>
+          </div>`).join('');
+      }
+    });
+
+  // ── LLaVA Latency ──
+  new ROSLIB.Topic({ ros, name: llavaLatencyTopic, messageType: 'std_msgs/msg/Float32' })
+    .subscribe(function(msg) {
+      if (!isConnected) return;
+      document.getElementById('llavaLatency').textContent = msg.data.toFixed(0);
+    });
+
+  // ── LLaVA Inference ──
+  new ROSLIB.Topic({ ros, name: llavaInferenceTopic, messageType: 'std_msgs/msg/Float32' })
+    .subscribe(function(msg) {
+      if (!isConnected) return;
+      document.getElementById('llavaInference').textContent = msg.data.toFixed(0);
+    });
+
+  // ── LLaVA Response ──
+  // Always updates the LLaVA visual-reasoning card. Mirrors into the Voxtral
+  // SYSTEM RESPONSE field ONLY when the user has just submitted a voice/text
+  // command (awaitingVoxtralResponse=true), so the auto-trigger of LLaVA
+  // (every ~8 s on YOLO detections) doesn't overwrite the voice answer.
+  new ROSLIB.Topic({ ros, name: llavaResponseTopic, messageType: 'std_msgs/msg/String' })
+    .subscribe(function(msg) {
+      if (!isConnected) return;
+      const el = document.getElementById('llavaResponse');
+      el.textContent = msg.data;
+      el.classList.add('has-response');
+
+      if (awaitingVoxtralResponse) {
+        const voxEl = document.getElementById('voxtralResponse');
+        if (voxEl) {
+          voxEl.textContent = msg.data;
+          voxEl.classList.remove('placeholder');
+        }
+        awaitingVoxtralResponse = false;
+      }
+    });
+
+  // ── Voxtral Response (back-channel from voxtral_node) ──
+  // Voxtral republishes LLaVA answers here when it finishes its own pipeline.
+  // If it never fires, the /llava/response mirror above keeps the box useful.
+  new ROSLIB.Topic({ ros, name: voiceResponseTopic, messageType: 'std_msgs/msg/String' })
+    .subscribe(function(msg) {
+      if (!isConnected) return;
+      const el = document.getElementById('voxtralResponse');
+      el.textContent = msg.data;
+      el.classList.remove('placeholder');
+    });
+
+  // ── Voxtral Transcript ──
+  new ROSLIB.Topic({ ros, name: voiceTranscriptTopic, messageType: 'std_msgs/msg/String' })
+    .subscribe(function(msg) {
+      if (!isConnected) return;
+      const el = document.getElementById('voxtralCommand');
+      el.textContent = msg.data;
+      el.classList.remove('placeholder');
+    });
+
+  // ── CPU ──
+  new ROSLIB.Topic({ ros, name: '/node/cpu_percent', messageType: 'std_msgs/msg/Float32' })
+    .subscribe(function(msg) {
+      if (!isConnected) return;
+      const pct = Math.min(100, Math.max(0, msg.data));
+      document.getElementById('cpuVal').textContent = pct.toFixed(1) + ' %';
+      document.getElementById('cpuBar').style.width = pct.toFixed(1) + '%';
+      bmCpuSamples.push(pct);
+      if (pct > bmCpuMax) bmCpuMax = pct;
+    });
+
+  // ── Memory ──
+  new ROSLIB.Topic({ ros, name: '/node/memory_percent', messageType: 'std_msgs/msg/Float32' })
+    .subscribe(function(msg) {
+      if (!isConnected) return;
+      const pct = Math.min(100, Math.max(0, msg.data));
+      document.getElementById('memVal').textContent = pct.toFixed(1) + ' %';
+      document.getElementById('memBar').style.width = pct.toFixed(1) + '%';
+    });
+
+  // ── GPU ──
+  new ROSLIB.Topic({ ros, name: '/node/gpu_percent', messageType: 'std_msgs/msg/Float32' })
+    .subscribe(function(msg) {
+      if (!isConnected) return;
+      gpuDataReceived = true;
+      const pct = Math.min(100, Math.max(0, msg.data));
+      document.getElementById('gpuVal').textContent = pct.toFixed(1) + ' %';
+      document.getElementById('gpuBar').style.width = pct.toFixed(1) + '%';
+      bmGpuSamples.push(pct);
+      if (pct > bmGpuMax) bmGpuMax = pct;
+    });
+}
+
+// ── Voxtral send command ──
+document.getElementById('voxtralSend').addEventListener('click', sendVoxtralCommand);
+document.getElementById('voxtralInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') sendVoxtralCommand();
+});
+
+function sendVoxtralCommand() {
+  if (!ros || !isConnected) return;
+  const input = document.getElementById('voxtralInput');
+  const text = input.value.trim();
+  if (!text) return;
+  const pub = new ROSLIB.Topic({ ros, name: voiceCommandTopic, messageType: 'std_msgs/msg/String' });
+  pub.publish(new ROSLIB.Message({ data: text }));
+  const el = document.getElementById('voxtralCommand');
+  el.textContent = text;
+  el.classList.remove('placeholder');
+  input.value = '';
+  awaitingVoxtralResponse = true;
+}
+
+function drawLiveImage(msg) {
+  try {
+    const fmt = (msg.format || 'jpeg').split(';')[0].trim();
+    const mimeType = fmt === 'jpeg' || fmt === 'jpg' ? 'image/jpeg' : 'image/' + fmt;
+    const img = new window.Image();
+    img.onload = function() {
+      document.getElementById('resDisplay').textContent =
+        `${img.naturalWidth} \u00D7 ${img.naturalHeight}`;
+      resize();
+      ctx.drawImage(img, 0, 0, W, H);
+    };
+    img.src = `data:${mimeType};base64,${msg.data}`;
+  } catch (e) {
+    console.error('[dashboard] Error decoding image:', e);
+  }
+}
+
+// ── FPS Counter ──
+setInterval(() => {
+  if (hasReceivedImage) {
+    const now = Date.now();
+    const elapsed = (now - lastFpsUpdate) / 1000;
+    const fps = framesInWindow / elapsed;
+    document.getElementById('fpsDisplay').textContent = fps.toFixed(1);
+    framesInWindow = 0;
+    lastFpsUpdate = now;
+  }
+}, 1000);
+
+// ── Benchmark Metrics ──
+setInterval(() => {
+  if (bmInfSamples.length > 0) {
+    const avg = bmInfSamples.reduce((a, b) => a + b, 0) / bmInfSamples.length;
+    document.getElementById('bmInfAvg').textContent = avg.toFixed(1) + ' ms';
+    document.getElementById('bmFps').textContent = (avg > 0 ? (1000 / avg).toFixed(1) : '0') + ' fps';
+  }
+  if (bmInfSamples.length > 1) {
+    const avg = bmInfSamples.reduce((a, b) => a + b, 0) / bmInfSamples.length;
+    const variance = bmInfSamples.reduce((sum, v) => sum + (v - avg) ** 2, 0) / bmInfSamples.length;
+    document.getElementById('bmJitter').textContent = Math.sqrt(variance).toFixed(1) + ' ms';
+  }
+  if (bmCpuSamples.length > 0) {
+    const avg = bmCpuSamples.reduce((a, b) => a + b, 0) / bmCpuSamples.length;
+    document.getElementById('bmCpuAvg').textContent = avg.toFixed(1) + ' %';
+    document.getElementById('bmCpuMax').textContent = bmCpuMax.toFixed(1) + ' %';
+  }
+  if (bmGpuSamples.length > 0) {
+    const avg = bmGpuSamples.reduce((a, b) => a + b, 0) / bmGpuSamples.length;
+    document.getElementById('bmGpuAvg').textContent = avg.toFixed(1) + ' %';
+    document.getElementById('bmGpuMax').textContent = bmGpuMax.toFixed(1) + ' %';
+  }
+  // Show "Sin datos" if GPU topic never published after 10s
+  if (!gpuDataReceived && Date.now() - startTime.getTime() > 10000) {
+    document.getElementById('gpuVal').textContent = 'No data';
+  }
+}, 2000);
+
+// ── Uptime ──
+setInterval(() => {
+  const elapsed = Math.floor((Date.now() - startTime.getTime()) / 1000);
+  const h = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+  const m = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+  const s = String(elapsed % 60).padStart(2, '0');
+  document.getElementById('uptimeDisplay').textContent = `Dashboard uptime: ${h}:${m}:${s}`;
+}, 1000);
+
+// ── Start ──
+initRosConnection();
+</script>
+</body>
+</html>

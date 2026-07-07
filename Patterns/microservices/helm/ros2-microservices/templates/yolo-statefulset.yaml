@@ -1,0 +1,172 @@
+{{- if .Values.yolo.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "ros2-microservices.fullname" . }}-yolo
+  labels:
+    {{- include "ros2-microservices.labels" . | nindent 4 }}
+    pattern: microservices
+    component: yolo
+spec:
+  serviceName: {{ include "ros2-microservices.fullname" . }}-yolo-peers
+  replicas: 1
+  selector:
+    matchLabels:
+      app: yolo
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        {{- include "ros2-microservices.labels" . | nindent 8 }}
+        app: yolo
+        component: yolo
+        pattern: microservices
+    spec:
+      {{- if .Values.imagePullSecretName }}
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecretName }}
+      {{- end }}
+      {{- if .Values.yolo.nodeHostname }}
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.yolo.nodeHostname }}
+      {{- else if .Values.yolo.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.yolo.nodeSelector | nindent 8 }}
+      {{- else if .Values.yolo.nodeArch }}
+      nodeSelector:
+        kubernetes.io/arch: {{ .Values.yolo.nodeArch }}
+      {{- end }}
+      {{- if .Values.yolo.affinity }}
+      affinity:
+        {{- toYaml .Values.yolo.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.yolo.tolerations }}
+      tolerations:
+        {{- toYaml .Values.yolo.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .Values.gpu.runtimeClassName }}
+      runtimeClassName: {{ .Values.gpu.runtimeClassName }}
+      {{- end }}
+      containers:
+        - name: yolo
+          image: "{{ .Values.images.yolo.repository }}:{{ .Values.images.yolo.tag }}"
+          imagePullPolicy: {{ .Values.images.yolo.pullPolicy }}
+          env:
+            - name: ROS_DOMAIN_ID
+              value: {{ .Values.ros.domainId | quote }}
+            - name: RMW_IMPLEMENTATION
+              value: {{ .Values.ros.rmwImplementation | quote }}
+            - name: ROS_LOCALHOST_ONLY
+              value: {{ .Values.ros.localhostOnly | quote }}
+            - name: YOLO_MODEL_PATH
+              value: {{ .Values.yolo.modelPath | quote }}
+            - name: YOLO_CONF
+              value: {{ .Values.yolo.conf | quote }}
+            - name: YOLO_PUBLISH_DEBUG
+              value: {{ .Values.yolo.publishDebugImage | quote }}
+            - name: YOLO_PUBLISH_METRICS
+              value: {{ .Values.yolo.publishMetrics | quote }}
+            - name: YOLO_FILTER_CLASSES
+              value: {{ .Values.yolo.filterClasses | toString | quote }}
+            - name: IMAGE_TOPIC
+              value: {{ .Values.topics.image | quote }}
+            - name: DETECTIONS_TOPIC
+              value: {{ .Values.topics.detections | quote }}
+            - name: DEBUG_IMAGE_TOPIC
+              value: {{ .Values.topics.debugImage | quote }}
+            - name: LATENCY_TOPIC
+              value: {{ .Values.topics.latency | quote }}
+            - name: INFERENCE_TOPIC
+              value: {{ .Values.topics.inference | quote }}
+            {{- if .Values.gpu.enabled }}
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: {{ .Values.gpu.visibleDevices | default "all" | quote }}
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: {{ .Values.gpu.driverCapabilities | default "compute,utility" | quote }}
+            {{- end }}
+            {{- if .Values.cyclonedds.enabled }}
+            - name: CYCLONEDDS_URI
+              value: "file:///etc/cyclonedds/cyclonedds.xml"
+            {{- end }}
+          command: ["/bin/bash", "-lc"]
+          args:
+            - |
+              set -e
+              source /opt/ros/humble/setup.bash
+              if [ -f /opt/ros_ws/install/setup.bash ]; then
+                source /opt/ros_ws/install/setup.bash
+              fi
+              ros2 run yolo_detector_pkg yolo_detector --ros-args \
+                -p model_path:="${YOLO_MODEL_PATH}" \
+                -p conf:=${YOLO_CONF} \
+                -p image_topic:="${IMAGE_TOPIC}" \
+                -p detections_topic:="${DETECTIONS_TOPIC}" \
+                -p debug_image_topic:="${DEBUG_IMAGE_TOPIC}" \
+                -p publish_debug_image:="${YOLO_PUBLISH_DEBUG}" \
+                -p publish_metrics:="${YOLO_PUBLISH_METRICS}" \
+                -p latency_topic:="${LATENCY_TOPIC}" \
+                -p inference_topic:="${INFERENCE_TOPIC}" \
+                -p filter_classes:="\"${YOLO_FILTER_CLASSES}\"" &
+              YOLO_PID=$!
+              python3 /opt/scripts/resource_monitor.py &
+              MONITOR_PID=$!
+              wait -n ${YOLO_PID} ${MONITOR_PID}
+              exit 1
+          resources:
+            {{- if and .Values.gpu.enabled .Values.gpu.requestGpuResource }}
+            limits:
+              nvidia.com/gpu: {{ .Values.gpu.count | default 1 }}
+            {{- end }}
+            {{- with .Values.yolo.resources }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          volumeMounts:
+            {{- if .Values.cyclonedds.enabled }}
+            - name: cyclonedds
+              mountPath: /etc/cyclonedds
+              readOnly: true
+            {{- end }}
+            {{- if .Values.gpu.enabled }}
+            - name: sys-devices-platform
+              mountPath: /sys/devices/platform
+              readOnly: true
+            {{- end }}
+          startupProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  pgrep -f yolo_detector >/dev/null
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 18
+          livenessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  pgrep -f yolo_detector >/dev/null
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+      {{- if or .Values.cyclonedds.enabled .Values.gpu.enabled }}
+      volumes:
+        {{- if .Values.cyclonedds.enabled }}
+        - name: cyclonedds
+          configMap:
+            name: {{ include "ros2-microservices.fullname" . }}-cyclonedds
+            items:
+              - key: cyclonedds.xml
+                path: cyclonedds.xml
+        {{- end }}
+        {{- if .Values.gpu.enabled }}
+        - name: sys-devices-platform
+          hostPath:
+            path: /sys/devices/platform
+            type: Directory
+        {{- end }}
+      {{- end }}
+{{- end }}

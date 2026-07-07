@@ -1,66 +1,161 @@
 replicaCount: 1
 
-images:
-  camera:
-    repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-camera
-    tag: v1
-    pullPolicy: IfNotPresent
-  dynamicHost:
-    repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-yolo
-    tag: v1
-    pullPolicy: IfNotPresent
-imagePullSecrets: []
+# ── Imagen única para los dos containers del pod ────────────────────────
+# component_container_isolated y orchestrator FastAPI usan la MISMA imagen,
+# solo difieren en el `command` que les pone el chart.
+image:
+  repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-component-host
+  tag: latest
+  pullPolicy: Always
 
+imagePullSecretName: regcred
+
+# ── ROS 2 ──
 ros:
   domainId: "42"
   rmwImplementation: rmw_cyclonedds_cpp
   localhostOnly: "0"
 
-network:
-  hostNetwork: true
+# ── Nodos del cluster ─────────────────────────────────────────────────
+# El pod corre en edgenode01 (necesita la GPU). El dashboard se pinea con
+# dashboard.nodeHostname más abajo.
+nodes:
+  edge:
+    name: edgenode01
 
+# ── Camera ──
 camera:
-  device: /dev/video0
+  device: /dev/video1                # alineado con questions.yaml (Jetson lab usa /dev/video1)
   width: 1280
   height: 720
-  fps: 10
+  fps: 0
   frameId: camera
-  syntheticMode: true
-  mountVideoDevice: false
+  syntheticMode: false
+  mountVideoDevice: true
 
-dynamic:
-  apiPort: 5000
-  autoLoadYolo: true
+# ── YOLO ── (forwarded by bootstrap Job to /load as ROS parameters)
+yolo:
   modelPath: /opt/models/yolov8n.pt
   conf: 0.25
-  publishDebugImage: "false"
-  publishMetrics: "true"
-  allowedModules:
-    - yolo_detector
+  filterClasses: "0,56,60"      # person+chair+dining table; "" = all 80 COCO classes
+  publishDebugImage: true
+  publishMetrics: true
 
+# ── LLaVA ──
+llava:
+  modelId: llava-hf/llava-1.5-7b-hf
+  triggerOnYolo: true
+  yoloTriggerIntervalS: 30.0
+  maxNewTokens: 150
+  load4bit: true                # Ignored on Jetson (FP16 used directly)
+
+# ── Voxtral ──
+# transformers 4.48 (LLaVA constraint) lacks VoxtralProcessor. Voxtral
+# falls back to TEXT_SIMULATION at runtime; browser audio still works.
+voxtral:
+  audioMode: false
+  modelId: mistralai/Voxtral-Mini-3B-2507
+
+# ── Component container (host process) ────────────────────────────────
+componentHost:
+  # Service name exposed by component_container_isolated.
+  # Resolved by the orchestrator client via:
+  #   /ComponentManager/_container/load_node etc.
+  containerName: ComponentManager
+  resources:
+    limits:
+      memory: 32Gi
+      cpu: "8"
+    requests:
+      memory: 8Gi
+      cpu: "2"
+
+# ── Orchestrator (FastAPI sidecar) ────────────────────────────────────
+orchestrator:
+  port: 5000
+  resources:
+    limits:
+      memory: 512Mi
+      cpu: 1
+    requests:
+      memory: 64Mi
+      cpu: 100m
+
+# ── Carga inicial ──
+# Si bootstrap.enabled=true, un Job post-install dispara `POST /load` para
+# cada módulo en bootstrap.modules. Si false, el pod arranca sin componentes
+# cargados — los cargas a demanda desde el dashboard.
+bootstrap:
+  enabled: true
+  modules:
+    - camera
+    - yolo
+    - llava
+    - voxtral
+  # Espera a que el orchestrator esté listo antes de disparar /load.
+  waitInitialSeconds: 30
+  # Tiempo total disponible para cargar todos los módulos.
+  totalTimeoutSeconds: 300
+
+# ── Topics (para que sean parametrizables) ────────────────────────────
 topics:
   image: /camera/image_raw
   detections: /detections
   debugImage: /detections/image
   latency: /benchmark/latency_ms
   inference: /benchmark/inference_ms
+  llavaResponse: /llava/response
+  llavaLatency: /llava/metrics_latency_ms
+  llavaInference: /llava/metrics_inference_ms
+  llavaTrigger: /llava/trigger
+  voiceCommand: /voice/command
+  voiceTranscript: /voice/transcript
+  voiceResponse: /voice/response
+  voiceLatency: /voice/metrics_latency_ms
 
-resources:
-  camera:
-    requests: { cpu: 300m, memory: 512Mi }
-    limits: { cpu: 1000m, memory: 1Gi }
-  dynamicHost:
-    requests: { cpu: 1000m, memory: 2Gi }
-    limits: { cpu: 4000m, memory: 8Gi }
+# ── GPU ──
+gpu:
+  enabled: true
+  runtimeClassName: nvidia
+  visibleDevices: "all"
+  driverCapabilities: "compute,utility"
+  requestGpuResource: true
+  count: 1
 
-service:
-  type: ClusterIP
-  port: 5000
-  targetPort: 5000
+resources: {}
 
-nodeSelector: {}
-affinity: {}
-tolerations: []
+# ── CycloneDDS ──
+cyclonedds:
+  enabled: true
+  allowMulticast: "false"
+  extraPeers: []
+
+# ── Dashboard ──
+dashboard:
+  enabled: true
+  pattern: dynamic-loader
+  peerReadyGraceSeconds: 60
+  image:
+    repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard
+    tag: latest
+    pullPolicy: Always
+  nodeHostname: ""
+  resources: {}
+  service:
+    type: NodePort
+    httpNodePort: 31406
+    wsNodePort: 31407
+  # Endpoint del orchestrator (HTTP, en el mismo pod runtime — accesible
+  # desde el browser vía el Service de orchestrator-api).
+  orchestratorApiNodePort: 31408   # opcional: expone el API HTTP fuera
+
+securityContext:
+  runAsNonRoot: false
+  allowPrivilegeEscalation: false
 
 nameOverride: ""
-fullnameOverride: ""
+# fullnameOverride pins all resource names to a stable, short prefix
+# regardless of the Helm release name used at install time. This keeps
+# resource names predictable for the IEEE Access reproducibility scripts
+# (results/, dist/metrics/) and well below the K8s 63-character label limit.
+fullnameOverride: "dynamic-pattern"
