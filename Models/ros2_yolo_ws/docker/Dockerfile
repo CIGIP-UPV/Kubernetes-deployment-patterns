@@ -102,6 +102,11 @@ RUN if [ -f src/yolo_detector_pkg/requirements.txt ]; then \
     fi
 
 SHELL ["/bin/bash", "-lc"]
+# Fix de deriva de dependencias (2026-07): la resolucion actual de pip instala
+# setuptools>=80 (arrastrado por torch), que rompe colcon-core (<80) y choca
+# con packaging antiguo (canonicalize_version strip_trailing_zero). Se fija
+# setuptools<80 + packaging moderno ANTES de colcon build.
+RUN python3 -m pip install --no-cache-dir "setuptools<80" "packaging>=23,<25"
 RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
     colcon build --symlink-install --packages-select yolo_detector_pkg
 

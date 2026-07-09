@@ -135,6 +135,9 @@ COPY Models/ros2_llava_ws/src/llava_pkg           src/llava_pkg
 COPY Models/ros2_voxtral_ws/src/voxtral_pkg       src/voxtral_pkg
 
 SHELL ["/bin/bash", "-lc"]
+# Fix de deriva de dependencias (2026-07): setuptools>=80 (arrastrado por torch)
+# rompe colcon-core (<80) y choca con packaging antiguo. Fijar antes de colcon.
+RUN python3 -m pip install --no-cache-dir "setuptools<80" "packaging>=23,<25"
 RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
     colcon build --symlink-install \
       --packages-select camera_driver_pkg yolo_detector_pkg llava_pkg voxtral_pkg
