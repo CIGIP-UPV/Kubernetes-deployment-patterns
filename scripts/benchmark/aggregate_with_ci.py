@@ -76,6 +76,19 @@ def read_regime(campaign_dir: Path) -> str:
     f = campaign_dir / "REGIME.txt"
     if f.exists():
         return f.read_text().strip()
+    # Campañas anteriores a la revision: el regimen se infiere del campaign.log
+    # ("Cold-cold : true|false"). OJO: el legacy cold-cold conservaba el hostPath
+    # del overlay, asi que equivale al regimen image-cold, NO a pristine (R1.2).
+    log = campaign_dir / "campaign.log"
+    if log.exists():
+        try:
+            head = log.read_text(errors="ignore")[:4000]
+            if "Cold-cold     : true" in head:
+                return "legacy-image-cold"
+            if "Cold-cold     : false" in head:
+                return "legacy-warm"
+        except OSError:
+            pass
     return "legacy-unknown"
 
 
@@ -85,7 +98,9 @@ def read_comparison(campaign_dir: Path):
     if not f.exists():
         return []
     with open(f, newline="") as fh:
-        return [r for r in csv.DictReader(fh) if r.get("status", "").strip() == "ok"]
+        # Filas truncadas en campañas antiguas: DictReader rellena con None.
+        return [r for r in csv.DictReader(fh)
+                if (r.get("status") or "").strip() == "ok"]
 
 
 def read_dashboard_samples(campaign_dir: Path, pattern: str):

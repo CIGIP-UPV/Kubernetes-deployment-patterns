@@ -1,54 +1,94 @@
 images:
   camera:
-    repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-camera
-    tag: v1
-    pullPolicy: IfNotPresent
+    repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-camera
+    tag: latest
+    pullPolicy: Always
   yolo:
-    repository: ghcr.io/cigip-upv/kubernetes-deployment-patterns/ros2-yolo
-    tag: v1
-    pullPolicy: IfNotPresent
-imagePullSecrets: []
+    repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-yolo
+    tag: latest
+    pullPolicy: Always
+  llava:
+    repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-llava
+    tag: latest
+    pullPolicy: Always
+  voxtral:
+    repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-voxtral
+    tag: latest
+    pullPolicy: Always
+
+imagePullSecretName: regcred
 
 ros:
   domainId: "42"
   rmwImplementation: rmw_cyclonedds_cpp
   localhostOnly: "0"
 
-network:
-  hostNetwork: true
-
 camera:
   enabled: true
-  # Edge placement: camera runs on the edge node (robot/sensor side)
-  # Override with --set camera.nodeSelector.kubernetes\\.io/hostname=<edge-node>
+  nodeHostname: ""
   nodeSelector: {}
+  # Pin to edge (Jetson) by architecture. Used only if nodeHostname/nodeSelector are empty.
+  nodeArch: "arm64"
   tolerations: []
   affinity: {}
   device: /dev/video0
   width: 1280
   height: 720
-  fps: 10
+  fps: 0  # 0 = unlimited (native camera rate); >0 = limit to N FPS
   frameId: camera
-  syntheticMode: true
-  mountVideoDevice: false
-  resources:
-    requests: { cpu: 300m, memory: 512Mi }
-    limits: { cpu: 1000m, memory: 1Gi }
+  syntheticMode: false
+  mountVideoDevice: true
+  resources: {}
 
 yolo:
   enabled: true
-  # Cloud placement: AI inference runs on the cloud node (more resources)
-  # Override with --set yolo.nodeSelector.kubernetes\\.io/hostname=<cloud-node>
+  nodeHostname: ""
   nodeSelector: {}
+  # Pin to edge (Jetson) — YOLO needs GPU, only available on arm64 edge node.
+  nodeArch: "arm64"
   tolerations: []
   affinity: {}
   modelPath: /opt/models/yolov8n.pt
   conf: 0.25
-  publishDebugImage: "false"
+  publishDebugImage: "true"
   publishMetrics: "true"
-  resources:
-    requests: { cpu: 1000m, memory: 2Gi }
-    limits: { cpu: 4000m, memory: 8Gi }
+  filterClasses: ""  # "" = all 80 COCO classes, "0" = person only, "0,16,17" = person+dog+cat
+  resources: {}
+
+llava:
+  enabled: true
+  nodeHostname: ""
+  nodeSelector: {}
+  # Pin to edge (Jetson) — LLaVA needs GPU, only available on arm64 edge node.
+  nodeArch: "arm64"
+  tolerations: []
+  affinity: {}
+  modelId: llava-hf/llava-1.5-7b-hf
+  triggerOnYolo: true
+  yoloTriggerIntervalS: 30.0
+  maxNewTokens: 150
+  load4bit: true
+  resources: {}
+
+voxtral:
+  enabled: true
+  nodeHostname: ""
+  nodeSelector: {}
+  # Pin to edge (Jetson) — voxtral lives on the edge alongside the other robot
+  # nodes. Keep it on arm64 even when scheduled without GPU, to avoid stranding
+  # on cloud nodes that don't have the nvidia runtime registered.
+  nodeArch: "arm64"
+  tolerations: []
+  affinity: {}
+  audioMode: true  # Audio + GPU inference enabled (FP16 on Jetson)
+  # Voxtral-Mini-3B-2507 is the HF-transformers-compatible Voxtral model.
+  # The 4B-Realtime-2602 variant is vLLM-only (no preprocessor_config.json).
+  modelId: mistralai/Voxtral-Mini-3B-2507
+  resources: {}
+  # Voxtral runs on the Jetson edge node with GPU acceleration (FP16).
+  # The pod uses the nvidia runtime and is pinned to arm64 via nodeArch above.
+  gpu:
+    enabled: true
 
 topics:
   image: /camera/image_raw
@@ -56,6 +96,84 @@ topics:
   debugImage: /detections/image
   latency: /benchmark/latency_ms
   inference: /benchmark/inference_ms
+  llavaResponse: /llava/response
+  llavaLatency: /llava/metrics_latency_ms
+  llavaInference: /llava/metrics_inference_ms
+  llavaTrigger: /llava/trigger
+  voiceCommand: /voice/command
+  voiceTranscript: /voice/transcript
+  voiceResponse: /voice/response
+  voiceLatency: /voice/metrics_latency_ms
+
+benchmark:
+  enabled: false
+  durationSeconds: 120
+  initialWaitSeconds: 60
+  httpPort: 9999
+  ttlSecondsAfterFinished: 3600
+
+# ── NVIDIA GPU (Jetson AGX Orin) ──
+# requestGpuResource is false by default for microservices because multiple
+# pods share the single Jetson GPU. The env vars + runtimeClassName are enough.
+# Set to true only if GPU time-slicing is configured in the device plugin.
+gpu:
+  enabled: true
+  runtimeClassName: nvidia
+  visibleDevices: "all"
+  driverCapabilities: "compute,utility"
+  requestGpuResource: false
+  count: 1
+
+# ── Persistent HuggingFace cache (edge node) ──
+# DISABLED by default: the LLaVA and Voxtral models are now BAKED INTO the
+# Docker images at build time (see snapshot_download steps in the Dockerfiles).
+# Mounting a hostPath at /opt/huggingface_cache hides the in-image cache and
+# breaks `from_pretrained(local_files_only=True)` with "No local files found".
+#
+# Re-enable only if you want to override the in-image weights with a different
+# version stored on the edge node (e.g. testing a fine-tuned checkpoint without
+# rebuilding the image). When enabled, you must populate the hostPath manually
+# with a valid HF cache layout.
+hfCache:
+  enabled: false
+  hostPath: /var/lib/ros2exp/hf_cache   # edgenode01 filesystem
+  mountPath: /opt/huggingface_cache     # matches hf_cache_dir param in *_node.py
+  type: DirectoryOrCreate
+
+# ── CycloneDDS Unicast (cloud-edge communication) ──
+cyclonedds:
+  enabled: true
+  allowMulticast: "false"
+  extraPeers: []  # Additional peer addresses (e.g., other charts' StatefulSets)
+
+# ── Dashboard (cloud-side observability) ──
+dashboard:
+  enabled: true
+  pattern: microservices  # rendered into dashboard.html via Helm replace of __PATTERN__
+  # Seconds to wait in the init container after all peer DNS records resolve,
+  # before rosbridge starts. Dashboard MUST be the last pod to start so when
+  # the user opens the browser, all topics are already publishing. The grace
+  # period covers LLaVA model load (~15 s), Voxtral model load (~15 s), and
+  # the warm-up of YOLO inference. Bump higher if the edge node is slow.
+  peerReadyGraceSeconds: 60
+  image:
+    repository: gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard
+    tag: latest
+    pullPolicy: Always
+  nodeHostname: ""  # Pin to cloud node (e.g., worker1-kb2)
+  # Architecture selector when nodeHostname is empty. Use amd64 for kb2,
+  # arm64 for edgenode01. Avoids scheduling an amd64 image on arm64 node
+  # (or vice-versa), which causes "exec format error".
+  nodeArch: "amd64"
+  resources: {}
+  service:
+    type: NodePort
+    httpNodePort: 31406
+    wsNodePort: 31407
 
 nameOverride: ""
-fullnameOverride: ""
+# fullnameOverride pins all resource names to a stable, short prefix
+# regardless of the Helm release name used at install time. This keeps
+# resource names predictable for the IEEE Access reproducibility scripts
+# (results/, dist/metrics/) and well below the K8s 63-character label limit.
+fullnameOverride: "microservices-pattern"

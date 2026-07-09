@@ -33,3 +33,4 @@ runtime_meta.log
 overlay_inc_warm*.log
 overlay_meta.log
 results/_campaigns/.regcred_*.yaml
+.DS_Store
