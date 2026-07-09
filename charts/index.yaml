@@ -5,7 +5,7 @@ entries:
       catalog.cattle.io/timeout: 30m
     apiVersion: v2
     appVersion: humble
-    created: "2026-06-05T12:15:29.114132623Z"
+    created: "2026-07-09T07:40:39.998488961Z"
     description: 'Dynamic Module Loading pattern for ROS 2 robotics on Kubernetes.  Realizes
       the ROS 2 dynamic composition theory:   - A long-lived component_container_isolated
       process exposes     LoadNode / UnloadNode services.   - Plugins (camera, yolo,
@@ -16,7 +16,7 @@ entries:
       /list to     the dashboard.  This realisation uses true intra-process composition
       through rclpy_components and the standard ROS 2 LoadNode / UnloadNode service
       contract, instead of spawning a subprocess per loaded module. '
-    digest: 77b288bc5a934fd973b3ec82f86a5b835a620c55b69ca7a06bf1d4c1881ace8c
+    digest: fd1d7b01ca733c467446f2408e0865fae2c4feb187c732e863ee8b1e8133041f
     keywords:
     - ros2
     - dynamic-composition
@@ -62,10 +62,10 @@ entries:
   ros2-microservices:
   - apiVersion: v2
     appVersion: humble
-    created: "2026-06-05T12:15:29.115292954Z"
+    created: "2026-07-09T07:40:39.999660792Z"
     description: Microservices ROS 2 pattern with decoupled camera, YOLO, LLaVA, and
       Voxtral services
-    digest: 6878132e6733a3fe8d8a4f8899b4bb5887f1ee7601e0cda46bbf6e4f3431ae19
+    digest: 50ec89ff233b9f50d9d86454aa9d682083b3cc1e08420a7e379ea56cea100a98
     keywords:
     - ros2
     - microservices
@@ -81,10 +81,10 @@ entries:
   ros2-monolithic:
   - apiVersion: v2
     appVersion: humble
-    created: "2026-06-05T12:15:29.116258181Z"
+    created: "2026-07-09T07:40:40.000632457Z"
     description: Monolithic ROS 2 pattern with camera + YOLO + LLaVA + Voxtral in
       a single runtime container
-    digest: 4c47d04b6567c8dffff5fd24017fb01c061332985c655e22e7d35397de8e5381
+    digest: ef3c815bb16dd2df00f4325a803509912ce0dc11e2f5266cde723ae5e39bf0d5
     keywords:
     - ros2
     - monolithic
@@ -102,7 +102,7 @@ entries:
       catalog.cattle.io/timeout: 45m
     apiVersion: v2
     appVersion: humble
-    created: "2026-06-05T12:15:29.117607717Z"
+    created: "2026-07-09T07:40:40.002029851Z"
     description: 'Overlay Workspaces pattern for ROS 2 robotics on Kubernetes.  Realizes
       the OTA cloud-edge delivery model from the paper:   - ros2-base (immutable platform:
       ROS 2 + camera driver + CUDA)   - ros2-overlay-pack (mutable AI layer: ML stack
@@ -112,7 +112,7 @@ entries:
       strictly separates immutable base from mutable overlay so that AI updates only
       re-publish the overlay-pack carrier (~25 GB), keeping the ROS 2 base image (~2.2
       GB) intact across releases. '
-    digest: 1885c24c145f77248346b71d5728177835f95ce4f0f24f608c5ee6683ad74f62
+    digest: c35a091934b6c0068f40b544540c7c319b99119709016d1b9b8034a27841d19b
     keywords:
     - ros2
     - overlay
@@ -156,4 +156,4 @@ entries:
     urls:
     - https://cigip-upv.github.io/Kubernetes-deployment-patterns/charts/ros2-overlay-canonical-1.0.0.tgz
     version: 1.0.0
-generated: "2026-06-05T12:15:29.112969535Z"
+generated: "2026-07-09T07:40:39.997240496Z"
