@@ -1,0 +1,906 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "creationTimestamp": "2026-07-09T10:12:03Z",
+                "generateName": "dynamic-pattern-",
+                "labels": {
+                    "app": "dynamic-loader-runtime",
+                    "app.kubernetes.io/instance": "dynamic-pattern",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "dynamic-loader",
+                    "apps.kubernetes.io/pod-index": "0",
+                    "component": "runtime",
+                    "controller-revision-hash": "dynamic-pattern-59b4fcf75b",
+                    "helm.sh/chart": "dynamic-loader-1.0.0",
+                    "pattern": "dynamic-loader",
+                    "statefulset.kubernetes.io/pod-name": "dynamic-pattern-0"
+                },
+                "name": "dynamic-pattern-0",
+                "namespace": "ros2exp",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "StatefulSet",
+                        "name": "dynamic-pattern",
+                        "uid": "40b9e0ee-2a2d-4283-a40e-8ec299d33a63"
+                    }
+                ],
+                "resourceVersion": "31929008",
+                "uid": "8ed4c5a0-3299-4122-9dc3-63f90197cc37"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "args": [
+                            "set -e\necho \"[host] Sourcing ROS 2 + workspaces...\"\nsource /opt/ros/humble/setup.bash\nsource /opt/base_ws/install/setup.bash\nsource /opt/component_ws/install/setup.bash\n\necho \"[host] Starting resource_monitor for dashboard telemetry...\"\npython3 /opt/scripts/resource_monitor.py \u0026\nRESMON_PID=$!\n\necho \"[host] Available rclpy_components plugins:\"\nros2 component types | grep -E '(camera_driver_pkg|yolo_detector_pkg|llava_pkg|voxtral_pkg)' || true\necho \"[host] Starting component_container_isolated as 'ComponentManager'...\"\n# The container name ComponentManager becomes\n# the prefix of the LoadNode/UnloadNode services, e.g.:\n#   /ComponentManager/_container/load_node\nros2 run rclpy_components component_container_isolated \\\n     --ros-args -r __node:=ComponentManager \u0026\nHOST_PID=$!\n\n# Forward TERM to children so the pod terminates cleanly.\ntrap 'kill -TERM ${HOST_PID} ${RESMON_PID} 2\u003e/dev/null; wait' TERM INT\nwait -n ${HOST_PID} ${RESMON_PID}\necho \"[host] One process exited — pod will restart\"\nexit 1\n"
+                        ],
+                        "command": [
+                            "/bin/bash",
+                            "-lc"
+                        ],
+                        "env": [
+                            {
+                                "name": "ROS_DOMAIN_ID",
+                                "value": "42"
+                            },
+                            {
+                                "name": "RMW_IMPLEMENTATION",
+                                "value": "rmw_cyclonedds_cpp"
+                            },
+                            {
+                                "name": "ROS_LOCALHOST_ONLY",
+                                "value": "0"
+                            },
+                            {
+                                "name": "CYCLONEDDS_URI",
+                                "value": "file:///etc/cyclonedds/cyclonedds.xml"
+                            },
+                            {
+                                "name": "HF_HOME",
+                                "value": "/opt/huggingface_cache"
+                            },
+                            {
+                                "name": "HF_HUB_CACHE",
+                                "value": "/opt/huggingface_cache"
+                            },
+                            {
+                                "name": "TRANSFORMERS_CACHE",
+                                "value": "/opt/huggingface_cache"
+                            },
+                            {
+                                "name": "HF_HUB_OFFLINE",
+                                "value": "1"
+                            },
+                            {
+                                "name": "TRANSFORMERS_OFFLINE",
+                                "value": "1"
+                            },
+                            {
+                                "name": "NVIDIA_VISIBLE_DEVICES",
+                                "value": "all"
+                            },
+                            {
+                                "name": "NVIDIA_DRIVER_CAPABILITIES",
+                                "value": "compute,utility"
+                            }
+                        ],
+                        "image": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-component-host:latest",
+                        "imagePullPolicy": "Always",
+                        "name": "component-host",
+                        "resources": {
+                            "limits": {
+                                "cpu": "8",
+                                "memory": "32Gi",
+                                "nvidia.com/gpu": "1"
+                            },
+                            "requests": {
+                                "cpu": "2",
+                                "memory": "8Gi",
+                                "nvidia.com/gpu": "1"
+                            }
+                        },
+                        "securityContext": {
+                            "privileged": true
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/etc/cyclonedds",
+                                "name": "cyclonedds",
+                                "readOnly": true
+                            },
+                            {
+                                "mountPath": "/dev/video1",
+                                "name": "video-device"
+                            },
+                            {
+                                "mountPath": "/sys/devices/platform",
+                                "name": "sys-devices-platform",
+                                "readOnly": true
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-bmpwd",
+                                "readOnly": true
+                            }
+                        ]
+                    },
+                    {
+                        "args": [
+                            "set -e\nsource /opt/ros/humble/setup.bash\nsource /opt/base_ws/install/setup.bash\nsource /opt/component_ws/install/setup.bash\necho \"[orchestrator] Starting FastAPI on port ${ORCHESTRATOR_PORT}\"\ncd /opt/orchestrator\nexec python3 orchestrator.py\n"
+                        ],
+                        "command": [
+                            "/bin/bash",
+                            "-lc"
+                        ],
+                        "env": [
+                            {
+                                "name": "ROS_DOMAIN_ID",
+                                "value": "42"
+                            },
+                            {
+                                "name": "RMW_IMPLEMENTATION",
+                                "value": "rmw_cyclonedds_cpp"
+                            },
+                            {
+                                "name": "ROS_LOCALHOST_ONLY",
+                                "value": "0"
+                            },
+                            {
+                                "name": "CYCLONEDDS_URI",
+                                "value": "file:///etc/cyclonedds/cyclonedds.xml"
+                            },
+                            {
+                                "name": "COMPONENT_CONTAINER_NAME",
+                                "value": "ComponentManager"
+                            },
+                            {
+                                "name": "ORCHESTRATOR_PORT",
+                                "value": "5000"
+                            }
+                        ],
+                        "image": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-component-host:latest",
+                        "imagePullPolicy": "Always",
+                        "livenessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/health",
+                                "port": "api",
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 30,
+                            "periodSeconds": 30,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "name": "orchestrator",
+                        "ports": [
+                            {
+                                "containerPort": 5000,
+                                "name": "api",
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "readinessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/health",
+                                "port": "api",
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 5,
+                            "periodSeconds": 5,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "resources": {
+                            "limits": {
+                                "cpu": "1",
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "64Mi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/etc/cyclonedds",
+                                "name": "cyclonedds",
+                                "readOnly": true
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-bmpwd",
+                                "readOnly": true
+                            }
+                        ]
+                    },
+                    {
+                        "args": [
+                            "set -e\nsource /opt/ros/humble/setup.bash\nsource /opt/base_ws/install/setup.bash\nsource /opt/component_ws/install/setup.bash\necho \"[llava-standalone] LLaVA como proceso separado (híbrido R1.4)\"\nexec ros2 run llava_pkg llava_node --ros-args \\\n  -p model_id:=\"llava-hf/llava-1.5-7b-hf\" \\\n  -p trigger_on_yolo:=true \\\n  -p yolo_trigger_interval_s:=30.0 \\\n  -p max_new_tokens:=150 \\\n  -p load_in_4bit:=true\n"
+                        ],
+                        "command": [
+                            "/bin/bash",
+                            "-lc"
+                        ],
+                        "env": [
+                            {
+                                "name": "ROS_DOMAIN_ID",
+                                "value": "42"
+                            },
+                            {
+                                "name": "RMW_IMPLEMENTATION",
+                                "value": "rmw_cyclonedds_cpp"
+                            },
+                            {
+                                "name": "ROS_LOCALHOST_ONLY",
+                                "value": "0"
+                            },
+                            {
+                                "name": "CYCLONEDDS_URI",
+                                "value": "file:///etc/cyclonedds/cyclonedds.xml"
+                            },
+                            {
+                                "name": "HF_HOME",
+                                "value": "/opt/huggingface_cache"
+                            },
+                            {
+                                "name": "HF_HUB_CACHE",
+                                "value": "/opt/huggingface_cache"
+                            },
+                            {
+                                "name": "TRANSFORMERS_CACHE",
+                                "value": "/opt/huggingface_cache"
+                            },
+                            {
+                                "name": "HF_HUB_OFFLINE",
+                                "value": "1"
+                            },
+                            {
+                                "name": "TRANSFORMERS_OFFLINE",
+                                "value": "1"
+                            },
+                            {
+                                "name": "NVIDIA_VISIBLE_DEVICES",
+                                "value": "all"
+                            },
+                            {
+                                "name": "NVIDIA_DRIVER_CAPABILITIES",
+                                "value": "compute,utility"
+                            }
+                        ],
+                        "image": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-component-host:latest",
+                        "imagePullPolicy": "Always",
+                        "name": "llava-standalone",
+                        "resources": {
+                            "limits": {
+                                "cpu": "4",
+                                "memory": "20Gi"
+                            },
+                            "requests": {
+                                "cpu": "1",
+                                "memory": "4Gi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/etc/cyclonedds",
+                                "name": "cyclonedds",
+                                "readOnly": true
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-bmpwd",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "hostname": "dynamic-pattern-0",
+                "imagePullSecrets": [
+                    {
+                        "name": "regcred"
+                    }
+                ],
+                "nodeName": "edgenode01",
+                "nodeSelector": {
+                    "kubernetes.io/hostname": "edgenode01"
+                },
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "runtimeClassName": "nvidia",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "subdomain": "dynamic-pattern-peers",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "configMap": {
+                            "defaultMode": 420,
+                            "items": [
+                                {
+                                    "key": "cyclonedds.xml",
+                                    "path": "cyclonedds.xml"
+                                }
+                            ],
+                            "name": "dynamic-pattern-cyclonedds"
+                        },
+                        "name": "cyclonedds"
+                    },
+                    {
+                        "hostPath": {
+                            "path": "/dev/video1",
+                            "type": "CharDevice"
+                        },
+                        "name": "video-device"
+                    },
+                    {
+                        "hostPath": {
+                            "path": "/sys/devices/platform",
+                            "type": "Directory"
+                        },
+                        "name": "sys-devices-platform"
+                    },
+                    {
+                        "name": "kube-api-access-bmpwd",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T10:12:07Z",
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T10:12:04Z",
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T10:12:13Z",
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T10:12:13Z",
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T10:12:03Z",
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "containerID": "containerd://42597d639e61819f957d0ce30d7a3fc880e86b1184cba519c83bf460ed6c9b19",
+                        "image": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-component-host:latest",
+                        "imageID": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-component-host@sha256:54d5a8fc4d347b1befedc45921c67db084725b35a2fedc2b7894cfe292138f25",
+                        "lastState": {},
+                        "name": "component-host",
+                        "ready": true,
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-07-09T10:12:05Z"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/etc/cyclonedds",
+                                "name": "cyclonedds",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            },
+                            {
+                                "mountPath": "/dev/video1",
+                                "name": "video-device"
+                            },
+                            {
+                                "mountPath": "/sys/devices/platform",
+                                "name": "sys-devices-platform",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-bmpwd",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    },
+                    {
+                        "containerID": "containerd://f2228163d4ef623d7f7c22fbb6992a7f48edd2343f7f7a751ec0acc00fa27373",
+                        "image": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-component-host:latest",
+                        "imageID": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-component-host@sha256:54d5a8fc4d347b1befedc45921c67db084725b35a2fedc2b7894cfe292138f25",
+                        "lastState": {},
+                        "name": "llava-standalone",
+                        "ready": true,
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-07-09T10:12:07Z"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/etc/cyclonedds",
+                                "name": "cyclonedds",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-bmpwd",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    },
+                    {
+                        "containerID": "containerd://ac5f2b42d5090c70ada1bbc2858d9a42d0be5c196dd0a272db4314ba0f507367",
+                        "image": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-component-host:latest",
+                        "imageID": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-component-host@sha256:54d5a8fc4d347b1befedc45921c67db084725b35a2fedc2b7894cfe292138f25",
+                        "lastState": {},
+                        "name": "orchestrator",
+                        "ready": true,
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-07-09T10:12:06Z"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/etc/cyclonedds",
+                                "name": "cyclonedds",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-bmpwd",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "158.42.104.206",
+                "hostIPs": [
+                    {
+                        "ip": "158.42.104.206"
+                    },
+                    {
+                        "ip": "2001:720:101c:107:2bb1:2437:d649:b2ab"
+                    }
+                ],
+                "phase": "Running",
+                "podIP": "10.42.2.208",
+                "podIPs": [
+                    {
+                        "ip": "10.42.2.208"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "startTime": "2026-07-09T10:12:04Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "creationTimestamp": "2026-07-09T10:12:03Z",
+                "generateName": "dynamic-pattern-dashboard-",
+                "labels": {
+                    "app": "dynamic-loader-dashboard",
+                    "app.kubernetes.io/instance": "dynamic-pattern",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "dynamic-loader",
+                    "apps.kubernetes.io/pod-index": "0",
+                    "component": "dashboard",
+                    "controller-revision-hash": "dynamic-pattern-dashboard-7bfc995b4b",
+                    "helm.sh/chart": "dynamic-loader-1.0.0",
+                    "pattern": "dynamic-loader",
+                    "statefulset.kubernetes.io/pod-name": "dynamic-pattern-dashboard-0"
+                },
+                "name": "dynamic-pattern-dashboard-0",
+                "namespace": "ros2exp",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "StatefulSet",
+                        "name": "dynamic-pattern-dashboard",
+                        "uid": "08b145cf-b5d7-42d9-adbc-4214d9719921"
+                    }
+                ],
+                "resourceVersion": "31929178",
+                "uid": "a9a85dc5-e46b-4e68-a84b-358331be943c"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "env": [
+                            {
+                                "name": "ROS_DOMAIN_ID",
+                                "value": "42"
+                            },
+                            {
+                                "name": "RMW_IMPLEMENTATION",
+                                "value": "rmw_cyclonedds_cpp"
+                            },
+                            {
+                                "name": "ROS_LOCALHOST_ONLY",
+                                "value": "0"
+                            },
+                            {
+                                "name": "CYCLONEDDS_URI",
+                                "value": "file:///etc/cyclonedds/cyclonedds.xml"
+                            }
+                        ],
+                        "image": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard:latest",
+                        "imagePullPolicy": "Always",
+                        "livenessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/",
+                                "port": "http",
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 10,
+                            "periodSeconds": 30,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "name": "dashboard",
+                        "ports": [
+                            {
+                                "containerPort": 8080,
+                                "name": "http",
+                                "protocol": "TCP"
+                            },
+                            {
+                                "containerPort": 9090,
+                                "name": "ws",
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "resources": {},
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/dashboard-cm",
+                                "name": "dashboard-html",
+                                "readOnly": true
+                            },
+                            {
+                                "mountPath": "/etc/cyclonedds",
+                                "name": "cyclonedds",
+                                "readOnly": true
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-xtrrg",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "hostname": "dynamic-pattern-dashboard-0",
+                "imagePullSecrets": [
+                    {
+                        "name": "regcred"
+                    }
+                ],
+                "initContainers": [
+                    {
+                        "command": [
+                            "sh",
+                            "-c",
+                            "FULLNAME=\"dynamic-pattern\"\nNS=\"ros2exp\"\nRUNTIME_PEER=\"${FULLNAME}-0.${FULLNAME}-peers.${NS}.svc.cluster.local\"\necho \"[init] Waiting for runtime DNS: $RUNTIME_PEER\"\nuntil nslookup \"$RUNTIME_PEER\" \u003e/dev/null 2\u003e\u00261; do\n  sleep 3\ndone\nGRACE=60\necho \"[init] Runtime resolved — waiting ${GRACE}s for components + bootstrap to complete\"\nsleep \"$GRACE\"\necho \"[init] Ready\"\n"
+                        ],
+                        "image": "busybox:1.36",
+                        "imagePullPolicy": "IfNotPresent",
+                        "name": "wait-for-peers",
+                        "resources": {},
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-xtrrg",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "nodeName": "worker1-kb2",
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "subdomain": "dynamic-pattern-dashboard-peers",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "configMap": {
+                            "defaultMode": 420,
+                            "name": "dynamic-pattern-dashboard-html"
+                        },
+                        "name": "dashboard-html"
+                    },
+                    {
+                        "configMap": {
+                            "defaultMode": 420,
+                            "items": [
+                                {
+                                    "key": "cyclonedds.xml",
+                                    "path": "cyclonedds.xml"
+                                }
+                            ],
+                            "name": "dynamic-pattern-cyclonedds"
+                        },
+                        "name": "cyclonedds"
+                    },
+                    {
+                        "name": "kube-api-access-xtrrg",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T10:12:05Z",
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T10:13:11Z",
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T10:13:12Z",
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T10:13:12Z",
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T10:12:03Z",
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "containerID": "containerd://f289573354b04f6b75411c519a24029d6690f43f1f4943e4001cc105b7f81872",
+                        "image": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard:latest",
+                        "imageID": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard@sha256:46f7e0651a22713ce0b1d911a07f9ce868fa0d2123a229f92301e640000d0df1",
+                        "lastState": {},
+                        "name": "dashboard",
+                        "ready": true,
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-07-09T10:13:11Z"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/dashboard-cm",
+                                "name": "dashboard-html",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            },
+                            {
+                                "mountPath": "/etc/cyclonedds",
+                                "name": "cyclonedds",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-xtrrg",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "158.42.104.103",
+                "hostIPs": [
+                    {
+                        "ip": "158.42.104.103"
+                    }
+                ],
+                "initContainerStatuses": [
+                    {
+                        "containerID": "containerd://d49758adadc0706c05c3de2151453e08a76a6ab606b973d84f4560ffbf1295be",
+                        "image": "docker.io/library/busybox:1.36",
+                        "imageID": "docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662",
+                        "lastState": {},
+                        "name": "wait-for-peers",
+                        "ready": true,
+                        "restartCount": 0,
+                        "started": false,
+                        "state": {
+                            "terminated": {
+                                "containerID": "containerd://d49758adadc0706c05c3de2151453e08a76a6ab606b973d84f4560ffbf1295be",
+                                "exitCode": 0,
+                                "finishedAt": "2026-07-09T10:13:10Z",
+                                "reason": "Completed",
+                                "startedAt": "2026-07-09T10:12:04Z"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-xtrrg",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "phase": "Running",
+                "podIP": "10.42.1.223",
+                "podIPs": [
+                    {
+                        "ip": "10.42.1.223"
+                    }
+                ],
+                "qosClass": "BestEffort",
+                "startTime": "2026-07-09T10:12:04Z"
+            }
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}

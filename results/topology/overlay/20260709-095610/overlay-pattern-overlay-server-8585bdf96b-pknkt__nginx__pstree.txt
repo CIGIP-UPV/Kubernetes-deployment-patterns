@@ -1,0 +1,8 @@
+PID   USER     TIME  COMMAND
+    1 root      0:00 nginx: master process nginx -g daemon off;
+   30 nginx     0:00 nginx: worker process
+   31 nginx     0:00 nginx: worker process
+   32 nginx     6:21 nginx: worker process
+   33 nginx     0:00 nginx: worker process
+   41 root      0:00 sh -c command -v ps >/dev/null 2>&1 && ps axjf 2>/dev/null || echo "ps axjf no disponible"
+   47 root      0:00 ps axjf

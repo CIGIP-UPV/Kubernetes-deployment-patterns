@@ -1,0 +1,4 @@
+UID          PID    PPID  C STIME TTY          TIME CMD
+root           1       0  1 10:05 ?        00:00:02 python3 orchestrator.py
+root          47       0  0 10:09 ?        00:00:00 sh -c command -v ps >/dev/null 2>&1 && ps -ef || echo "ps no disponible en este contenedor"
+root          53      47  0 10:09 ?        00:00:00 ps -ef

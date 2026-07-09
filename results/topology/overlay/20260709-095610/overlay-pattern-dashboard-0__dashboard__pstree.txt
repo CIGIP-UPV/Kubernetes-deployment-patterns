@@ -1,0 +1,9 @@
+   PPID     PID    PGID     SID TTY        TPGID STAT   UID   TIME COMMAND
+      0     101     101     101 ?             -1 Ss       0   0:00 sh -c command -v ps >/dev/null 2>&1 && ps axjf 2>/dev/null || echo "ps axjf no disponible"
+    101     107     101     101 ?             -1 R        0   0:00  \_ ps axjf
+      0       1       1       1 ?             -1 Ss       0   0:00 /bin/bash /entrypoint.sh
+      1      36       1       1 ?             -1 Sl       0   0:00 /usr/bin/python3 /opt/ros/humble/bin/ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=9090 address:=0.0.0.0
+     36      45       1       1 ?             -1 Sl       0   1:17  \_ python3 /opt/ros/humble/lib/rosbridge_server/rosbridge_websocket --ros-args -r __node:=rosbridge_websocket --params-file /tmp/launch_params_wsb4zp5w --params-file /tmp/launch_params_zin6_am0 --params-file /tmp/launch_params_8k0xcx35 --params-file /tmp/launch_params_ki1p9dft --params-file /tmp/launch_params_4zi8th70 --params-file /tmp/launch_params_uef4glu8 --params-file /tmp/launch_params_ax7fau48 --params-file /tmp/launch_params_c9kyeyo3 --params-file /tmp/launch_params_pdnqmnz3 --params-file /tmp/launch_params_efbdx4pa --params-file /tmp/launch_params_esnxcx2h --params-file /tmp/launch_params_51m7x597 --params-file /tmp/launch_params_9is3mxv6 --params-file /tmp/launch_params_rgtkx9ae --params-file /tmp/launch_params_toi26c0g --params-file /tmp/launch_params_dqi54q6s
+     36      47       1       1 ?             -1 Sl       0   0:00  \_ python3 /opt/ros/humble/lib/rosapi/rosapi_node --ros-args -r __node:=rosapi --params-file /tmp/launch_params_a3qkr5_t --params-file /tmp/launch_params_ptedvnxh --params-file /tmp/launch_params_yd4y1wbh --params-file /tmp/launch_params_un38hco5
+      1      37       1       1 ?             -1 S        0   0:00 /bin/bash /entrypoint.sh
+     37      39       1       1 ?             -1 S        0   0:00  \_ python3 -m http.server 8080

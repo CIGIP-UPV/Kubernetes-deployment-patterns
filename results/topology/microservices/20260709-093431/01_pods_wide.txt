@@ -1,0 +1,6 @@
+NAME                                READY   STATUS    RESTARTS   AGE   IP            NODE          NOMINATED NODE   READINESS GATES
+microservices-pattern-camera-0      1/1     Running   0          11m   10.42.2.202   edgenode01    <none>           <none>
+microservices-pattern-dashboard-0   1/1     Running   0          11m   10.42.1.219   worker1-kb2   <none>           <none>
+microservices-pattern-llava-0       1/1     Running   0          11m   10.42.2.204   edgenode01    <none>           <none>
+microservices-pattern-voxtral-0     1/1     Running   0          11m   10.42.2.205   edgenode01    <none>           <none>
+microservices-pattern-yolo-0        1/1     Running   0          11m   10.42.2.203   edgenode01    <none>           <none>

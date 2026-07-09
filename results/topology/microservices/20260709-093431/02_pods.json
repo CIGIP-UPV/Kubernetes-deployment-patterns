@@ -1,0 +1,1751 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "creationTimestamp": "2026-07-09T09:22:38Z",
+                "generateName": "microservices-pattern-camera-",
+                "labels": {
+                    "app": "camera",
+                    "app.kubernetes.io/instance": "microservices-pattern",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "ros2-microservices",
+                    "apps.kubernetes.io/pod-index": "0",
+                    "component": "camera",
+                    "controller-revision-hash": "microservices-pattern-camera-6d9747844d",
+                    "helm.sh/chart": "ros2-microservices-1.0.0",
+                    "pattern": "microservices",
+                    "statefulset.kubernetes.io/pod-name": "microservices-pattern-camera-0"
+                },
+                "name": "microservices-pattern-camera-0",
+                "namespace": "ros2exp",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "StatefulSet",
+                        "name": "microservices-pattern-camera",
+                        "uid": "4de625b8-d74b-4d30-b794-ba68c007d8b5"
+                    }
+                ],
+                "resourceVersion": "31920661",
+                "uid": "86d90c23-ca1a-41f2-a5c5-d72e1fa77640"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "args": [
+                            "set -e\nsource /opt/ros/humble/setup.bash\nif [ -f /opt/ros2_cam_ws/install/setup.bash ]; then\n  source /opt/ros2_cam_ws/install/setup.bash\nfi\nros2 run camera_driver_pkg camera_driver --ros-args \\\n  -p device:=\"/dev/video0\" \\\n  -p width:=1280 \\\n  -p height:=720 \\\n  -p fps:=0 \\\n  -p frame_id:=\"camera\" \\\n  -p synthetic_mode:=\"false\" \\\n  -p image_topic:=\"/camera/image_raw\"\n"
+                        ],
+                        "command": [
+                            "/bin/bash",
+                            "-lc"
+                        ],
+                        "env": [
+                            {
+                                "name": "ROS_DOMAIN_ID",
+                                "value": "42"
+                            },
+                            {
+                                "name": "RMW_IMPLEMENTATION",
+                                "value": "rmw_cyclonedds_cpp"
+                            },
+                            {
+                                "name": "ROS_LOCALHOST_ONLY",
+                                "value": "0"
+                            },
+                            {
+                                "name": "CYCLONEDDS_URI",
+                                "value": "file:///etc/cyclonedds/cyclonedds.xml"
+                            }
+                        ],
+                        "image": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-camera:latest",
+                        "imagePullPolicy": "Always",
+                        "name": "camera",
+                        "resources": {},
+                        "securityContext": {
+                            "privileged": true
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/dev/video0",
+                                "name": "video-device"
+                            },
+                            {
+                                "mountPath": "/etc/cyclonedds",
+                                "name": "cyclonedds",
+                                "readOnly": true
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-v8d2x",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "hostname": "microservices-pattern-camera-0",
+                "imagePullSecrets": [
+                    {
+                        "name": "regcred"
+                    }
+                ],
+                "nodeName": "edgenode01",
+                "nodeSelector": {
+                    "kubernetes.io/arch": "arm64"
+                },
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "subdomain": "microservices-pattern-camera-peers",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": {
+                            "path": "/dev/video0",
+                            "type": "CharDevice"
+                        },
+                        "name": "video-device"
+                    },
+                    {
+                        "configMap": {
+                            "defaultMode": 420,
+                            "items": [
+                                {
+                                    "key": "cyclonedds.xml",
+                                    "path": "cyclonedds.xml"
+                                }
+                            ],
+                            "name": "microservices-pattern-cyclonedds"
+                        },
+                        "name": "cyclonedds"
+                    },
+                    {
+                        "name": "kube-api-access-v8d2x",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:22:55Z",
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:22:38Z",
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:22:55Z",
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:22:55Z",
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:22:38Z",
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "containerID": "containerd://b8cb7cc98b98f083459387b57c28c4541d9fd1a57058360caaa9e79b66b539d7",
+                        "image": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-camera:latest",
+                        "imageID": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-camera@sha256:ccd43f182d00452743b11cbb330f135c3f6a063d0f2c1939925ae8de0f5843dd",
+                        "lastState": {},
+                        "name": "camera",
+                        "ready": true,
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-07-09T09:22:54Z"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/dev/video0",
+                                "name": "video-device"
+                            },
+                            {
+                                "mountPath": "/etc/cyclonedds",
+                                "name": "cyclonedds",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-v8d2x",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "158.42.104.206",
+                "hostIPs": [
+                    {
+                        "ip": "158.42.104.206"
+                    },
+                    {
+                        "ip": "2001:720:101c:107:2bb1:2437:d649:b2ab"
+                    }
+                ],
+                "phase": "Running",
+                "podIP": "10.42.2.202",
+                "podIPs": [
+                    {
+                        "ip": "10.42.2.202"
+                    }
+                ],
+                "qosClass": "BestEffort",
+                "startTime": "2026-07-09T09:22:38Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "creationTimestamp": "2026-07-09T09:22:38Z",
+                "generateName": "microservices-pattern-dashboard-",
+                "labels": {
+                    "app": "ros2-microservices-dashboard",
+                    "app.kubernetes.io/instance": "microservices-pattern",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "ros2-microservices",
+                    "apps.kubernetes.io/pod-index": "0",
+                    "component": "dashboard",
+                    "controller-revision-hash": "microservices-pattern-dashboard-5dc647685",
+                    "helm.sh/chart": "ros2-microservices-1.0.0",
+                    "pattern": "microservices",
+                    "statefulset.kubernetes.io/pod-name": "microservices-pattern-dashboard-0"
+                },
+                "name": "microservices-pattern-dashboard-0",
+                "namespace": "ros2exp",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "StatefulSet",
+                        "name": "microservices-pattern-dashboard",
+                        "uid": "d6d70f19-ad02-4fb7-ae75-ff6819e49a40"
+                    }
+                ],
+                "resourceVersion": "31921199",
+                "uid": "c03ad26b-d7b1-4aba-a4d0-73a295266e19"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "env": [
+                            {
+                                "name": "ROS_DOMAIN_ID",
+                                "value": "42"
+                            },
+                            {
+                                "name": "RMW_IMPLEMENTATION",
+                                "value": "rmw_cyclonedds_cpp"
+                            },
+                            {
+                                "name": "ROS_LOCALHOST_ONLY",
+                                "value": "0"
+                            },
+                            {
+                                "name": "CYCLONEDDS_URI",
+                                "value": "file:///etc/cyclonedds/cyclonedds.xml"
+                            }
+                        ],
+                        "image": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard:latest",
+                        "imagePullPolicy": "Always",
+                        "livenessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/",
+                                "port": "http",
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 10,
+                            "periodSeconds": 30,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "name": "dashboard",
+                        "ports": [
+                            {
+                                "containerPort": 8080,
+                                "name": "http",
+                                "protocol": "TCP"
+                            },
+                            {
+                                "containerPort": 9090,
+                                "name": "ws",
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "resources": {},
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/dashboard-cm",
+                                "name": "dashboard-html",
+                                "readOnly": true
+                            },
+                            {
+                                "mountPath": "/etc/cyclonedds",
+                                "name": "cyclonedds",
+                                "readOnly": true
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-w75b4",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "hostname": "microservices-pattern-dashboard-0",
+                "imagePullSecrets": [
+                    {
+                        "name": "regcred"
+                    }
+                ],
+                "initContainers": [
+                    {
+                        "command": [
+                            "sh",
+                            "-c",
+                            "FULLNAME=\"microservices-pattern\"\nNS=\"ros2exp\"\nPEERS=\"\"\nPEERS=\"$PEERS ${FULLNAME}-camera-0.${FULLNAME}-camera-peers.${NS}.svc.cluster.local\"\nPEERS=\"$PEERS ${FULLNAME}-yolo-0.${FULLNAME}-yolo-peers.${NS}.svc.cluster.local\"\nPEERS=\"$PEERS ${FULLNAME}-llava-0.${FULLNAME}-llava-peers.${NS}.svc.cluster.local\"\nPEERS=\"$PEERS ${FULLNAME}-voxtral-0.${FULLNAME}-voxtral-peers.${NS}.svc.cluster.local\"\nfor PEER in $PEERS; do\n  echo \"[init] Waiting for DDS peer DNS: $PEER\"\n  until nslookup \"$PEER\" \u003e/dev/null 2\u003e\u00261; do\n    echo \"[init]   $PEER not resolvable yet, retrying in 3s...\"\n    sleep 3\n  done\n  echo \"[init]   $PEER resolved\"\ndone\nGRACE=60\necho \"[init] All peer DNS resolved — waiting ${GRACE}s for nodes to finish loading models and start publishing\"\nsleep \"$GRACE\"\necho \"[init] Ready to start rosbridge\"\n"
+                        ],
+                        "image": "busybox:1.36",
+                        "imagePullPolicy": "IfNotPresent",
+                        "name": "wait-for-peers",
+                        "resources": {},
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-w75b4",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "nodeName": "worker1-kb2",
+                "nodeSelector": {
+                    "kubernetes.io/arch": "amd64"
+                },
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "subdomain": "microservices-pattern-dashboard-peers",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "configMap": {
+                            "defaultMode": 420,
+                            "name": "microservices-pattern-dashboard-html"
+                        },
+                        "name": "dashboard-html"
+                    },
+                    {
+                        "configMap": {
+                            "defaultMode": 420,
+                            "items": [
+                                {
+                                    "key": "cyclonedds.xml",
+                                    "path": "cyclonedds.xml"
+                                }
+                            ],
+                            "name": "microservices-pattern-cyclonedds"
+                        },
+                        "name": "cyclonedds"
+                    },
+                    {
+                        "name": "kube-api-access-w75b4",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:22:41Z",
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:25:57Z",
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:26:10Z",
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:26:10Z",
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:22:38Z",
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "containerID": "containerd://4fbf34852ff8e44501e7967851bac56bcb951258e23eddea16c119b97bd6fd29",
+                        "image": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard:latest",
+                        "imageID": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard@sha256:46f7e0651a22713ce0b1d911a07f9ce868fa0d2123a229f92301e640000d0df1",
+                        "lastState": {},
+                        "name": "dashboard",
+                        "ready": true,
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-07-09T09:26:09Z"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/dashboard-cm",
+                                "name": "dashboard-html",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            },
+                            {
+                                "mountPath": "/etc/cyclonedds",
+                                "name": "cyclonedds",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-w75b4",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "158.42.104.103",
+                "hostIPs": [
+                    {
+                        "ip": "158.42.104.103"
+                    }
+                ],
+                "initContainerStatuses": [
+                    {
+                        "containerID": "containerd://c0c4460751cad6dd77db6df615a4916acd00fa2a322e6fea67c6cb79b5bb912c",
+                        "image": "docker.io/library/busybox:1.36",
+                        "imageID": "docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662",
+                        "lastState": {},
+                        "name": "wait-for-peers",
+                        "ready": true,
+                        "restartCount": 0,
+                        "started": false,
+                        "state": {
+                            "terminated": {
+                                "containerID": "containerd://c0c4460751cad6dd77db6df615a4916acd00fa2a322e6fea67c6cb79b5bb912c",
+                                "exitCode": 0,
+                                "finishedAt": "2026-07-09T09:25:56Z",
+                                "reason": "Completed",
+                                "startedAt": "2026-07-09T09:22:41Z"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-w75b4",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "phase": "Running",
+                "podIP": "10.42.1.219",
+                "podIPs": [
+                    {
+                        "ip": "10.42.1.219"
+                    }
+                ],
+                "qosClass": "BestEffort",
+                "startTime": "2026-07-09T09:22:39Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "creationTimestamp": "2026-07-09T09:22:38Z",
+                "generateName": "microservices-pattern-llava-",
+                "labels": {
+                    "app": "llava",
+                    "app.kubernetes.io/instance": "microservices-pattern",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "ros2-microservices",
+                    "apps.kubernetes.io/pod-index": "0",
+                    "component": "llava",
+                    "controller-revision-hash": "microservices-pattern-llava-7785876d75",
+                    "helm.sh/chart": "ros2-microservices-1.0.0",
+                    "pattern": "microservices",
+                    "statefulset.kubernetes.io/pod-name": "microservices-pattern-llava-0"
+                },
+                "name": "microservices-pattern-llava-0",
+                "namespace": "ros2exp",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "StatefulSet",
+                        "name": "microservices-pattern-llava",
+                        "uid": "4e2f4abb-738e-4d1f-a3e1-f6ace454ea04"
+                    }
+                ],
+                "resourceVersion": "31922343",
+                "uid": "2be291d1-74f4-44a0-bffd-fd109be8214c"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "args": [
+                            "set -e\nsource /opt/ros/humble/setup.bash\nif [ -f /opt/ros_ws/install/setup.bash ]; then\n  source /opt/ros_ws/install/setup.bash\nfi\nros2 run llava_pkg llava_node --ros-args \\\n  -p model_id:=${LLAVA_MODEL_ID} \\\n  -p image_topic:=\"${IMAGE_TOPIC}\" \\\n  -p detection_topic:=\"${DETECTIONS_TOPIC}\" \\\n  -p trigger_topic:=\"${LLAVA_TRIGGER_TOPIC}\" \\\n  -p response_topic:=\"${LLAVA_RESPONSE_TOPIC}\" \\\n  -p latency_topic:=\"${LLAVA_LATENCY_TOPIC}\" \\\n  -p inference_topic:=\"${LLAVA_INFERENCE_TOPIC}\" \\\n  -p trigger_on_yolo:=${LLAVA_TRIGGER_ON_YOLO} \\\n  -p yolo_trigger_interval_s:=$(printf \"%.1f\" \"${LLAVA_YOLO_INTERVAL_S}\") \\\n  -p max_new_tokens:=${LLAVA_MAX_TOKENS} \\\n  -p load_in_4bit:=${LLAVA_LOAD_4BIT} \u0026\nLLAVA_PID=$!\npython3 /opt/scripts/resource_monitor.py \u0026\nMONITOR_PID=$!\nwait -n ${LLAVA_PID} ${MONITOR_PID}\nexit 1\n"
+                        ],
+                        "command": [
+                            "/bin/bash",
+                            "-lc"
+                        ],
+                        "env": [
+                            {
+                                "name": "ROS_DOMAIN_ID",
+                                "value": "42"
+                            },
+                            {
+                                "name": "RMW_IMPLEMENTATION",
+                                "value": "rmw_cyclonedds_cpp"
+                            },
+                            {
+                                "name": "ROS_LOCALHOST_ONLY",
+                                "value": "0"
+                            },
+                            {
+                                "name": "LLAVA_MODEL_ID",
+                                "value": "llava-hf/llava-1.5-7b-hf"
+                            },
+                            {
+                                "name": "LLAVA_TRIGGER_ON_YOLO",
+                                "value": "true"
+                            },
+                            {
+                                "name": "LLAVA_YOLO_INTERVAL_S",
+                                "value": "30"
+                            },
+                            {
+                                "name": "LLAVA_MAX_TOKENS",
+                                "value": "150"
+                            },
+                            {
+                                "name": "LLAVA_LOAD_4BIT",
+                                "value": "true"
+                            },
+                            {
+                                "name": "IMAGE_TOPIC",
+                                "value": "/camera/image_raw"
+                            },
+                            {
+                                "name": "DETECTIONS_TOPIC",
+                                "value": "/detections"
+                            },
+                            {
+                                "name": "LLAVA_TRIGGER_TOPIC",
+                                "value": "/llava/trigger"
+                            },
+                            {
+                                "name": "LLAVA_RESPONSE_TOPIC",
+                                "value": "/llava/response"
+                            },
+                            {
+                                "name": "LLAVA_LATENCY_TOPIC",
+                                "value": "/llava/metrics_latency_ms"
+                            },
+                            {
+                                "name": "LLAVA_INFERENCE_TOPIC",
+                                "value": "/llava/metrics_inference_ms"
+                            },
+                            {
+                                "name": "NVIDIA_VISIBLE_DEVICES",
+                                "value": "all"
+                            },
+                            {
+                                "name": "NVIDIA_DRIVER_CAPABILITIES",
+                                "value": "compute,utility"
+                            },
+                            {
+                                "name": "CYCLONEDDS_URI",
+                                "value": "file:///etc/cyclonedds/cyclonedds.xml"
+                            }
+                        ],
+                        "image": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-llava:latest",
+                        "imagePullPolicy": "Always",
+                        "livenessProbe": {
+                            "exec": {
+                                "command": [
+                                    "/bin/bash",
+                                    "-c",
+                                    "pgrep -f llava_node \u003e/dev/null\n"
+                                ]
+                            },
+                            "failureThreshold": 3,
+                            "periodSeconds": 20,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 5
+                        },
+                        "name": "llava",
+                        "resources": {},
+                        "startupProbe": {
+                            "exec": {
+                                "command": [
+                                    "/bin/bash",
+                                    "-c",
+                                    "pgrep -f llava_node \u003e/dev/null\n"
+                                ]
+                            },
+                            "failureThreshold": 18,
+                            "initialDelaySeconds": 90,
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 5
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/etc/cyclonedds",
+                                "name": "cyclonedds",
+                                "readOnly": true
+                            },
+                            {
+                                "mountPath": "/sys/devices/platform",
+                                "name": "sys-devices-platform",
+                                "readOnly": true
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-2tksx",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "hostname": "microservices-pattern-llava-0",
+                "imagePullSecrets": [
+                    {
+                        "name": "regcred"
+                    }
+                ],
+                "initContainers": [
+                    {
+                        "command": [
+                            "sh",
+                            "-c",
+                            "FULLNAME=\"microservices-pattern\"\nNS=\"ros2exp\"\nPEERS=\"\"\nPEERS=\"$PEERS ${FULLNAME}-camera-0.${FULLNAME}-camera-peers.${NS}.svc.cluster.local\"\nPEERS=\"$PEERS ${FULLNAME}-yolo-0.${FULLNAME}-yolo-peers.${NS}.svc.cluster.local\"\nPEERS=\"$PEERS ${FULLNAME}-dashboard-0.${FULLNAME}-dashboard-peers.${NS}.svc.cluster.local\"\nfor PEER in $PEERS; do\n  echo \"[init] Waiting for DDS peer DNS: $PEER\"\n  until nslookup \"$PEER\" \u003e/dev/null 2\u003e\u00261; do\n    echo \"[init]   $PEER not resolvable yet, retrying in 3s...\"\n    sleep 3\n  done\n  echo \"[init]   $PEER resolved\"\ndone\necho \"[init] All peers resolved — starting LLaVA\"\n"
+                        ],
+                        "image": "busybox:1.36",
+                        "imagePullPolicy": "IfNotPresent",
+                        "name": "wait-for-peers",
+                        "resources": {},
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-2tksx",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "nodeName": "edgenode01",
+                "nodeSelector": {
+                    "kubernetes.io/arch": "arm64"
+                },
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "runtimeClassName": "nvidia",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "subdomain": "microservices-pattern-llava-peers",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "configMap": {
+                            "defaultMode": 420,
+                            "items": [
+                                {
+                                    "key": "cyclonedds.xml",
+                                    "path": "cyclonedds.xml"
+                                }
+                            ],
+                            "name": "microservices-pattern-cyclonedds"
+                        },
+                        "name": "cyclonedds"
+                    },
+                    {
+                        "hostPath": {
+                            "path": "/sys/devices/platform",
+                            "type": "Directory"
+                        },
+                        "name": "sys-devices-platform"
+                    },
+                    {
+                        "name": "kube-api-access-2tksx",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:22:40Z",
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:24:59Z",
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:33:19Z",
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:33:19Z",
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:22:38Z",
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "containerID": "containerd://e03b4d2e9ebf8453ca068cf78f62235f0c893f776e6a5ade0cb66bbb83ed0fc5",
+                        "image": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-llava:latest",
+                        "imageID": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-llava@sha256:121ff8295d62c7401cd623875ad0f136122dd356ea16a2661c55602178908272",
+                        "lastState": {},
+                        "name": "llava",
+                        "ready": true,
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-07-09T09:31:46Z"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/etc/cyclonedds",
+                                "name": "cyclonedds",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            },
+                            {
+                                "mountPath": "/sys/devices/platform",
+                                "name": "sys-devices-platform",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-2tksx",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "158.42.104.206",
+                "hostIPs": [
+                    {
+                        "ip": "158.42.104.206"
+                    },
+                    {
+                        "ip": "2001:720:101c:107:2bb1:2437:d649:b2ab"
+                    }
+                ],
+                "initContainerStatuses": [
+                    {
+                        "containerID": "containerd://0589e87d07b9c69c97540ac235fb0376a6d686a8914743af2abb6353b6806957",
+                        "image": "docker.io/library/busybox:1.36",
+                        "imageID": "docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662",
+                        "lastState": {},
+                        "name": "wait-for-peers",
+                        "ready": true,
+                        "restartCount": 0,
+                        "started": false,
+                        "state": {
+                            "terminated": {
+                                "containerID": "containerd://0589e87d07b9c69c97540ac235fb0376a6d686a8914743af2abb6353b6806957",
+                                "exitCode": 0,
+                                "finishedAt": "2026-07-09T09:24:58Z",
+                                "reason": "Completed",
+                                "startedAt": "2026-07-09T09:22:39Z"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-2tksx",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "phase": "Running",
+                "podIP": "10.42.2.204",
+                "podIPs": [
+                    {
+                        "ip": "10.42.2.204"
+                    }
+                ],
+                "qosClass": "BestEffort",
+                "startTime": "2026-07-09T09:22:38Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "creationTimestamp": "2026-07-09T09:22:38Z",
+                "generateName": "microservices-pattern-voxtral-",
+                "labels": {
+                    "app": "voxtral",
+                    "app.kubernetes.io/instance": "microservices-pattern",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "ros2-microservices",
+                    "apps.kubernetes.io/pod-index": "0",
+                    "component": "voxtral",
+                    "controller-revision-hash": "microservices-pattern-voxtral-7f466d4698",
+                    "helm.sh/chart": "ros2-microservices-1.0.0",
+                    "pattern": "microservices",
+                    "statefulset.kubernetes.io/pod-name": "microservices-pattern-voxtral-0"
+                },
+                "name": "microservices-pattern-voxtral-0",
+                "namespace": "ros2exp",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "StatefulSet",
+                        "name": "microservices-pattern-voxtral",
+                        "uid": "08581a3b-4e1b-4954-82ec-216d91ba4ee5"
+                    }
+                ],
+                "resourceVersion": "31922371",
+                "uid": "304ab713-e907-4c3f-bd87-174d64de26ce"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "args": [
+                            "set -e\nsource /opt/ros/humble/setup.bash\nif [ -f /opt/ros_ws/install/setup.bash ]; then\n  source /opt/ros_ws/install/setup.bash\nfi\nros2 run voxtral_pkg voxtral_node --ros-args \\\n  -p audio_mode:=${VOXTRAL_AUDIO_MODE} \\\n  -p model_id:=\"${VOXTRAL_MODEL_ID}\" \\\n  -p command_topic:=\"${VOICE_COMMAND_TOPIC}\" \\\n  -p transcript_topic:=\"${VOICE_TRANSCRIPT_TOPIC}\" \\\n  -p response_topic:=\"${VOICE_RESPONSE_TOPIC}\" \\\n  -p latency_topic:=\"${VOICE_LATENCY_TOPIC}\" \u0026\nVOXTRAL_PID=$!\npython3 /opt/scripts/resource_monitor.py \u0026\nMONITOR_PID=$!\nwait -n ${VOXTRAL_PID} ${MONITOR_PID}\nexit 1\n"
+                        ],
+                        "command": [
+                            "/bin/bash",
+                            "-lc"
+                        ],
+                        "env": [
+                            {
+                                "name": "ROS_DOMAIN_ID",
+                                "value": "42"
+                            },
+                            {
+                                "name": "RMW_IMPLEMENTATION",
+                                "value": "rmw_cyclonedds_cpp"
+                            },
+                            {
+                                "name": "ROS_LOCALHOST_ONLY",
+                                "value": "0"
+                            },
+                            {
+                                "name": "VOXTRAL_AUDIO_MODE",
+                                "value": "true"
+                            },
+                            {
+                                "name": "VOXTRAL_MODEL_ID",
+                                "value": "mistralai/Voxtral-Mini-3B-2507"
+                            },
+                            {
+                                "name": "VOICE_COMMAND_TOPIC",
+                                "value": "/voice/command"
+                            },
+                            {
+                                "name": "VOICE_TRANSCRIPT_TOPIC",
+                                "value": "/voice/transcript"
+                            },
+                            {
+                                "name": "VOICE_RESPONSE_TOPIC",
+                                "value": "/voice/response"
+                            },
+                            {
+                                "name": "VOICE_LATENCY_TOPIC",
+                                "value": "/voice/metrics_latency_ms"
+                            },
+                            {
+                                "name": "NVIDIA_VISIBLE_DEVICES",
+                                "value": "all"
+                            },
+                            {
+                                "name": "NVIDIA_DRIVER_CAPABILITIES",
+                                "value": "compute,utility"
+                            },
+                            {
+                                "name": "CYCLONEDDS_URI",
+                                "value": "file:///etc/cyclonedds/cyclonedds.xml"
+                            }
+                        ],
+                        "image": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-voxtral:latest",
+                        "imagePullPolicy": "Always",
+                        "livenessProbe": {
+                            "exec": {
+                                "command": [
+                                    "/bin/bash",
+                                    "-c",
+                                    "pgrep -f voxtral_node \u003e/dev/null\n"
+                                ]
+                            },
+                            "failureThreshold": 3,
+                            "periodSeconds": 20,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 5
+                        },
+                        "name": "voxtral",
+                        "resources": {},
+                        "startupProbe": {
+                            "exec": {
+                                "command": [
+                                    "/bin/bash",
+                                    "-c",
+                                    "pgrep -f voxtral_node \u003e/dev/null\n"
+                                ]
+                            },
+                            "failureThreshold": 18,
+                            "initialDelaySeconds": 15,
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 5
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/etc/cyclonedds",
+                                "name": "cyclonedds",
+                                "readOnly": true
+                            },
+                            {
+                                "mountPath": "/sys/devices/platform",
+                                "name": "sys-devices-platform",
+                                "readOnly": true
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-vfnwj",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "hostname": "microservices-pattern-voxtral-0",
+                "imagePullSecrets": [
+                    {
+                        "name": "regcred"
+                    }
+                ],
+                "initContainers": [
+                    {
+                        "command": [
+                            "sh",
+                            "-c",
+                            "FULLNAME=\"microservices-pattern\"\nNS=\"ros2exp\"\nPEERS=\"\"\nPEERS=\"$PEERS ${FULLNAME}-camera-0.${FULLNAME}-camera-peers.${NS}.svc.cluster.local\"\nPEERS=\"$PEERS ${FULLNAME}-yolo-0.${FULLNAME}-yolo-peers.${NS}.svc.cluster.local\"\nPEERS=\"$PEERS ${FULLNAME}-dashboard-0.${FULLNAME}-dashboard-peers.${NS}.svc.cluster.local\"\nfor PEER in $PEERS; do\n  echo \"[init] Waiting for DDS peer DNS: $PEER\"\n  until nslookup \"$PEER\" \u003e/dev/null 2\u003e\u00261; do\n    echo \"[init]   $PEER not resolvable yet, retrying in 3s...\"\n    sleep 3\n  done\n  echo \"[init]   $PEER resolved\"\ndone\necho \"[init] All peers resolved — starting Voxtral\"\n"
+                        ],
+                        "image": "busybox:1.36",
+                        "imagePullPolicy": "IfNotPresent",
+                        "name": "wait-for-peers",
+                        "resources": {},
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-vfnwj",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "nodeName": "edgenode01",
+                "nodeSelector": {
+                    "kubernetes.io/arch": "arm64"
+                },
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "runtimeClassName": "nvidia",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "subdomain": "microservices-pattern-voxtral-peers",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "configMap": {
+                            "defaultMode": 420,
+                            "items": [
+                                {
+                                    "key": "cyclonedds.xml",
+                                    "path": "cyclonedds.xml"
+                                }
+                            ],
+                            "name": "microservices-pattern-cyclonedds"
+                        },
+                        "name": "cyclonedds"
+                    },
+                    {
+                        "hostPath": {
+                            "path": "/sys/devices/platform",
+                            "type": "Directory"
+                        },
+                        "name": "sys-devices-platform"
+                    },
+                    {
+                        "name": "kube-api-access-vfnwj",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:22:40Z",
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:24:59Z",
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:33:29Z",
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:33:29Z",
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:22:38Z",
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "containerID": "containerd://13bc89ddb503662122b6546b95e620a44d411f2d22d2fcf2798362028e4768fc",
+                        "image": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-voxtral:latest",
+                        "imageID": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-voxtral@sha256:da95c27e78bf962285257e4450983ea0ce7bfcc447e6ce4743514f6dcc15051f",
+                        "lastState": {},
+                        "name": "voxtral",
+                        "ready": true,
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-07-09T09:33:05Z"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/etc/cyclonedds",
+                                "name": "cyclonedds",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            },
+                            {
+                                "mountPath": "/sys/devices/platform",
+                                "name": "sys-devices-platform",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-vfnwj",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "158.42.104.206",
+                "hostIPs": [
+                    {
+                        "ip": "158.42.104.206"
+                    },
+                    {
+                        "ip": "2001:720:101c:107:2bb1:2437:d649:b2ab"
+                    }
+                ],
+                "initContainerStatuses": [
+                    {
+                        "containerID": "containerd://25d625a0982967fab861c91edf2fa06701080ed5b96af120f03dce11019d53ee",
+                        "image": "docker.io/library/busybox:1.36",
+                        "imageID": "docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662",
+                        "lastState": {},
+                        "name": "wait-for-peers",
+                        "ready": true,
+                        "restartCount": 0,
+                        "started": false,
+                        "state": {
+                            "terminated": {
+                                "containerID": "containerd://25d625a0982967fab861c91edf2fa06701080ed5b96af120f03dce11019d53ee",
+                                "exitCode": 0,
+                                "finishedAt": "2026-07-09T09:24:58Z",
+                                "reason": "Completed",
+                                "startedAt": "2026-07-09T09:22:39Z"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-vfnwj",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "phase": "Running",
+                "podIP": "10.42.2.205",
+                "podIPs": [
+                    {
+                        "ip": "10.42.2.205"
+                    }
+                ],
+                "qosClass": "BestEffort",
+                "startTime": "2026-07-09T09:22:39Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "creationTimestamp": "2026-07-09T09:22:38Z",
+                "generateName": "microservices-pattern-yolo-",
+                "labels": {
+                    "app": "yolo",
+                    "app.kubernetes.io/instance": "microservices-pattern",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "ros2-microservices",
+                    "apps.kubernetes.io/pod-index": "0",
+                    "component": "yolo",
+                    "controller-revision-hash": "microservices-pattern-yolo-644bdff77b",
+                    "helm.sh/chart": "ros2-microservices-1.0.0",
+                    "pattern": "microservices",
+                    "statefulset.kubernetes.io/pod-name": "microservices-pattern-yolo-0"
+                },
+                "name": "microservices-pattern-yolo-0",
+                "namespace": "ros2exp",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "StatefulSet",
+                        "name": "microservices-pattern-yolo",
+                        "uid": "7e19778a-6816-482e-9ac9-7750ec362d42"
+                    }
+                ],
+                "resourceVersion": "31921084",
+                "uid": "f00bb977-72f6-4bd5-9329-50739de4d5c1"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "args": [
+                            "set -e\nsource /opt/ros/humble/setup.bash\nif [ -f /opt/ros_ws/install/setup.bash ]; then\n  source /opt/ros_ws/install/setup.bash\nfi\nros2 run yolo_detector_pkg yolo_detector --ros-args \\\n  -p model_path:=\"${YOLO_MODEL_PATH}\" \\\n  -p conf:=${YOLO_CONF} \\\n  -p image_topic:=\"${IMAGE_TOPIC}\" \\\n  -p detections_topic:=\"${DETECTIONS_TOPIC}\" \\\n  -p debug_image_topic:=\"${DEBUG_IMAGE_TOPIC}\" \\\n  -p publish_debug_image:=\"${YOLO_PUBLISH_DEBUG}\" \\\n  -p publish_metrics:=\"${YOLO_PUBLISH_METRICS}\" \\\n  -p latency_topic:=\"${LATENCY_TOPIC}\" \\\n  -p inference_topic:=\"${INFERENCE_TOPIC}\" \\\n  -p filter_classes:=\"\\\"${YOLO_FILTER_CLASSES}\\\"\" \u0026\nYOLO_PID=$!\npython3 /opt/scripts/resource_monitor.py \u0026\nMONITOR_PID=$!\nwait -n ${YOLO_PID} ${MONITOR_PID}\nexit 1\n"
+                        ],
+                        "command": [
+                            "/bin/bash",
+                            "-lc"
+                        ],
+                        "env": [
+                            {
+                                "name": "ROS_DOMAIN_ID",
+                                "value": "42"
+                            },
+                            {
+                                "name": "RMW_IMPLEMENTATION",
+                                "value": "rmw_cyclonedds_cpp"
+                            },
+                            {
+                                "name": "ROS_LOCALHOST_ONLY",
+                                "value": "0"
+                            },
+                            {
+                                "name": "YOLO_MODEL_PATH",
+                                "value": "/opt/models/yolov8n.pt"
+                            },
+                            {
+                                "name": "YOLO_CONF",
+                                "value": "0.25"
+                            },
+                            {
+                                "name": "YOLO_PUBLISH_DEBUG",
+                                "value": "true"
+                            },
+                            {
+                                "name": "YOLO_PUBLISH_METRICS",
+                                "value": "true"
+                            },
+                            {
+                                "name": "YOLO_FILTER_CLASSES"
+                            },
+                            {
+                                "name": "IMAGE_TOPIC",
+                                "value": "/camera/image_raw"
+                            },
+                            {
+                                "name": "DETECTIONS_TOPIC",
+                                "value": "/detections"
+                            },
+                            {
+                                "name": "DEBUG_IMAGE_TOPIC",
+                                "value": "/detections/image"
+                            },
+                            {
+                                "name": "LATENCY_TOPIC",
+                                "value": "/benchmark/latency_ms"
+                            },
+                            {
+                                "name": "INFERENCE_TOPIC",
+                                "value": "/benchmark/inference_ms"
+                            },
+                            {
+                                "name": "NVIDIA_VISIBLE_DEVICES",
+                                "value": "all"
+                            },
+                            {
+                                "name": "NVIDIA_DRIVER_CAPABILITIES",
+                                "value": "compute,utility"
+                            },
+                            {
+                                "name": "CYCLONEDDS_URI",
+                                "value": "file:///etc/cyclonedds/cyclonedds.xml"
+                            }
+                        ],
+                        "image": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-yolo:latest",
+                        "imagePullPolicy": "Always",
+                        "livenessProbe": {
+                            "exec": {
+                                "command": [
+                                    "/bin/bash",
+                                    "-c",
+                                    "pgrep -f yolo_detector \u003e/dev/null\n"
+                                ]
+                            },
+                            "failureThreshold": 3,
+                            "periodSeconds": 20,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 5
+                        },
+                        "name": "yolo",
+                        "resources": {},
+                        "startupProbe": {
+                            "exec": {
+                                "command": [
+                                    "/bin/bash",
+                                    "-c",
+                                    "pgrep -f yolo_detector \u003e/dev/null\n"
+                                ]
+                            },
+                            "failureThreshold": 18,
+                            "initialDelaySeconds": 30,
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 5
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/etc/cyclonedds",
+                                "name": "cyclonedds",
+                                "readOnly": true
+                            },
+                            {
+                                "mountPath": "/sys/devices/platform",
+                                "name": "sys-devices-platform",
+                                "readOnly": true
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-fmrlw",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "hostname": "microservices-pattern-yolo-0",
+                "imagePullSecrets": [
+                    {
+                        "name": "regcred"
+                    }
+                ],
+                "nodeName": "edgenode01",
+                "nodeSelector": {
+                    "kubernetes.io/arch": "arm64"
+                },
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "runtimeClassName": "nvidia",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "subdomain": "microservices-pattern-yolo-peers",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "configMap": {
+                            "defaultMode": 420,
+                            "items": [
+                                {
+                                    "key": "cyclonedds.xml",
+                                    "path": "cyclonedds.xml"
+                                }
+                            ],
+                            "name": "microservices-pattern-cyclonedds"
+                        },
+                        "name": "cyclonedds"
+                    },
+                    {
+                        "hostPath": {
+                            "path": "/sys/devices/platform",
+                            "type": "Directory"
+                        },
+                        "name": "sys-devices-platform"
+                    },
+                    {
+                        "name": "kube-api-access-fmrlw",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:24:51Z",
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:22:38Z",
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:25:29Z",
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:25:29Z",
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:22:38Z",
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "containerID": "containerd://01ce7d49f8e1894c9be1ef56595656965a9d884664ee18b86e94b8d86511ab6f",
+                        "image": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-yolo:latest",
+                        "imageID": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-yolo@sha256:b0da2a27cb6ef6bb9f250888a2220c8fa716bb032dfc198cf3dbb9b0e07920ff",
+                        "lastState": {},
+                        "name": "yolo",
+                        "ready": true,
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-07-09T09:24:50Z"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/etc/cyclonedds",
+                                "name": "cyclonedds",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            },
+                            {
+                                "mountPath": "/sys/devices/platform",
+                                "name": "sys-devices-platform",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-fmrlw",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "158.42.104.206",
+                "hostIPs": [
+                    {
+                        "ip": "158.42.104.206"
+                    },
+                    {
+                        "ip": "2001:720:101c:107:2bb1:2437:d649:b2ab"
+                    }
+                ],
+                "phase": "Running",
+                "podIP": "10.42.2.203",
+                "podIPs": [
+                    {
+                        "ip": "10.42.2.203"
+                    }
+                ],
+                "qosClass": "BestEffort",
+                "startTime": "2026-07-09T09:22:38Z"
+            }
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}

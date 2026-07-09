@@ -1,0 +1,2 @@
+error: Internal error occurred: error executing command in container: failed to exec in container: failed to start exec "01da2a8f80ba88f372db7351ff34ad4dce31f7750a470539315a44c2a9bc86b9": OCI runtime exec failed: exec failed: unable to start container process: exec: "bash": executable file not found in $PATH
+(exec fallo)

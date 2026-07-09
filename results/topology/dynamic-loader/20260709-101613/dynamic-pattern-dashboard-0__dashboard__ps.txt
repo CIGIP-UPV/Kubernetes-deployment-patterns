@@ -1,0 +1,9 @@
+UID          PID    PPID  C STIME TTY          TIME CMD
+root           1       0  0 10:13 ?        00:00:00 /bin/bash /entrypoint.sh
+root          36       1  0 10:13 ?        00:00:00 /usr/bin/python3 /opt/ros/humble/bin/ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=9090 address:=0.0.0.0
+root          37       1  0 10:13 ?        00:00:00 /bin/bash /entrypoint.sh
+root          39      37  0 10:13 ?        00:00:00 python3 -m http.server 8080
+root          45      36  9 10:13 ?        00:00:18 python3 /opt/ros/humble/lib/rosbridge_server/rosbridge_websocket --ros-args -r __node:=rosbridge_websocket --params-file /tmp/launch_params_6zr6pw57 --params-file /tmp/launch_params_2njurzlq --params-file /tmp/launch_params_7cuj7awr --params-file /tmp/launch_params_4i33ek5z --params-file /tmp/launch_params_0jvm5rf2 --params-file /tmp/launch_params_ho8we25q --params-file /tmp/launch_params_nqxf3xm2 --params-file /tmp/launch_params_ovzpzf6b --params-file /tmp/launch_params_qstdw8vi --params-file /tmp/launch_params_b9pzolri --params-file /tmp/launch_params_15lpx_4u --params-file /tmp/launch_params_2fkg7iax --params-file /tmp/launch_params_p9gwfjqt --params-file /tmp/launch_params_7k0wn7ok --params-file /tmp/launch_params_6r_vqmh5 --params-file /tmp/launch_params_kzjja9cq
+root          47      36  0 10:13 ?        00:00:00 python3 /opt/ros/humble/lib/rosapi/rosapi_node --ros-args -r __node:=rosapi --params-file /tmp/launch_params_r0vgtjil --params-file /tmp/launch_params_1r3_0gn2 --params-file /tmp/launch_params_zv9ruapc --params-file /tmp/launch_params_l0zouc12
+root          73       0  0 10:16 ?        00:00:00 sh -c command -v ps >/dev/null 2>&1 && ps -ef || echo "ps no disponible en este contenedor"
+root          78      73  0 10:16 ?        00:00:00 ps -ef

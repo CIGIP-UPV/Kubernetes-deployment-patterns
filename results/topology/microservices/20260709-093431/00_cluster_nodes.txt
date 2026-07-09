@@ -1,0 +1,4 @@
+NAME          STATUS   ROLES                  AGE    VERSION        INTERNAL-IP      EXTERNAL-IP     OS-IMAGE             KERNEL-VERSION       CONTAINER-RUNTIME
+edgenode01    Ready    <none>                 101d   v1.32.6+k3s1   158.42.104.206   <none>          Ubuntu 22.04.5 LTS   5.15.148-tegra       containerd://2.0.5-k3s1.32
+kb2           Ready    control-plane,master   168d   v1.32.6+k3s1   158.42.104.15    158.42.104.15   Ubuntu 22.04.4 LTS   5.15.0-185-generic   containerd://2.0.5-k3s1.32
+worker1-kb2   Ready    <none>                 120d   v1.32.6+k3s1   158.42.104.103   <none>          Ubuntu 22.04.4 LTS   6.8.0-111-generic    containerd://2.0.5-k3s1.32

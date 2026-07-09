@@ -1,0 +1,5 @@
+UID          PID    PPID  C STIME TTY          TIME CMD
+root           1       0  0 10:12 ?        00:00:00 /usr/bin/python3 /opt/ros/humble/bin/ros2 run llava_pkg llava_node --ros-args -p model_id:=llava-hf/llava-1.5-7b-hf -p trigger_on_yolo:=true -p yolo_trigger_interval_s:=30.0 -p max_new_tokens:=150 -p load_in_4bit:=true
+root          46       1 28 10:12 ?        00:01:12 /usr/bin/python3 /opt/component_ws/install/llava_pkg/lib/llava_pkg/llava_node --ros-args -p model_id:=llava-hf/llava-1.5-7b-hf -p trigger_on_yolo:=true -p yolo_trigger_interval_s:=30.0 -p max_new_tokens:=150 -p load_in_4bit:=true
+root          80       0  0 10:16 ?        00:00:00 sh -c command -v ps >/dev/null 2>&1 && ps -ef || echo "ps no disponible en este contenedor"
+root          86      80  0 10:16 ?        00:00:00 ps -ef

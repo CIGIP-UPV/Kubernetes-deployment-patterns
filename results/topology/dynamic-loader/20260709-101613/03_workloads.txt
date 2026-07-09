@@ -1,0 +1,3 @@
+NAME                                         READY   AGE     CONTAINERS                                     IMAGES
+statefulset.apps/dynamic-pattern             1/1     4m10s   component-host,orchestrator,llava-standalone   gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-component-host:latest,gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-component-host:latest,gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-component-host:latest
+statefulset.apps/dynamic-pattern-dashboard   1/1     4m10s   dashboard                                      gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard:latest

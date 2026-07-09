@@ -1,0 +1,4 @@
+NAME                                              READY   STATUS    RESTARTS   AGE   IP            NODE          NOMINATED NODE   READINESS GATES
+overlay-pattern-0                                 1/1     Running   0          14m   10.42.2.206   edgenode01    <none>           <none>
+overlay-pattern-dashboard-0                       1/1     Running   0          14m   10.42.1.220   worker1-kb2   <none>           <none>
+overlay-pattern-overlay-server-8585bdf96b-pknkt   1/1     Running   0          14m   10.42.0.179   kb2           <none>           <none>

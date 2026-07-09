@@ -1,0 +1,15 @@
+1|ppid=0|threads=1|rss=5788 kB|nginx: master process nginx -g daemon off; 
+30|ppid=1|threads=1|rss=2572 kB|nginx: worker process 
+31|ppid=1|threads=1|rss=2572 kB|nginx: worker process 
+32|ppid=1|threads=1|rss=3144 kB|nginx: worker process 
+33|ppid=1|threads=1|rss=2572 kB|nginx: worker process 
+48|ppid=0|threads=1|rss=1092 kB|sh -c for d in /proc/[0-9]*; do
+  pid=${d#/proc/}
+  [ -r "$d/cmdline" ] || continue
+  cmd=$(tr "\0" " " < "$d/cmdline" 2>/dev/null)
+  [ -n "$cmd" ] || cmd="[sin cmdline: kernel/zombie]"
+  ppid=$(awk "{print \$4}" "$d/stat" 2>/dev/null)
+  threads=$(awk "/^Threads:/{print \$2}" "$d/status" 2>/dev/null)
+  rss=$(awk "/^VmRSS:/{print \$2\" \"\$3}" "$d/status" 2>/dev/null)
+  echo "$pid|ppid=$ppid|threads=$threads|rss=$rss|$cmd"
+done 

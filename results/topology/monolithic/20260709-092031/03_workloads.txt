@@ -1,0 +1,3 @@
+NAME                                            READY   AGE     CONTAINERS           IMAGES
+statefulset.apps/monolithic-pattern             1/1     7m11s   monolithic-runtime   gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-monolithic:latest
+statefulset.apps/monolithic-pattern-dashboard   1/1     7m11s   dashboard            gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard:latest

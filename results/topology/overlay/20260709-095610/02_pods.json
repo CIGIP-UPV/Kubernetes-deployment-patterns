@@ -1,0 +1,1208 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "creationTimestamp": "2026-07-09T09:41:19Z",
+                "generateName": "overlay-pattern-",
+                "labels": {
+                    "app": "ros2-overlay-runtime",
+                    "app.kubernetes.io/instance": "overlay-pattern",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "ros2-overlay",
+                    "apps.kubernetes.io/pod-index": "0",
+                    "component": "runtime",
+                    "controller-revision-hash": "overlay-pattern-5c6d98b69",
+                    "helm.sh/chart": "ros2-overlay-1.0.0",
+                    "pattern": "overlay",
+                    "statefulset.kubernetes.io/pod-name": "overlay-pattern-0"
+                },
+                "name": "overlay-pattern-0",
+                "namespace": "ros2exp",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "StatefulSet",
+                        "name": "overlay-pattern",
+                        "uid": "c09ed719-cd92-4bab-8e17-0db2d9dad621"
+                    }
+                ],
+                "resourceVersion": "31926020",
+                "uid": "cf126d38-5e54-4ac2-97c8-da4282d3e8bf"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "args": [
+                            "set -e\necho \"[runtime] Sourcing ROS 2 + base workspace...\"\nsource /opt/ros/humble/setup.bash\nsource /opt/base_ws/install/setup.bash\n\necho \"[runtime] Sourcing overlay workspace...\"\nsource /opt/overlay/install/setup.bash\n\n# ── Workaround for ros2-overlay-pack \u003c= 1.0.x ──\n# pip pulls nvidia-cuda-runtime-cu13 + nvidia-cudnn-cu13 etc.\n# as transitive deps of ultralytics/transformers. Their .so\n# files install under /opt/overlay/python-deps/nvidia/\u003clib\u003e/\n# as a SHARED namespace package, so deleting the .dist-info\n# dirs alone is not enough — we must wipe the nvidia/ dir\n# itself. The Jetson PyTorch wheel does NOT depend on these\n# (it links libcuda from /usr/local/cuda/lib64 inherited\n# from ros2-base).\necho \"[runtime] Stripping nvidia-cu13 datacenter libs from overlay...\"\nrm -rf /opt/overlay/python-deps/nvidia      2\u003e/dev/null || true\nrm -rf /opt/overlay/python-deps/cuda_toolkit 2\u003e/dev/null || true\n# Also remove any *.dist-info / *.libs folders that referenced them\nfind /opt/overlay/python-deps -maxdepth 1 -type d \\\n  \\( -name \"nvidia_*\" -o -name \"cuda_toolkit*\" \\) \\\n  -exec rm -rf {} + 2\u003e/dev/null || true\necho \"[runtime] Remaining python-deps top-level (nvidia/cuda):\"\nls /opt/overlay/python-deps 2\u003e/dev/null | grep -i -E \"nvidia|cuda\" || \\\n  echo \"  (none — clean)\"\n\n# PYTHONPATH for the overlay's pip --target site-packages\n# (PyTorch, transformers, accelerate, ultralytics, etc.)\nexport PYTHONPATH=\"/opt/overlay/python-deps:${PYTHONPATH}\"\n\n# LD_LIBRARY_PATH for the system libs we staged in the overlay\n# (libasound, libportaudio, libsndfile — needed by librosa,\n# sounddevice). Append to existing path (set in ros2-base ENV).\nexport LD_LIBRARY_PATH=\"/opt/overlay/system-libs:${LD_LIBRARY_PATH}\"\n\necho \"[runtime] Environment summary:\"\necho \"  PYTHONPATH=${PYTHONPATH}\"\necho \"  LD_LIBRARY_PATH=${LD_LIBRARY_PATH}\"\necho \"  HF_HOME=${HF_HOME}\"\necho \"\"\n\necho \"[runtime] Starting resource_monitor...\"\npython3 /opt/scripts/resource_monitor.py \u0026\nRESMON_PID=$!\n\necho \"[runtime] Starting camera_driver...\"\nros2 run camera_driver_pkg camera_driver --ros-args \\\n  -p device:=${CAMERA_DEVICE} \\\n  -p width:=${CAMERA_WIDTH} \\\n  -p height:=${CAMERA_HEIGHT} \\\n  -p fps:=${CAMERA_FPS} \\\n  -p frame_id:=${CAMERA_FRAME_ID} \\\n  -p synthetic_mode:=${CAMERA_SYNTHETIC_MODE} \\\n  -p image_topic:=${IMAGE_TOPIC} \u0026\nCAMERA_PID=$!\n\nsleep ${YOLO_START_DELAY}\necho \"[runtime] Starting yolo_detector...\"\nros2 run yolo_detector_pkg yolo_detector --ros-args \\\n  -p model_path:=${YOLO_MODEL_PATH} \\\n  -p conf:=${YOLO_CONF} \\\n  -p image_topic:=${IMAGE_TOPIC} \\\n  -p detections_topic:=${DETECTIONS_TOPIC} \\\n  -p debug_image_topic:=${DEBUG_IMAGE_TOPIC} \\\n  -p publish_debug_image:=${YOLO_PUBLISH_DEBUG} \\\n  -p publish_metrics:=${YOLO_PUBLISH_METRICS} \\\n  -p latency_topic:=${LATENCY_TOPIC} \\\n  -p inference_topic:=${INFERENCE_TOPIC} \\\n  -p filter_classes:=\"\\\"${YOLO_FILTER_CLASSES}\\\"\" \u0026\nYOLO_PID=$!\n\nif [ \"${LLAVA_ENABLED}\" = \"true\" ]; then\n  sleep ${LLAVA_START_DELAY}\n  echo \"[runtime] Starting llava_node...\"\n  ros2 run llava_pkg llava_node --ros-args \\\n    -p model_id:=${LLAVA_MODEL_ID} \\\n    -p image_topic:=${IMAGE_TOPIC} \\\n    -p detection_topic:=${DETECTIONS_TOPIC} \\\n    -p trigger_topic:=${LLAVA_TRIGGER_TOPIC} \\\n    -p response_topic:=${LLAVA_RESPONSE_TOPIC} \\\n    -p latency_topic:=${LLAVA_LATENCY_TOPIC} \\\n    -p inference_topic:=${LLAVA_INFERENCE_TOPIC} \\\n    -p trigger_on_yolo:=${LLAVA_TRIGGER_ON_YOLO} \\\n    -p yolo_trigger_interval_s:=$(printf \"%.1f\" \"${LLAVA_YOLO_INTERVAL_S}\") \\\n    -p max_new_tokens:=${LLAVA_MAX_TOKENS} \\\n    -p load_in_4bit:=${LLAVA_LOAD_4BIT} \\\n    -p hf_cache_dir:=/opt/overlay/huggingface_cache \u0026\n  LLAVA_PID=$!\nfi\n\nif [ \"${VOXTRAL_ENABLED}\" = \"true\" ]; then\n  echo \"[runtime] Starting voxtral_node...\"\n  ros2 run voxtral_pkg voxtral_node --ros-args \\\n    -p audio_mode:=${VOXTRAL_AUDIO_MODE} \\\n    -p model_id:=${VOXTRAL_MODEL_ID} \\\n    -p command_topic:=${VOICE_COMMAND_TOPIC} \\\n    -p transcript_topic:=${VOICE_TRANSCRIPT_TOPIC} \\\n    -p response_topic:=${VOICE_RESPONSE_TOPIC} \\\n    -p llava_trigger_topic:=${LLAVA_TRIGGER_TOPIC} \\\n    -p llava_response_topic:=${LLAVA_RESPONSE_TOPIC} \\\n    -p latency_topic:=${VOICE_LATENCY_TOPIC} \\\n    -p hf_cache_dir:=/opt/overlay/huggingface_cache \u0026\n  VOXTRAL_PID=$!\nfi\n\necho \"[runtime] All nodes launched. Waiting for any to exit...\"\nwait -n ${CAMERA_PID} ${YOLO_PID} ${RESMON_PID} ${LLAVA_PID:-} ${VOXTRAL_PID:-}\necho \"[runtime] One process exited — pod will restart\"\nexit 1\n"
+                        ],
+                        "command": [
+                            "/bin/bash",
+                            "-lc"
+                        ],
+                        "env": [
+                            {
+                                "name": "ROS_DOMAIN_ID",
+                                "value": "42"
+                            },
+                            {
+                                "name": "RMW_IMPLEMENTATION",
+                                "value": "rmw_cyclonedds_cpp"
+                            },
+                            {
+                                "name": "ROS_LOCALHOST_ONLY",
+                                "value": "0"
+                            },
+                            {
+                                "name": "CYCLONEDDS_URI",
+                                "value": "file:///etc/cyclonedds/cyclonedds.xml"
+                            },
+                            {
+                                "name": "CAMERA_DEVICE",
+                                "value": "/dev/video1"
+                            },
+                            {
+                                "name": "CAMERA_WIDTH",
+                                "value": "1280"
+                            },
+                            {
+                                "name": "CAMERA_HEIGHT",
+                                "value": "720"
+                            },
+                            {
+                                "name": "CAMERA_FPS",
+                                "value": "0"
+                            },
+                            {
+                                "name": "CAMERA_FRAME_ID",
+                                "value": "camera"
+                            },
+                            {
+                                "name": "CAMERA_SYNTHETIC_MODE",
+                                "value": "false"
+                            },
+                            {
+                                "name": "IMAGE_TOPIC",
+                                "value": "/camera/image_raw"
+                            },
+                            {
+                                "name": "YOLO_MODEL_PATH",
+                                "value": "/opt/overlay/models/yolov8n.pt"
+                            },
+                            {
+                                "name": "YOLO_CONF",
+                                "value": "0.25"
+                            },
+                            {
+                                "name": "YOLO_PUBLISH_DEBUG",
+                                "value": "true"
+                            },
+                            {
+                                "name": "YOLO_PUBLISH_METRICS",
+                                "value": "true"
+                            },
+                            {
+                                "name": "YOLO_FILTER_CLASSES",
+                                "value": "0,56,60"
+                            },
+                            {
+                                "name": "YOLO_START_DELAY",
+                                "value": "2"
+                            },
+                            {
+                                "name": "DETECTIONS_TOPIC",
+                                "value": "/detections"
+                            },
+                            {
+                                "name": "DEBUG_IMAGE_TOPIC",
+                                "value": "/detections/image"
+                            },
+                            {
+                                "name": "LATENCY_TOPIC",
+                                "value": "/benchmark/latency_ms"
+                            },
+                            {
+                                "name": "INFERENCE_TOPIC",
+                                "value": "/benchmark/inference_ms"
+                            },
+                            {
+                                "name": "LLAVA_ENABLED",
+                                "value": "true"
+                            },
+                            {
+                                "name": "LLAVA_MODEL_ID",
+                                "value": "llava-hf/llava-1.5-7b-hf"
+                            },
+                            {
+                                "name": "LLAVA_TRIGGER_ON_YOLO",
+                                "value": "true"
+                            },
+                            {
+                                "name": "LLAVA_YOLO_INTERVAL_S",
+                                "value": "30"
+                            },
+                            {
+                                "name": "LLAVA_MAX_TOKENS",
+                                "value": "150"
+                            },
+                            {
+                                "name": "LLAVA_LOAD_4BIT",
+                                "value": "true"
+                            },
+                            {
+                                "name": "LLAVA_START_DELAY",
+                                "value": "15"
+                            },
+                            {
+                                "name": "LLAVA_TRIGGER_TOPIC",
+                                "value": "/llava/trigger"
+                            },
+                            {
+                                "name": "LLAVA_RESPONSE_TOPIC",
+                                "value": "/llava/response"
+                            },
+                            {
+                                "name": "LLAVA_LATENCY_TOPIC",
+                                "value": "/llava/metrics_latency_ms"
+                            },
+                            {
+                                "name": "LLAVA_INFERENCE_TOPIC",
+                                "value": "/llava/metrics_inference_ms"
+                            },
+                            {
+                                "name": "VOXTRAL_ENABLED",
+                                "value": "true"
+                            },
+                            {
+                                "name": "VOXTRAL_AUDIO_MODE",
+                                "value": "false"
+                            },
+                            {
+                                "name": "VOXTRAL_MODEL_ID",
+                                "value": "mistralai/Voxtral-Mini-3B-2507"
+                            },
+                            {
+                                "name": "VOICE_COMMAND_TOPIC",
+                                "value": "/voice/command"
+                            },
+                            {
+                                "name": "VOICE_TRANSCRIPT_TOPIC",
+                                "value": "/voice/transcript"
+                            },
+                            {
+                                "name": "VOICE_RESPONSE_TOPIC",
+                                "value": "/voice/response"
+                            },
+                            {
+                                "name": "VOICE_LATENCY_TOPIC",
+                                "value": "/voice/metrics_latency_ms"
+                            },
+                            {
+                                "name": "HF_HOME",
+                                "value": "/opt/overlay/huggingface_cache"
+                            },
+                            {
+                                "name": "HF_HUB_CACHE",
+                                "value": "/opt/overlay/huggingface_cache"
+                            },
+                            {
+                                "name": "TRANSFORMERS_CACHE",
+                                "value": "/opt/overlay/huggingface_cache"
+                            },
+                            {
+                                "name": "HF_HUB_OFFLINE",
+                                "value": "1"
+                            },
+                            {
+                                "name": "TRANSFORMERS_OFFLINE",
+                                "value": "1"
+                            },
+                            {
+                                "name": "NVIDIA_VISIBLE_DEVICES",
+                                "value": "all"
+                            },
+                            {
+                                "name": "NVIDIA_DRIVER_CAPABILITIES",
+                                "value": "compute,utility"
+                            }
+                        ],
+                        "image": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-base:latest",
+                        "imagePullPolicy": "Always",
+                        "livenessProbe": {
+                            "exec": {
+                                "command": [
+                                    "/bin/bash",
+                                    "-c",
+                                    "pgrep -f camera_driver \u003e/dev/null \u0026\u0026 pgrep -f yolo_detector \u003e/dev/null\n"
+                                ]
+                            },
+                            "failureThreshold": 3,
+                            "periodSeconds": 30,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 5
+                        },
+                        "name": "overlay-runtime",
+                        "resources": {
+                            "limits": {
+                                "nvidia.com/gpu": "1"
+                            },
+                            "requests": {
+                                "nvidia.com/gpu": "1"
+                            }
+                        },
+                        "securityContext": {
+                            "privileged": true
+                        },
+                        "startupProbe": {
+                            "exec": {
+                                "command": [
+                                    "/bin/bash",
+                                    "-c",
+                                    "pgrep -f camera_driver \u003e/dev/null \u0026\u0026 pgrep -f yolo_detector \u003e/dev/null\n"
+                                ]
+                            },
+                            "failureThreshold": 36,
+                            "initialDelaySeconds": 30,
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 5
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/opt/overlay",
+                                "name": "overlay-mount"
+                            },
+                            {
+                                "mountPath": "/etc/cyclonedds",
+                                "name": "cyclonedds",
+                                "readOnly": true
+                            },
+                            {
+                                "mountPath": "/dev/video1",
+                                "name": "video-device"
+                            },
+                            {
+                                "mountPath": "/sys/devices/platform",
+                                "name": "sys-devices-platform",
+                                "readOnly": true
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-zvzbf",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "hostname": "overlay-pattern-0",
+                "imagePullSecrets": [
+                    {
+                        "name": "regcred"
+                    }
+                ],
+                "initContainers": [
+                    {
+                        "command": [
+                            "sh",
+                            "-c",
+                            "FULLNAME=\"overlay-pattern\"\nNS=\"ros2exp\"\nOVERLAY_SVC=\"${FULLNAME}-overlay-server.${NS}.svc.cluster.local\"\nDASH_SVC=\"${FULLNAME}-dashboard-0.${FULLNAME}-dashboard-peers.${NS}.svc.cluster.local\"\necho \"[init] Waiting for overlay-server DNS: $OVERLAY_SVC\"\nuntil nslookup \"$OVERLAY_SVC\" \u003e/dev/null 2\u003e\u00261; do\n  echo \"[init]   $OVERLAY_SVC not resolvable yet, retrying in 3s...\"\n  sleep 3\ndone\necho \"[init]   $OVERLAY_SVC resolved\"\nif [ -n \"$DASH_SVC\" ]; then\n  echo \"[init] Waiting for dashboard DNS: $DASH_SVC\"\n  until nslookup \"$DASH_SVC\" \u003e/dev/null 2\u003e\u00261; do\n    echo \"[init]   $DASH_SVC not resolvable yet, retrying in 3s...\"\n    sleep 3\n  done\n  echo \"[init]   $DASH_SVC resolved\"\nfi\necho \"[init] All DNS targets resolved — proceeding to overlay sync\"\n"
+                        ],
+                        "image": "busybox:1.36",
+                        "imagePullPolicy": "IfNotPresent",
+                        "name": "wait-for-services",
+                        "resources": {},
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-zvzbf",
+                                "readOnly": true
+                            }
+                        ]
+                    },
+                    {
+                        "command": [
+                            "sh",
+                            "-c",
+                            "set -eo pipefail\n# Install curl (alpine doesn't include it by default)\napk add --no-cache curl \u003e/dev/null\n\nFULLNAME=\"overlay-pattern\"\nNS=\"ros2exp\"\nVERSION=\"1.0.0\"\nOVERLAY_SVC=\"${FULLNAME}-overlay-server.${NS}.svc.cluster.local\"\nPORT=80\nTARGET=/opt/overlay\nTIMEOUT=1800\n\n# Helper: HTTP HEAD probe — returns 0 if URL is reachable with 200.\nprobe_url() {\n  curl -fsI --max-time 5 \"$1\" -o /dev/null\n}\n\n# Helper: poll a URL until it becomes reachable. Used in\n# overlay.pipeline=true mode where the pre-install Job runs in\n# parallel with this init container, so a layer tarball may not\n# exist yet at this container's start time.\nwait_for_url() {\n  local url=$1\n  local label=${2:-$url}\n  local max_wait=${TIMEOUT}\n  local waited=0\n  while ! probe_url \"${url}\"; do\n    if [ \"${waited}\" -ge \"${max_wait}\" ]; then\n      echo \"[sync] FATAL: ${label} did not become available within ${max_wait} s\"\n      exit 1\n    fi\n    sleep 5\n    waited=$((waited + 5))\n    if [ $((waited % 30)) -eq 0 ]; then\n      echo \"[sync]   still waiting for ${label} (${waited}/${max_wait}s)\"\n    fi\n  done\n}\n\nmkdir -p \"${TARGET}\"\n# ── Legacy single-tarball mode ─────────────────────────────────\nURL=\"http://${OVERLAY_SVC}:${PORT}/overlay/${VERSION}.tar\"\necho \"[sync] Source: ${URL}\"\necho \"[sync] Target: ${TARGET}\"\nif [ -f \"${TARGET}/install/setup.bash\" ]; then\n  echo \"[sync] Overlay already extracted, skipping download\"\n  ls -la \"${TARGET}/\"\n  exit 0\nfi\necho \"[sync] Waiting for overlay-server + tarball availability...\"\nwait_for_url \"${URL}\" \"overlay tarball\"\necho \"[sync] Server OK. Downloading + extracting tarball...\"\ncurl -fSL --max-time ${TIMEOUT} \"${URL}\" \\\n  | tar -xf - -C \"${TARGET}\"\n\necho \"[sync] Extraction complete. Contents:\"\nls -la \"${TARGET}/\"\necho \"[sync] Sizes:\"\ndu -sh \"${TARGET}\"/install        2\u003e/dev/null || true\ndu -sh \"${TARGET}\"/python-deps    2\u003e/dev/null || true\ndu -sh \"${TARGET}\"/huggingface_cache 2\u003e/dev/null || true\ndu -sh \"${TARGET}\"/models         2\u003e/dev/null || true\ndu -sh \"${TARGET}\"/system-libs    2\u003e/dev/null || true\necho \"[sync] Done.\"\n"
+                        ],
+                        "image": "alpine:latest",
+                        "imagePullPolicy": "IfNotPresent",
+                        "name": "overlay-sync",
+                        "resources": {},
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/opt/overlay",
+                                "name": "overlay-mount"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-zvzbf",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "nodeName": "edgenode01",
+                "nodeSelector": {
+                    "kubernetes.io/hostname": "edgenode01"
+                },
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "runtimeClassName": "nvidia",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "subdomain": "overlay-pattern-peers",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "emptyDir": {},
+                        "name": "overlay-mount"
+                    },
+                    {
+                        "configMap": {
+                            "defaultMode": 420,
+                            "items": [
+                                {
+                                    "key": "cyclonedds.xml",
+                                    "path": "cyclonedds.xml"
+                                }
+                            ],
+                            "name": "overlay-pattern-cyclonedds"
+                        },
+                        "name": "cyclonedds"
+                    },
+                    {
+                        "hostPath": {
+                            "path": "/dev/video1",
+                            "type": "CharDevice"
+                        },
+                        "name": "video-device"
+                    },
+                    {
+                        "hostPath": {
+                            "path": "/sys/devices/platform",
+                            "type": "Directory"
+                        },
+                        "name": "sys-devices-platform"
+                    },
+                    {
+                        "name": "kube-api-access-zvzbf",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:41:21Z",
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:54:29Z",
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:55:10Z",
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:55:10Z",
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:41:19Z",
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "containerID": "containerd://ff1191660e1a986bafd83f21819bb13db9fc957a59361f554ae18403108e4980",
+                        "image": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-base:latest",
+                        "imageID": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-base@sha256:dd75e9d7995b52a79bc1be125e02de5028d6d03ba6e12f9cc360bef51aee78d3",
+                        "lastState": {},
+                        "name": "overlay-runtime",
+                        "ready": true,
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-07-09T09:54:31Z"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/opt/overlay",
+                                "name": "overlay-mount"
+                            },
+                            {
+                                "mountPath": "/etc/cyclonedds",
+                                "name": "cyclonedds",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            },
+                            {
+                                "mountPath": "/dev/video1",
+                                "name": "video-device"
+                            },
+                            {
+                                "mountPath": "/sys/devices/platform",
+                                "name": "sys-devices-platform",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-zvzbf",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "158.42.104.206",
+                "hostIPs": [
+                    {
+                        "ip": "158.42.104.206"
+                    },
+                    {
+                        "ip": "2001:720:101c:107:2bb1:2437:d649:b2ab"
+                    }
+                ],
+                "initContainerStatuses": [
+                    {
+                        "containerID": "containerd://fb5119d11e5716cc30bac1831f7f24efd860dbd36620a091288bf6543c1340d5",
+                        "image": "docker.io/library/busybox:1.36",
+                        "imageID": "docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662",
+                        "lastState": {},
+                        "name": "wait-for-services",
+                        "ready": true,
+                        "restartCount": 0,
+                        "started": false,
+                        "state": {
+                            "terminated": {
+                                "containerID": "containerd://fb5119d11e5716cc30bac1831f7f24efd860dbd36620a091288bf6543c1340d5",
+                                "exitCode": 0,
+                                "finishedAt": "2026-07-09T09:41:26Z",
+                                "reason": "Completed",
+                                "startedAt": "2026-07-09T09:41:20Z"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-zvzbf",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    },
+                    {
+                        "containerID": "containerd://d485f89d0e40461b7ff7e3682d129e7d6e0614454ac1b56d7b12c6a902da0616",
+                        "image": "docker.io/library/alpine:latest",
+                        "imageID": "docker.io/library/alpine@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11",
+                        "lastState": {},
+                        "name": "overlay-sync",
+                        "ready": true,
+                        "restartCount": 0,
+                        "started": false,
+                        "state": {
+                            "terminated": {
+                                "containerID": "containerd://d485f89d0e40461b7ff7e3682d129e7d6e0614454ac1b56d7b12c6a902da0616",
+                                "exitCode": 0,
+                                "finishedAt": "2026-07-09T09:54:28Z",
+                                "reason": "Completed",
+                                "startedAt": "2026-07-09T09:41:27Z"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/opt/overlay",
+                                "name": "overlay-mount"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-zvzbf",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "phase": "Running",
+                "podIP": "10.42.2.206",
+                "podIPs": [
+                    {
+                        "ip": "10.42.2.206"
+                    }
+                ],
+                "qosClass": "BestEffort",
+                "startTime": "2026-07-09T09:41:19Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "creationTimestamp": "2026-07-09T09:41:19Z",
+                "generateName": "overlay-pattern-dashboard-",
+                "labels": {
+                    "app": "ros2-overlay-dashboard",
+                    "app.kubernetes.io/instance": "overlay-pattern",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "ros2-overlay",
+                    "apps.kubernetes.io/pod-index": "0",
+                    "component": "dashboard",
+                    "controller-revision-hash": "overlay-pattern-dashboard-cdcc4bc76",
+                    "helm.sh/chart": "ros2-overlay-1.0.0",
+                    "pattern": "overlay",
+                    "statefulset.kubernetes.io/pod-name": "overlay-pattern-dashboard-0"
+                },
+                "name": "overlay-pattern-dashboard-0",
+                "namespace": "ros2exp",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "StatefulSet",
+                        "name": "overlay-pattern-dashboard",
+                        "uid": "a2a770c9-e37c-416c-8bfa-a44b9280b005"
+                    }
+                ],
+                "resourceVersion": "31924007",
+                "uid": "8490cc9d-5c00-47bd-bf7d-00ff6efd6729"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "env": [
+                            {
+                                "name": "ROS_DOMAIN_ID",
+                                "value": "42"
+                            },
+                            {
+                                "name": "RMW_IMPLEMENTATION",
+                                "value": "rmw_cyclonedds_cpp"
+                            },
+                            {
+                                "name": "ROS_LOCALHOST_ONLY",
+                                "value": "0"
+                            },
+                            {
+                                "name": "CYCLONEDDS_URI",
+                                "value": "file:///etc/cyclonedds/cyclonedds.xml"
+                            }
+                        ],
+                        "image": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard:latest",
+                        "imagePullPolicy": "Always",
+                        "livenessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/",
+                                "port": "http",
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 10,
+                            "periodSeconds": 30,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "name": "dashboard",
+                        "ports": [
+                            {
+                                "containerPort": 8080,
+                                "name": "http",
+                                "protocol": "TCP"
+                            },
+                            {
+                                "containerPort": 9090,
+                                "name": "ws",
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "resources": {},
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/dashboard-cm",
+                                "name": "dashboard-html",
+                                "readOnly": true
+                            },
+                            {
+                                "mountPath": "/etc/cyclonedds",
+                                "name": "cyclonedds",
+                                "readOnly": true
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-2kcrr",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "hostname": "overlay-pattern-dashboard-0",
+                "imagePullSecrets": [
+                    {
+                        "name": "regcred"
+                    }
+                ],
+                "initContainers": [
+                    {
+                        "command": [
+                            "sh",
+                            "-c",
+                            "FULLNAME=\"overlay-pattern\"\nNS=\"ros2exp\"\nRUNTIME_PEER=\"${FULLNAME}-0.${FULLNAME}-peers.${NS}.svc.cluster.local\"\necho \"[init] Waiting for DDS peer DNS: $RUNTIME_PEER\"\nuntil nslookup \"$RUNTIME_PEER\" \u003e/dev/null 2\u003e\u00261; do\n  echo \"[init]   $RUNTIME_PEER not resolvable yet, retrying in 3s...\"\n  sleep 3\ndone\necho \"[init]   $RUNTIME_PEER resolved\"\nGRACE=60\necho \"[init] Runtime DNS resolved — waiting ${GRACE}s for camera/YOLO/LLaVA/Voxtral to finish loading models\"\nsleep \"$GRACE\"\necho \"[init] Ready to start rosbridge\"\n"
+                        ],
+                        "image": "busybox:1.36",
+                        "imagePullPolicy": "IfNotPresent",
+                        "name": "wait-for-peers",
+                        "resources": {},
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-2kcrr",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "nodeName": "worker1-kb2",
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "subdomain": "overlay-pattern-dashboard-peers",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "configMap": {
+                            "defaultMode": 420,
+                            "name": "overlay-pattern-dashboard-html"
+                        },
+                        "name": "dashboard-html"
+                    },
+                    {
+                        "configMap": {
+                            "defaultMode": 420,
+                            "items": [
+                                {
+                                    "key": "cyclonedds.xml",
+                                    "path": "cyclonedds.xml"
+                                }
+                            ],
+                            "name": "overlay-pattern-cyclonedds"
+                        },
+                        "name": "cyclonedds"
+                    },
+                    {
+                        "name": "kube-api-access-2kcrr",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:41:20Z",
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:42:26Z",
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:42:27Z",
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:42:27Z",
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:41:19Z",
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "containerID": "containerd://a67d6ed999da4e4803bf657c2cf9d8fbd7bd86c6cab0d544d7997ec651944580",
+                        "image": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard:latest",
+                        "imageID": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard@sha256:46f7e0651a22713ce0b1d911a07f9ce868fa0d2123a229f92301e640000d0df1",
+                        "lastState": {},
+                        "name": "dashboard",
+                        "ready": true,
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-07-09T09:42:27Z"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/dashboard-cm",
+                                "name": "dashboard-html",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            },
+                            {
+                                "mountPath": "/etc/cyclonedds",
+                                "name": "cyclonedds",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-2kcrr",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "158.42.104.103",
+                "hostIPs": [
+                    {
+                        "ip": "158.42.104.103"
+                    }
+                ],
+                "initContainerStatuses": [
+                    {
+                        "containerID": "containerd://7e87f763122ac1b83daa9535e98b2e2bf6b92a1b5376b7add5ab69c9e6e753c6",
+                        "image": "docker.io/library/busybox:1.36",
+                        "imageID": "docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662",
+                        "lastState": {},
+                        "name": "wait-for-peers",
+                        "ready": true,
+                        "restartCount": 0,
+                        "started": false,
+                        "state": {
+                            "terminated": {
+                                "containerID": "containerd://7e87f763122ac1b83daa9535e98b2e2bf6b92a1b5376b7add5ab69c9e6e753c6",
+                                "exitCode": 0,
+                                "finishedAt": "2026-07-09T09:42:26Z",
+                                "reason": "Completed",
+                                "startedAt": "2026-07-09T09:41:20Z"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-2kcrr",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "phase": "Running",
+                "podIP": "10.42.1.220",
+                "podIPs": [
+                    {
+                        "ip": "10.42.1.220"
+                    }
+                ],
+                "qosClass": "BestEffort",
+                "startTime": "2026-07-09T09:41:19Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "creationTimestamp": "2026-07-09T09:41:19Z",
+                "generateName": "overlay-pattern-overlay-server-8585bdf96b-",
+                "labels": {
+                    "app": "ros2-overlay-overlay-server",
+                    "app.kubernetes.io/instance": "overlay-pattern",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "ros2-overlay",
+                    "component": "overlay-server",
+                    "helm.sh/chart": "ros2-overlay-1.0.0",
+                    "pod-template-hash": "8585bdf96b"
+                },
+                "name": "overlay-pattern-overlay-server-8585bdf96b-pknkt",
+                "namespace": "ros2exp",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "ReplicaSet",
+                        "name": "overlay-pattern-overlay-server-8585bdf96b",
+                        "uid": "c79e4331-ae4e-4067-9255-768ce6249f26"
+                    }
+                ],
+                "resourceVersion": "31923850",
+                "uid": "3d92953d-dcfa-486c-b964-5c25cc406e87"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "image": "nginx:alpine",
+                        "imagePullPolicy": "IfNotPresent",
+                        "livenessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/",
+                                "port": "http",
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 5,
+                            "periodSeconds": 30,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 5
+                        },
+                        "name": "nginx",
+                        "ports": [
+                            {
+                                "containerPort": 80,
+                                "name": "http",
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "readinessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/",
+                                "port": "http",
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 1,
+                            "periodSeconds": 5,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 3
+                        },
+                        "resources": {
+                            "limits": {
+                                "cpu": "500m",
+                                "memory": "256Mi"
+                            },
+                            "requests": {
+                                "cpu": "50m",
+                                "memory": "64Mi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/usr/share/nginx/html/overlay",
+                                "name": "overlay-source",
+                                "readOnly": true
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-hnbmv",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "imagePullSecrets": [
+                    {
+                        "name": "regcred"
+                    }
+                ],
+                "nodeName": "kb2",
+                "nodeSelector": {
+                    "kubernetes.io/hostname": "kb2"
+                },
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "overlay-source",
+                        "persistentVolumeClaim": {
+                            "claimName": "overlay-pattern-overlay-source"
+                        }
+                    },
+                    {
+                        "name": "kube-api-access-hnbmv",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:41:33Z",
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:41:20Z",
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:41:33Z",
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:41:33Z",
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-09T09:41:20Z",
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "containerID": "containerd://94e5a920ef32f729b4657c4c315b43908868ccfcceb9da05122c3cd100b46889",
+                        "image": "docker.io/library/nginx:alpine",
+                        "imageID": "docker.io/library/nginx@sha256:dc48b7a872a79fb541ba5081d320b11b549231bc63ba465a7495afaa7d2ebcb8",
+                        "lastState": {},
+                        "name": "nginx",
+                        "ready": true,
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-07-09T09:41:32Z"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/usr/share/nginx/html/overlay",
+                                "name": "overlay-source",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-hnbmv",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "158.42.104.15",
+                "hostIPs": [
+                    {
+                        "ip": "158.42.104.15"
+                    }
+                ],
+                "phase": "Running",
+                "podIP": "10.42.0.179",
+                "podIPs": [
+                    {
+                        "ip": "10.42.0.179"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "startTime": "2026-07-09T09:41:20Z"
+            }
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}

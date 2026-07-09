@@ -1,0 +1,6 @@
+NAME                                         READY   AGE   CONTAINERS        IMAGES
+statefulset.apps/overlay-pattern             1/1     14m   overlay-runtime   gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-base:latest
+statefulset.apps/overlay-pattern-dashboard   1/1     14m   dashboard         gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard:latest
+
+NAME                                             READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES         SELECTOR
+deployment.apps/overlay-pattern-overlay-server   1/1     1            1           14m   nginx        nginx:alpine   app=ros2-overlay-overlay-server,app.kubernetes.io/instance=overlay-pattern

@@ -1,0 +1,6 @@
+NAME                                               READY   AGE   CONTAINERS   IMAGES
+statefulset.apps/microservices-pattern-camera      1/1     11m   camera       gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-camera:latest
+statefulset.apps/microservices-pattern-dashboard   1/1     11m   dashboard    gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard:latest
+statefulset.apps/microservices-pattern-llava       1/1     11m   llava        gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-llava:latest
+statefulset.apps/microservices-pattern-voxtral     1/1     11m   voxtral      gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-voxtral:latest
+statefulset.apps/microservices-pattern-yolo        1/1     11m   yolo         gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-yolo:latest
