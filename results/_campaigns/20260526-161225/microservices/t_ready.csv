@@ -1,0 +1,6 @@
+pod,podscheduled,ready,delta_s
+microservices-pattern-camera-0,2026-05-26T16:35:17Z,2026-05-26T16:35:55Z,38
+microservices-pattern-dashboard-0,2026-05-26T16:35:17Z,2026-05-26T16:38:27Z,190
+microservices-pattern-llava-0,2026-05-26T16:35:17Z,2026-05-26T16:45:59Z,642
+microservices-pattern-voxtral-0,2026-05-26T16:35:17Z,2026-05-26T16:45:59Z,642
+microservices-pattern-yolo-0,2026-05-26T16:35:17Z,2026-05-26T16:37:59Z,162

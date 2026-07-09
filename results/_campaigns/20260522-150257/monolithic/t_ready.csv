@@ -1,0 +1,3 @@
+pod,podscheduled,ready,delta_s
+monolithic-pattern-0,2026-05-22T15:02:59Z,2026-05-22T15:03:39Z,40
+monolithic-pattern-dashboard-0,2026-05-22T15:02:59Z,2026-05-22T15:04:07Z,68

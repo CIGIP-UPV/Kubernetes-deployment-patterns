@@ -1,0 +1,2 @@
+pattern,t_zero,t_fin,t_install_e2e_s,t_ready_system_s,s_img_total_gb,t_inf_avg_ms,f_fps_pub,t_e2e_avg_ms,j_inf_ms,u_cpu_avg_pct,u_gpu_avg_pct,u_ram_avg_pct,run_dir,status,notes
+overlay-canonical,2026-06-01T08:12:24Z,2026-06-01T08:27:56Z,932,930,0.00,29.65,21.41,58.35,3.26,38.82,83.35,32.41,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260601-081223/overlay-canonical,ready_timeout,kubectl wait timed out at 90m;capture_pattern_run failed

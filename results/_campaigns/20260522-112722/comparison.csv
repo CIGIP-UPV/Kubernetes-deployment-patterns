@@ -1,0 +1,5 @@
+pattern,t_zero,t_fin,t_install_e2e_s,t_ready_system_s,s_img_total_gb,t_inf_avg_ms,f_fps_pub,t_e2e_avg_ms,j_inf_ms,u_cpu_avg_pct,u_gpu_avg_pct,u_ram_avg_pct,run_dir,status,notes
+monolithic,2026-05-22T11:27:23Z,2026-05-22T11:28:34Z,71,68,0.00,25.43,21.13,58.16,1.06,45.13,38.16,28.95,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260522-112722/monolithic,ok,
+microservices,2026-05-22T11:41:46Z,2026-05-22T11:43:30Z,104,100,0.00,25.58,22.99,77.73,0.81,36.20,42.26,48.73,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260522-112722/microservices,ok,
+overlay-canonical,2026-05-22T11:56:45Z,2026-05-22T12:14:51Z,1086,831,0.00,25.93,22.60,56.66,1.15,43.53,38.64,28.81,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260522-112722/overlay-canonical,ok,
+dynamic-canonical,2026-05-22T12:28:04Z,2026-05-22T12:31:57Z,233,68,0.00,549.93,1.67,610.91,63.68,22.65,3.63,49.71,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260522-112722/dynamic-canonical,ok,

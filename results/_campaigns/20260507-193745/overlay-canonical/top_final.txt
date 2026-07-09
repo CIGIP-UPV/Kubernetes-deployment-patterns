@@ -1,0 +1,3 @@
+NAME                                              CPU(cores)   MEMORY(bytes)   
+overlay-pattern-dashboard-0                       125m         100Mi           
+overlay-pattern-overlay-server-7f59b6b6b9-swlwx   1m           131Mi           

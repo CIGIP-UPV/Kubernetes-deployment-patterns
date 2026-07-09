@@ -1,0 +1,5 @@
+# Captured 2026-05-22T22:31:58Z
+NAME                                              CPU(cores)   MEMORY(bytes)   
+overlay-pattern-0                                 3148m        15155Mi         
+overlay-pattern-dashboard-0                       97m          101Mi           
+overlay-pattern-overlay-server-7f59b6b6b9-h5ct8   1m           96Mi            

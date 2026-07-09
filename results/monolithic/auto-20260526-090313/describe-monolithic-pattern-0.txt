@@ -1,0 +1,234 @@
+Name:                monolithic-pattern-0
+Namespace:           ros2exp
+Priority:            0
+Runtime Class Name:  nvidia
+Service Account:     default
+Node:                edgenode01/158.42.104.206
+Start Time:          Tue, 26 May 2026 09:03:14 +0000
+Labels:              app=ros2-monolithic
+                     app.kubernetes.io/instance=monolithic-pattern
+                     app.kubernetes.io/managed-by=Helm
+                     app.kubernetes.io/name=ros2-monolithic
+                     app.kubernetes.io/version=humble
+                     apps.kubernetes.io/pod-index=0
+                     controller-revision-hash=monolithic-pattern-694d9c7b88
+                     helm.sh/chart=ros2-monolithic-1.0.0
+                     pattern=monolithic
+                     statefulset.kubernetes.io/pod-name=monolithic-pattern-0
+Annotations:         <none>
+Status:              Running
+IP:                  10.42.2.105
+IPs:
+  IP:           10.42.2.105
+Controlled By:  StatefulSet/monolithic-pattern
+Init Containers:
+  wait-for-peers:
+    Container ID:  containerd://c56d4bb946527103560d4fd3cafc5017f0479d974a75d987f6af177dbd0fd7b8
+    Image:         busybox:1.36
+    Image ID:      docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      sh
+      -c
+      FULLNAME="monolithic-pattern"
+      NS="ros2exp"
+      PEER="${FULLNAME}-dashboard-0.${FULLNAME}-dashboard-peers.${NS}.svc.cluster.local"
+      echo "[init] Waiting for DDS peer DNS: $PEER"
+      until nslookup "$PEER" >/dev/null 2>&1; do
+        echo "[init]   $PEER not resolvable yet, retrying in 3s..."
+        sleep 3
+      done
+      echo "[init] $PEER resolved — starting monolithic runtime"
+      
+    State:          Terminated
+      Reason:       Completed
+      Exit Code:    0
+      Started:      Tue, 26 May 2026 09:03:15 +0000
+      Finished:     Tue, 26 May 2026 09:03:15 +0000
+    Ready:          True
+    Restart Count:  0
+    Environment:    <none>
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-jsqfn (ro)
+Containers:
+  monolithic-runtime:
+    Container ID:  containerd://d6af4d162811ce873cedeb274fdc28c31e706df419d089b073d25958ebe1e6e7
+    Image:         gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-monolithic:latest
+    Image ID:      gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-monolithic@sha256:8332f9f33034db8c0cac394eb02c7a5be62d18d80d9e09aae793497528cce047
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      /bin/bash
+      -lc
+    Args:
+      set -e
+      source /opt/ros/humble/setup.bash
+      if [ -f /opt/ros2_monolithic_ws/install/setup.bash ]; then
+        source /opt/ros2_monolithic_ws/install/setup.bash
+      fi
+      echo "[monolithic] Starting camera node..."
+      ros2 run camera_driver_pkg camera_driver --ros-args \
+        -p device:=${CAMERA_DEVICE} \
+        -p width:=${CAMERA_WIDTH} \
+        -p height:=${CAMERA_HEIGHT} \
+        -p fps:=${CAMERA_FPS} \
+        -p frame_id:=${CAMERA_FRAME_ID} \
+        -p synthetic_mode:=${CAMERA_SYNTHETIC_MODE} \
+        -p image_topic:=${IMAGE_TOPIC} &
+      CAMERA_PID=$!
+      
+      sleep ${YOLO_START_DELAY}
+      echo "[monolithic] Starting yolo node..."
+      ros2 run yolo_detector_pkg yolo_detector --ros-args \
+        -p model_path:=${YOLO_MODEL_PATH} \
+        -p conf:=${YOLO_CONF} \
+        -p image_topic:=${IMAGE_TOPIC} \
+        -p detections_topic:=${DETECTIONS_TOPIC} \
+        -p debug_image_topic:=${DEBUG_IMAGE_TOPIC} \
+        -p publish_debug_image:=${YOLO_PUBLISH_DEBUG} \
+        -p publish_metrics:=${YOLO_PUBLISH_METRICS} \
+        -p latency_topic:=${LATENCY_TOPIC} \
+        -p inference_topic:=${INFERENCE_TOPIC} \
+        -p filter_classes:="\"${YOLO_FILTER_CLASSES}\"" &
+      YOLO_PID=$!
+      
+      echo "[monolithic] Starting resource monitor..."
+      python3 /opt/scripts/resource_monitor.py &
+      RESMON_PID=$!
+      
+      if [ "${LLAVA_ENABLED}" = "true" ]; then
+        sleep ${LLAVA_START_DELAY}
+        echo "[monolithic] Starting LLaVA reasoning node..."
+        ros2 run llava_pkg llava_node --ros-args \
+          -p model_id:=${LLAVA_MODEL_ID} \
+          -p image_topic:=${IMAGE_TOPIC} \
+          -p detection_topic:=${DETECTIONS_TOPIC} \
+          -p trigger_topic:=${LLAVA_TRIGGER_TOPIC} \
+          -p response_topic:=${LLAVA_RESPONSE_TOPIC} \
+          -p latency_topic:=${LLAVA_LATENCY_TOPIC} \
+          -p inference_topic:=${LLAVA_INFERENCE_TOPIC} \
+          -p trigger_on_yolo:=${LLAVA_TRIGGER_ON_YOLO} \
+          -p yolo_trigger_interval_s:=$(printf "%.1f" "${LLAVA_YOLO_INTERVAL_S}") \
+          -p max_new_tokens:=${LLAVA_MAX_TOKENS} \
+          -p load_in_4bit:=${LLAVA_LOAD_4BIT} &
+        LLAVA_PID=$!
+      fi
+      
+      if [ "${VOXTRAL_ENABLED}" = "true" ]; then
+        echo "[monolithic] Starting Voxtral interaction node..."
+        ros2 run voxtral_pkg voxtral_node --ros-args \
+          -p audio_mode:=${VOXTRAL_AUDIO_MODE} \
+          -p model_id:=${VOXTRAL_MODEL_ID} \
+          -p command_topic:=${VOICE_COMMAND_TOPIC} \
+          -p transcript_topic:=${VOICE_TRANSCRIPT_TOPIC} \
+          -p response_topic:=${VOICE_RESPONSE_TOPIC} \
+          -p llava_trigger_topic:=${LLAVA_TRIGGER_TOPIC} \
+          -p llava_response_topic:=${LLAVA_RESPONSE_TOPIC} \
+          -p latency_topic:=${VOICE_LATENCY_TOPIC} &
+        VOXTRAL_PID=$!
+      fi
+      
+      wait -n ${CAMERA_PID} ${YOLO_PID} ${RESMON_PID} ${LLAVA_PID:-} ${VOXTRAL_PID:-}
+      exit 1
+      
+    State:          Running
+      Started:      Tue, 26 May 2026 09:03:17 +0000
+    Ready:          True
+    Restart Count:  0
+    Limits:
+      nvidia.com/gpu:  1
+    Requests:
+      nvidia.com/gpu:  1
+    Liveness:          exec [/bin/bash -c pgrep -f camera_driver >/dev/null && pgrep -f yolo_detector >/dev/null
+] delay=0s timeout=5s period=20s #success=1 #failure=3
+    Startup:  exec [/bin/bash -c pgrep -f camera_driver >/dev/null && pgrep -f yolo_detector >/dev/null
+] delay=30s timeout=5s period=10s #success=1 #failure=18
+    Environment:
+      ROS_DOMAIN_ID:               42
+      RMW_IMPLEMENTATION:          rmw_cyclonedds_cpp
+      ROS_LOCALHOST_ONLY:          0
+      CAMERA_DEVICE:               /dev/video1
+      CAMERA_WIDTH:                1280
+      CAMERA_HEIGHT:               720
+      CAMERA_FPS:                  0
+      CAMERA_FRAME_ID:             camera
+      CAMERA_SYNTHETIC_MODE:       false
+      IMAGE_TOPIC:                 /camera/image_raw
+      DETECTIONS_TOPIC:            /detections
+      DEBUG_IMAGE_TOPIC:           /detections/image
+      LATENCY_TOPIC:               /benchmark/latency_ms
+      INFERENCE_TOPIC:             /benchmark/inference_ms
+      YOLO_MODEL_PATH:             /opt/models/yolov8n.pt
+      YOLO_CONF:                   0.25
+      YOLO_PUBLISH_DEBUG:          true
+      YOLO_PUBLISH_METRICS:        true
+      YOLO_FILTER_CLASSES:         
+      YOLO_START_DELAY:            2
+      LLAVA_ENABLED:               true
+      LLAVA_MODEL_ID:              llava-hf/llava-1.5-7b-hf
+      LLAVA_TRIGGER_ON_YOLO:       true
+      LLAVA_YOLO_INTERVAL_S:       30
+      LLAVA_MAX_TOKENS:            150
+      LLAVA_LOAD_4BIT:             true
+      LLAVA_START_DELAY:           15
+      LLAVA_TRIGGER_TOPIC:         /llava/trigger
+      LLAVA_RESPONSE_TOPIC:        /llava/response
+      LLAVA_LATENCY_TOPIC:         /llava/metrics_latency_ms
+      LLAVA_INFERENCE_TOPIC:       /llava/metrics_inference_ms
+      VOXTRAL_ENABLED:             true
+      VOXTRAL_AUDIO_MODE:          true
+      VOXTRAL_MODEL_ID:            mistralai/Voxtral-Mini-3B-2507
+      VOICE_COMMAND_TOPIC:         /voice/command
+      VOICE_TRANSCRIPT_TOPIC:      /voice/transcript
+      VOICE_RESPONSE_TOPIC:        /voice/response
+      VOICE_LATENCY_TOPIC:         /voice/metrics_latency_ms
+      NVIDIA_VISIBLE_DEVICES:      all
+      NVIDIA_DRIVER_CAPABILITIES:  compute,utility
+      CYCLONEDDS_URI:              file:///etc/cyclonedds/cyclonedds.xml
+    Mounts:
+      /dev/video1 from video-device (rw)
+      /etc/cyclonedds from cyclonedds (ro)
+      /sys/devices/platform from sys-devices-platform (ro)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-jsqfn (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  video-device:
+    Type:          HostPath (bare host directory volume)
+    Path:          /dev/video1
+    HostPathType:  CharDevice
+  cyclonedds:
+    Type:      ConfigMap (a volume populated by a ConfigMap)
+    Name:      monolithic-pattern-cyclonedds
+    Optional:  false
+  sys-devices-platform:
+    Type:          HostPath (bare host directory volume)
+    Path:          /sys/devices/platform
+    HostPathType:  Directory
+  kube-api-access-jsqfn:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age   From               Message
+  ----    ------     ----  ----               -------
+  Normal  Scheduled  11m   default-scheduler  Successfully assigned ros2exp/monolithic-pattern-0 to edgenode01
+  Normal  Pulled     11m   kubelet            Container image "busybox:1.36" already present on machine
+  Normal  Created    11m   kubelet            Created container: wait-for-peers
+  Normal  Started    11m   kubelet            Started container wait-for-peers
+  Normal  Pulling    11m   kubelet            Pulling image "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-monolithic:latest"
+  Normal  Pulled     11m   kubelet            Successfully pulled image "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-monolithic:latest" in 341ms (341ms including waiting). Image size: 31999268081 bytes.
+  Normal  Created    11m   kubelet            Created container: monolithic-runtime
+  Normal  Started    11m   kubelet            Started container monolithic-runtime

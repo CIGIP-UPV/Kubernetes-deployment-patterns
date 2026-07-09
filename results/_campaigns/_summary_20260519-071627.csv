@@ -1,0 +1,6 @@
+cycle,regimen,campaign_dir,started_at,finished_at,duration_s
+1,warm,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260519-071633,2026-05-19T07:16:33Z,2026-05-19T08:50:30Z,5637
+2,warm,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260519-092037,2026-05-19T09:20:37Z,2026-05-19T10:54:34Z,5637
+3,warm,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260519-112441,2026-05-19T11:24:41Z,2026-05-19T12:58:34Z,5633
+4,warm,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260519-132841,2026-05-19T13:28:41Z,2026-05-19T15:02:42Z,5641
+5,warm,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260519-153249,2026-05-19T15:32:49Z,2026-05-19T17:06:46Z,5637

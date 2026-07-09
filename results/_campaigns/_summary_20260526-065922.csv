@@ -1,0 +1,9 @@
+cycle,regimen,campaign_dir,started_at,finished_at,duration_s
+1,warm,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260526-065929,2026-05-26T06:59:29Z,2026-05-26T08:33:06Z,5617
+2,warm,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260526-090313,2026-05-26T09:03:13Z,2026-05-26T10:20:21Z,4628
+3,warm,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260526-105027,2026-05-26T10:50:27Z,2026-05-26T12:07:56Z,4649
+4,warm,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260526-123803,2026-05-26T12:38:03Z,2026-05-26T13:55:02Z,4619
+5,warm,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260526-142508,2026-05-26T14:25:08Z,2026-05-26T15:42:18Z,4630
+6,cold-cold,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260526-161225,2026-05-26T16:12:25Z,2026-05-26T17:56:01Z,6216
+7,cold-cold,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260526-182607,2026-05-26T18:26:07Z,2026-05-26T20:09:11Z,6184
+8,cold-cold,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260526-203918,2026-05-26T20:39:18Z,2026-05-26T22:22:23Z,6185

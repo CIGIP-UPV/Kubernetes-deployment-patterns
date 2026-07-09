@@ -1,0 +1,2 @@
+pattern,t_zero,t_fin,t_install_e2e_s,t_ready_system_s,s_img_total_gb,t_inf_avg_ms,f_fps_pub,t_e2e_avg_ms,j_inf_ms,u_cpu_avg_pct,u_gpu_avg_pct,u_ram_avg_pct,run_dir,status,notes
+overlay-canonical,2026-06-01T13:41:03Z,2026-06-01T13:42:55Z,112,111,0.00,28.83,20.67,59.63,3.65,41.47,75.95,31.70,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260601-134054/overlay-canonical,ok,;capture_pattern_run failed

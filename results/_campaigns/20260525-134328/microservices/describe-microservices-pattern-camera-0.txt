@@ -1,0 +1,94 @@
+Name:             microservices-pattern-camera-0
+Namespace:        ros2exp
+Priority:         0
+Service Account:  default
+Node:             edgenode01/158.42.104.206
+Start Time:       Mon, 25 May 2026 13:57:54 +0000
+Labels:           app=camera
+                  app.kubernetes.io/instance=microservices-pattern
+                  app.kubernetes.io/managed-by=Helm
+                  app.kubernetes.io/name=ros2-microservices
+                  apps.kubernetes.io/pod-index=0
+                  component=camera
+                  controller-revision-hash=microservices-pattern-camera-6c48bdddd5
+                  helm.sh/chart=ros2-microservices-1.0.0
+                  pattern=microservices
+                  statefulset.kubernetes.io/pod-name=microservices-pattern-camera-0
+Annotations:      <none>
+Status:           Running
+IP:               10.42.2.88
+IPs:
+  IP:           10.42.2.88
+Controlled By:  StatefulSet/microservices-pattern-camera
+Containers:
+  camera:
+    Container ID:  containerd://d43030103ee86162edb72ff883f169ae79e4ce5e4f5da5f2dca2a7baafae02e6
+    Image:         gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-camera:latest
+    Image ID:      gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-camera@sha256:ccd43f182d00452743b11cbb330f135c3f6a063d0f2c1939925ae8de0f5843dd
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      /bin/bash
+      -lc
+    Args:
+      set -e
+      source /opt/ros/humble/setup.bash
+      if [ -f /opt/ros2_cam_ws/install/setup.bash ]; then
+        source /opt/ros2_cam_ws/install/setup.bash
+      fi
+      ros2 run camera_driver_pkg camera_driver --ros-args \
+        -p device:="/dev/video1" \
+        -p width:=1280 \
+        -p height:=720 \
+        -p fps:=0 \
+        -p frame_id:="camera" \
+        -p synthetic_mode:="false" \
+        -p image_topic:="/camera/image_raw"
+      
+    State:          Running
+      Started:      Mon, 25 May 2026 13:58:15 +0000
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      ROS_DOMAIN_ID:       42
+      RMW_IMPLEMENTATION:  rmw_cyclonedds_cpp
+      ROS_LOCALHOST_ONLY:  0
+      CYCLONEDDS_URI:      file:///etc/cyclonedds/cyclonedds.xml
+    Mounts:
+      /dev/video1 from video-device (rw)
+      /etc/cyclonedds from cyclonedds (ro)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-c8sbq (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  video-device:
+    Type:          HostPath (bare host directory volume)
+    Path:          /dev/video1
+    HostPathType:  CharDevice
+  cyclonedds:
+    Type:      ConfigMap (a volume populated by a ConfigMap)
+    Name:      microservices-pattern-cyclonedds
+    Optional:  false
+  kube-api-access-c8sbq:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              kubernetes.io/arch=arm64
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age   From               Message
+  ----    ------     ----  ----               -------
+  Normal  Scheduled  21m   default-scheduler  Successfully assigned ros2exp/microservices-pattern-camera-0 to edgenode01
+  Normal  Pulling    21m   kubelet            Pulling image "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-camera:latest"
+  Normal  Pulled     20m   kubelet            Successfully pulled image "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-camera:latest" in 19.574s (19.574s including waiting). Image size: 494863587 bytes.
+  Normal  Created    20m   kubelet            Created container: camera
+  Normal  Started    20m   kubelet            Started container camera

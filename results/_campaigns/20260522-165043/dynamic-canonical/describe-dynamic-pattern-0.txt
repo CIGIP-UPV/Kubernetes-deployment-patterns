@@ -1,0 +1,171 @@
+Name:                dynamic-pattern-0
+Namespace:           ros2exp
+Priority:            0
+Runtime Class Name:  nvidia
+Service Account:     default
+Node:                edgenode01/158.42.104.206
+Start Time:          Fri, 22 May 2026 18:09:44 +0000
+Labels:              app=ros2-dynamic-canonical-runtime
+                     app.kubernetes.io/instance=dynamic-pattern
+                     app.kubernetes.io/managed-by=Helm
+                     app.kubernetes.io/name=ros2-dynamic-canonical
+                     apps.kubernetes.io/pod-index=0
+                     component=runtime
+                     controller-revision-hash=dynamic-pattern-5d4c76b8db
+                     helm.sh/chart=ros2-dynamic-canonical-1.0.0
+                     pattern=dynamic-canonical
+                     statefulset.kubernetes.io/pod-name=dynamic-pattern-0
+Annotations:         <none>
+Status:              Running
+IP:                  10.42.2.65
+IPs:
+  IP:           10.42.2.65
+Controlled By:  StatefulSet/dynamic-pattern
+Containers:
+  component-host:
+    Container ID:  containerd://1e32735080df79001810eb2a6b01ea0984e50511f6a7e7fd4e4d8ddb0fd67b53
+    Image:         gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-component-host:latest
+    Image ID:      gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-component-host@sha256:d4ec47778cfe3ff8c86e0d55ae4c2a0454a064b5284d7330153db073c5e21b65
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      /bin/bash
+      -lc
+    Args:
+      set -e
+      echo "[host] Sourcing ROS 2 + workspaces..."
+      source /opt/ros/humble/setup.bash
+      source /opt/base_ws/install/setup.bash
+      source /opt/component_ws/install/setup.bash
+      
+      echo "[host] Starting resource_monitor for dashboard telemetry..."
+      python3 /opt/scripts/resource_monitor.py &
+      RESMON_PID=$!
+      
+      echo "[host] Available rclpy_components plugins:"
+      ros2 component types | grep -E '(camera_driver_pkg|yolo_detector_pkg|llava_pkg|voxtral_pkg)' || true
+      echo "[host] Starting component_container_isolated as 'ComponentManager'..."
+      # The container name ComponentManager becomes
+      # the prefix of the LoadNode/UnloadNode services, e.g.:
+      #   /ComponentManager/_container/load_node
+      ros2 run rclpy_components component_container_isolated \
+           --ros-args -r __node:=ComponentManager &
+      HOST_PID=$!
+      
+      # Forward TERM to children so the pod terminates cleanly.
+      trap 'kill -TERM ${HOST_PID} ${RESMON_PID} 2>/dev/null; wait' TERM INT
+      wait -n ${HOST_PID} ${RESMON_PID}
+      echo "[host] One process exited — pod will restart"
+      exit 1
+      
+    State:          Running
+      Started:      Fri, 22 May 2026 18:17:28 +0000
+    Ready:          True
+    Restart Count:  0
+    Limits:
+      cpu:             8
+      memory:          32Gi
+      nvidia.com/gpu:  1
+    Requests:
+      cpu:             2
+      memory:          8Gi
+      nvidia.com/gpu:  1
+    Environment:
+      ROS_DOMAIN_ID:               42
+      RMW_IMPLEMENTATION:          rmw_cyclonedds_cpp
+      ROS_LOCALHOST_ONLY:          0
+      CYCLONEDDS_URI:              file:///etc/cyclonedds/cyclonedds.xml
+      HF_HOME:                     /opt/huggingface_cache
+      HF_HUB_CACHE:                /opt/huggingface_cache
+      TRANSFORMERS_CACHE:          /opt/huggingface_cache
+      HF_HUB_OFFLINE:              1
+      TRANSFORMERS_OFFLINE:        1
+      NVIDIA_VISIBLE_DEVICES:      all
+      NVIDIA_DRIVER_CAPABILITIES:  compute,utility
+    Mounts:
+      /dev/video1 from video-device (rw)
+      /etc/cyclonedds from cyclonedds (ro)
+      /sys/devices/platform from sys-devices-platform (ro)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-hkh4f (ro)
+  orchestrator:
+    Container ID:  containerd://07f50b7064a2f8dcb87f33e376b8e47a615dedefbe272df4f5887b0c247796e6
+    Image:         gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-component-host:latest
+    Image ID:      gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-component-host@sha256:d4ec47778cfe3ff8c86e0d55ae4c2a0454a064b5284d7330153db073c5e21b65
+    Port:          5000/TCP
+    Host Port:     0/TCP
+    Command:
+      /bin/bash
+      -lc
+    Args:
+      set -e
+      source /opt/ros/humble/setup.bash
+      source /opt/base_ws/install/setup.bash
+      source /opt/component_ws/install/setup.bash
+      echo "[orchestrator] Starting FastAPI on port ${ORCHESTRATOR_PORT}"
+      cd /opt/orchestrator
+      exec python3 orchestrator.py
+      
+    State:          Running
+      Started:      Fri, 22 May 2026 18:17:28 +0000
+    Ready:          True
+    Restart Count:  0
+    Limits:
+      cpu:     1
+      memory:  512Mi
+    Requests:
+      cpu:      100m
+      memory:   64Mi
+    Liveness:   http-get http://:api/health delay=30s timeout=1s period=30s #success=1 #failure=3
+    Readiness:  http-get http://:api/health delay=5s timeout=1s period=5s #success=1 #failure=3
+    Environment:
+      ROS_DOMAIN_ID:             42
+      RMW_IMPLEMENTATION:        rmw_cyclonedds_cpp
+      ROS_LOCALHOST_ONLY:        0
+      CYCLONEDDS_URI:            file:///etc/cyclonedds/cyclonedds.xml
+      COMPONENT_CONTAINER_NAME:  ComponentManager
+      ORCHESTRATOR_PORT:         5000
+    Mounts:
+      /etc/cyclonedds from cyclonedds (ro)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-hkh4f (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  cyclonedds:
+    Type:      ConfigMap (a volume populated by a ConfigMap)
+    Name:      dynamic-pattern-cyclonedds
+    Optional:  false
+  video-device:
+    Type:          HostPath (bare host directory volume)
+    Path:          /dev/video1
+    HostPathType:  CharDevice
+  sys-devices-platform:
+    Type:          HostPath (bare host directory volume)
+    Path:          /sys/devices/platform
+    HostPathType:  Directory
+  kube-api-access-hkh4f:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              kubernetes.io/hostname=edgenode01
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age   From               Message
+  ----    ------     ----  ----               -------
+  Normal  Scheduled  20m   default-scheduler  Successfully assigned ros2exp/dynamic-pattern-0 to edgenode01
+  Normal  Pulling    20m   kubelet            Pulling image "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-component-host:latest"
+  Normal  Pulled     12m   kubelet            Successfully pulled image "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-component-host:latest" in 7m40.408s (7m40.408s including waiting). Image size: 31964924756 bytes.
+  Normal  Created    12m   kubelet            Created container: component-host
+  Normal  Started    12m   kubelet            Started container component-host
+  Normal  Pulling    12m   kubelet            Pulling image "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-component-host:latest"
+  Normal  Pulled     12m   kubelet            Successfully pulled image "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-component-host:latest" in 372ms (372ms including waiting). Image size: 31964924756 bytes.
+  Normal  Created    12m   kubelet            Created container: orchestrator
+  Normal  Started    12m   kubelet            Started container orchestrator

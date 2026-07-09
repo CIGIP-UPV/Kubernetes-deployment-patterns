@@ -1,0 +1,4 @@
+# Captured 2026-05-19T14:59:17Z
+NAME                          CPU(cores)   MEMORY(bytes)   
+dynamic-pattern-0             1240m        16359Mi         
+dynamic-pattern-dashboard-0   89m          101Mi           

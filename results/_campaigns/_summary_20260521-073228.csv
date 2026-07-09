@@ -1,0 +1,3 @@
+cycle,regimen,campaign_dir,started_at,finished_at,duration_s
+1,warm,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260521-073234,2026-05-21T07:32:34Z,2026-05-21T08:04:50Z,1936
+2,warm,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260521-083457,2026-05-21T08:34:57Z,2026-05-21T09:06:24Z,1887

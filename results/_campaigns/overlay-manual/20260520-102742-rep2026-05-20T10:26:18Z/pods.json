@@ -1,0 +1,239 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "creationTimestamp": "2026-05-20T10:26:26Z",
+                "finalizers": [
+                    "batch.kubernetes.io/job-tracking"
+                ],
+                "generateName": "overlay-pattern-overlay-installer-",
+                "labels": {
+                    "app.kubernetes.io/instance": "overlay-pattern",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "ros2-overlay-canonical",
+                    "batch.kubernetes.io/controller-uid": "0bb94841-fb71-4d88-8a02-00f2e21f9cfa",
+                    "batch.kubernetes.io/job-name": "overlay-pattern-overlay-installer",
+                    "component": "overlay-installer",
+                    "controller-uid": "0bb94841-fb71-4d88-8a02-00f2e21f9cfa",
+                    "helm.sh/chart": "ros2-overlay-canonical-1.0.0",
+                    "job-name": "overlay-pattern-overlay-installer"
+                },
+                "name": "overlay-pattern-overlay-installer-krv9c",
+                "namespace": "ros2exp",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "batch/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Job",
+                        "name": "overlay-pattern-overlay-installer",
+                        "uid": "0bb94841-fb71-4d88-8a02-00f2e21f9cfa"
+                    }
+                ],
+                "resourceVersion": "14847738",
+                "uid": "8b075a55-2457-457d-aa9f-145d9aafd363"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "command": [
+                            "sh",
+                            "-c",
+                            "set -e\nVERSION=\"1.0.0\"\n# Tarball at PVC root (NOT in /pvc/overlay/ subdir). Reason:\n# the nginx server mounts the PVC at /usr/share/nginx/html/overlay/,\n# so PVC-root tarballs become /overlay/{version}.tar in URLs and\n# the default nginx index.html stays intact (probes on / return 200).\nTARGET=/pvc/${VERSION}.tar\nTARGET_TMP=/pvc/${VERSION}.tar.tmp\nSOURCE=/opt/overlay\n\necho \"[installer] Carrier version: ${VERSION}\"\necho \"[installer] Source content:\"\nls -la ${SOURCE}/\n\n# Idempotency: if final tarball already exists, skip.\n# Atomic: tarball is created with .tmp suffix and renamed at end.\n# The runtime initContainer would never see a partial download.\nif [ -f \"${TARGET}\" ]; then\n  echo \"[installer] ${TARGET} already exists\"\n  echo \"[installer] Skipping creation (idempotent re-run)\"\n  echo \"[installer] Existing tarball size:\"\n  ls -lh \"${TARGET}\"\n  exit 0\nfi\n\n# Why tarball instead of cp directory:\n# The HF cache contains relative symlinks (snapshots/HASH/X →\n# ../../blobs/Y). nginx serves symlinks as their target's content,\n# so an init container using `wget -r` over HTTP would receive\n# the same blob bytes TWICE (once via snapshots/ path, once via\n# blobs/ path), turning a 17 GB overlay into a 30 GB on edge.\n# A tarball preserves symlinks faithfully and travels as a single\n# HTTP GET — faster, atomic, no duplication.\necho \"[installer] Creating tarball ${TARGET_TMP}...\"\necho \"[installer] (This will take a few minutes for ~17 GB)\"\ntar -cf \"${TARGET_TMP}\" -C ${SOURCE} .\necho \"[installer] Tarball created. Renaming atomically...\"\nmv \"${TARGET_TMP}\" \"${TARGET}\"\n\necho \"\"\necho \"[installer] Final tarball:\"\nls -lh \"${TARGET}\"\necho \"\"\necho \"[installer] PVC contents:\"\nls -la /pvc/\necho \"\"\necho \"[installer] PVC total usage:\"\ndu -sh /pvc/\n\necho \"[installer] Done.\"\n"
+                        ],
+                        "image": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-overlay-pack:latest",
+                        "imagePullPolicy": "Always",
+                        "name": "overlay-installer",
+                        "resources": {
+                            "limits": {
+                                "cpu": "1",
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "128Mi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/pvc",
+                                "name": "overlay-source"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-tv4t6",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "imagePullSecrets": [
+                    {
+                        "name": "regcred"
+                    }
+                ],
+                "nodeName": "kb2",
+                "nodeSelector": {
+                    "kubernetes.io/hostname": "kb2"
+                },
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "OnFailure",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "overlay-source",
+                        "persistentVolumeClaim": {
+                            "claimName": "overlay-pattern-overlay-source"
+                        }
+                    },
+                    {
+                        "name": "kube-api-access-tv4t6",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-05-20T10:26:31Z",
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-05-20T10:26:30Z",
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-05-20T10:26:31Z",
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-05-20T10:26:31Z",
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-05-20T10:26:30Z",
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "containerID": "containerd://14ffea4d1635f908a17865b33cccb6b9bb1fee4931f619bfeae44bc7122cad17",
+                        "image": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-overlay-pack:latest",
+                        "imageID": "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-overlay-pack@sha256:389bcb9eb7689acd379b8f405d3e9554d0be80bc48af7a8896d60c5aa9aa8f70",
+                        "lastState": {},
+                        "name": "overlay-installer",
+                        "ready": true,
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-05-20T10:26:31Z"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/pvc",
+                                "name": "overlay-source"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-tv4t6",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "158.42.104.15",
+                "hostIPs": [
+                    {
+                        "ip": "158.42.104.15"
+                    }
+                ],
+                "phase": "Running",
+                "podIP": "10.42.0.201",
+                "podIPs": [
+                    {
+                        "ip": "10.42.0.201"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "startTime": "2026-05-20T10:26:30Z"
+            }
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}

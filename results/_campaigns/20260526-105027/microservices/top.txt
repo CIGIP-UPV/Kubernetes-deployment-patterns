@@ -1,0 +1,7 @@
+# Captured 2026-05-26T11:16:41Z
+NAME                                CPU(cores)   MEMORY(bytes)   
+microservices-pattern-camera-0      483m         82Mi            
+microservices-pattern-dashboard-0   100m         100Mi           
+microservices-pattern-llava-0       665m         15971Mi         
+microservices-pattern-voxtral-0     7m           13333Mi         
+microservices-pattern-yolo-0        1015m        973Mi           

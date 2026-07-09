@@ -1,0 +1,2 @@
+t_inf_avg_ms,f_fps_avg,t_e2e_avg_ms,j_inf_ms,u_cpu_avg_pct,u_gpu_avg_pct,u_ram_avg_pct
+25.15,21.69,58.52,0.86,42.86,43.10,28.76
