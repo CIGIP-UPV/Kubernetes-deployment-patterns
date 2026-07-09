@@ -56,6 +56,23 @@ voxtral:
   audioMode: false
   modelId: mistralai/Voxtral-Mini-3B-2507
 
+# ── Composición híbrida (revisión IEEE Access, R1.4/D2) ───────────────
+# hybrid.enabled=true saca LLaVA del component_container y lo ejecuta como
+# proceso OS separado en su propio contenedor del mismo pod (mismo nodo,
+# misma imagen). Los 3 nodos ligeros (camera, yolo, voxtral) siguen como
+# plugins hot-swappables. El bootstrap Job omite llava automáticamente.
+# Objetivo experimental: si el colapso runtime desaparece con el híbrido,
+# se confirma la serialización por GIL del host process como causa dominante.
+hybrid:
+  enabled: false
+  resources:
+    limits:
+      memory: 20Gi
+      cpu: "4"
+    requests:
+      memory: 4Gi
+      cpu: "1"
+
 # ── Component container (host process) ────────────────────────────────
 componentHost:
   # Service name exposed by component_container_isolated.

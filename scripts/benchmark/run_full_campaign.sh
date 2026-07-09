@@ -38,6 +38,11 @@
 #   CAMERA_DEVICE         Default /dev/video1
 #   COLD_COLD             Default false. If true, SSH into nodes and purge images before each install.
 #                         Requires SSH keys for: anakin@edgenode01, administrador@worker1-kb2, administrador@kb2
+#   COLD_MODE             Regimen de cold-start (R1.2): warm | image-cold | pristine.
+#                         Prevalece sobre COLD_COLD. pristine purga ademas el hostPath
+#                         del overlay en el edge (requiere sudo NOPASSWD para rm en el edge).
+#   EDGE_PURGE_HOST       Default anakin@edgenode01.cigip.upv.es (purga hostPath en pristine)
+#   OVERLAY_HOSTPATH      Default /mnt/ssd/overlay-runtime
 #   KEEP_DEPLOYMENT       Default true. Leave each helm release running between patterns. Set false to uninstall.
 #   ABORT_FILE            Default /tmp/STOP_CAMPAIGN. Touch this file between patterns to abort gracefully.
 #   RESULTS_BASE          Default results/_campaigns
@@ -74,6 +79,28 @@ CAMERA_DEVICE="${CAMERA_DEVICE:-/dev/video1}"
 # usage during the install is ~70 GB).
 CLOUD_NODE="${CLOUD_NODE:-kb2}"
 COLD_COLD="${COLD_COLD:-false}"
+# ── Regimenes de cold-start (revision IEEE Access, R1.2) ────────────────────
+# COLD_MODE ∈ {warm | image-cold | pristine}. Si se define, prevalece sobre
+# COLD_COLD (que se mantiene por retrocompatibilidad):
+#   warm       : caches de imagen y capas/modelos intactos (== COLD_COLD=false)
+#   image-cold : purga containerd en todos los nodos; el hostPath del overlay
+#                PERSISTE en el edge (== antiguo COLD_COLD=true, el "cold-start"
+#                del articulo enviado)
+#   pristine   : image-cold + purga del hostPath del overlay en el edge
+#                ("fully clean deployment" que exige R1.2). Para patrones sin
+#                estado persistente en el edge, pristine == image-cold.
+COLD_MODE="${COLD_MODE:-}"
+if [ -z "${COLD_MODE}" ]; then
+  if [ "${COLD_COLD}" = "true" ]; then COLD_MODE="image-cold"; else COLD_MODE="warm"; fi
+fi
+case "${COLD_MODE}" in
+  warm)       COLD_COLD="false" ;;
+  image-cold) COLD_COLD="true"  ;;
+  pristine)   COLD_COLD="true"  ;;
+  *) echo "ERROR: COLD_MODE invalido '${COLD_MODE}' (usa warm|image-cold|pristine)" >&2; exit 1 ;;
+esac
+EDGE_PURGE_HOST="${EDGE_PURGE_HOST:-anakin@edgenode01.cigip.upv.es}"
+OVERLAY_HOSTPATH="${OVERLAY_HOSTPATH:-/mnt/ssd/overlay-runtime}"
 KEEP_DEPLOYMENT="${KEEP_DEPLOYMENT:-true}"
 ABORT_FILE="${ABORT_FILE:-/tmp/STOP_CAMPAIGN}"
 RESULTS_BASE="${RESULTS_BASE:-results/_campaigns}"
@@ -103,8 +130,13 @@ log " Cloud node    : ${CLOUD_NODE} (overlay Job + PVC + nginx)"
 log " Warmup        : ${WARMUP_SECONDS} s"
 log " Sample window : ${SAMPLE_SECONDS} s"
 log " Cold-cold     : ${COLD_COLD}"
+log " Cold mode     : ${COLD_MODE} (warm|image-cold|pristine — R1.2)"
 log " Output        : ${CAMPAIGN_DIR}"
 log "============================================================"
+
+# Registrar el regimen de la campaña como artefacto de primera clase, para que
+# la agregacion posterior nunca mezcle regimenes (R1.2).
+echo "${COLD_MODE}" > "${CAMPAIGN_DIR}/REGIME.txt"
 
 # Initialize comparison CSV header.
 echo "pattern,t_zero,t_fin,t_install_e2e_s,t_ready_system_s,s_img_total_gb,t_inf_avg_ms,f_fps_pub,t_e2e_avg_ms,j_inf_ms,u_cpu_avg_pct,u_gpu_avg_pct,u_ram_avg_pct,run_dir,status,notes" > "${COMPARISON_CSV}"
@@ -151,6 +183,34 @@ purge_node_images() {
       done
       ;;
   esac
+}
+
+# ── Helper: purga del hostPath del overlay en el edge (solo COLD_MODE=pristine)
+# Convierte el ciclo en un "fully clean deployment" (R1.2): ni caches de imagen
+# ni capas/modelos persistidos. Sin esta purga, el regimen image-cold del overlay
+# se beneficia de los markers por capa que sobreviven en el SSD del Jetson.
+# Requiere en el edge: clave SSH y sudo NOPASSWD para rm
+# (/etc/sudoers.d/overlay-purge: "anakin ALL=(ALL) NOPASSWD: /bin/rm").
+purge_edge_hostpath() {
+  if [ "${COLD_MODE}" != "pristine" ]; then
+    return 0
+  fi
+  local pattern=$1
+  if [ "${pattern}" != "overlay" ]; then
+    log "  [pristine] ${pattern} no tiene estado persistente en el edge: pristine == image-cold."
+    return 0
+  fi
+  log "  [pristine] Purgando hostPath del overlay (${OVERLAY_HOSTPATH}) en ${EDGE_PURGE_HOST}..."
+  # ${VAR:?} evita un rm -rf catastrofico si la variable llegara vacia.
+  if ssh -o BatchMode=yes -o ConnectTimeout=8 "${EDGE_PURGE_HOST}" \
+       "sudo -n /bin/rm -rf ${OVERLAY_HOSTPATH:?}/ && echo '[pristine] hostPath eliminado'" \
+       >> "${CAMPAIGN_LOG}" 2>&1; then
+    log "  [pristine] hostPath purgado: el proximo install del overlay sera fully clean."
+  else
+    log "  [pristine] ERROR: no se pudo purgar el hostPath en ${EDGE_PURGE_HOST} (SSH o sudo NOPASSWD)."
+    log "  [pristine]        El regimen de este ciclo NO es pristine de verdad; se registra el error."
+    echo "pristine_purge_failed pattern=${pattern} $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "${CAMPAIGN_DIR}/REGIME_WARNINGS.txt"
+  fi
 }
 
 # ── Helper: short release name for each pattern ────────────────────────────
@@ -216,10 +276,14 @@ install_pattern() {
         --set camera.device="${CAMERA_DEVICE}"
       ;;
     dynamic-loader)
+      # DYNAMIC_HYBRID=true instala la variante hibrida (R1.4/D2: LLaVA como
+      # proceso separado). Medirla con la MISMA metodologia que el resto:
+      #   DYNAMIC_HYBRID=true PATTERNS="dynamic-loader" bash run_full_campaign.sh
       helm install "${release}" "${PROJECT_ROOT}/Patterns/dynamic-loader/helm/dynamic-loader" \
         -n "${NAMESPACE}" --create-namespace \
         --timeout "${HELM_TIMEOUT}" --wait \
         --set image.tag="${IMAGE_TAG}" \
+        --set hybrid.enabled="${DYNAMIC_HYBRID:-false}" \
         --set camera.device="${CAMERA_DEVICE}"
       ;;
     *)
@@ -298,9 +362,10 @@ for pattern in ${PATTERNS}; do
   uninstall_pattern "${RELEASE}"
   wait_namespace_empty_for_release "${RELEASE}"
 
-  # 2. Optional cold-cold image purge
-  log "  [2/9] (Cold-cold? ${COLD_COLD}) Purging images..."
+  # 2. Optional cold-cold image purge (+ hostPath purge en modo pristine)
+  log "  [2/9] (Cold mode: ${COLD_MODE}) Purging images..."
   purge_node_images "${pattern}"
+  purge_edge_hostpath "${pattern}"
 
   # 3. T_zero
   T_ZERO=$(date -u +%Y-%m-%dT%H:%M:%SZ)

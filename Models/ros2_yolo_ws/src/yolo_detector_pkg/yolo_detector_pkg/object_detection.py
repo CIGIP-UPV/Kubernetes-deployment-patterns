@@ -164,6 +164,18 @@ class YoloDetector(Node):
                 self.get_parameter('inference_topic').value,
                 50,
             )
+            # ── Instrumentacion de colas/descartes (revision IEEE Access, R1.10) ──
+            # frames_received : contador acumulado de callbacks ejecutados. Junto con
+            #                   /camera/frames_published permite calcular los frames
+            #                   descartados por la QoS (drop = published - received).
+            # queue_wait_ms   : latencia total del frame menos la inferencia pura;
+            #                   aproxima la espera en cola DDS + conversion (staleness).
+            #                   Su crecimiento es la firma de acumulacion de cola que
+            #                   R1.10 pide reportar para el patron dinamico.
+            self.pub_frames_received = self.create_publisher(
+                Float32, '/benchmark/frames_received', 50)
+            self.pub_queue_wait = self.create_publisher(
+                Float32, '/benchmark/queue_wait_ms', 50)
         self.frame_counter = 0
         self.stats_started_at = time.monotonic()
 
@@ -241,6 +253,11 @@ class YoloDetector(Node):
                 latency_ms = 0.0
             self.pub_latency.publish(Float32(data=float(latency_ms)))
             self.pub_inference.publish(Float32(data=float(infer_ms)))
+            # R1.10: contador acumulado y espera en cola (staleness) por frame.
+            self.pub_frames_received.publish(
+                Float32(data=float(self.frame_counter + 1)))
+            self.pub_queue_wait.publish(
+                Float32(data=float(max(latency_ms - infer_ms, 0.0))))
 
         self.frame_counter += 1
         if self.frame_counter % 50 == 0:

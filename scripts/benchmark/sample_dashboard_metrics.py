@@ -56,6 +56,12 @@ TOPICS = {
     "/node/memory_percent":        "std_msgs/Float32",
     "/node/io_read_mbs":           "std_msgs/Float32",
     "/node/io_write_mbs":          "std_msgs/Float32",
+    # ── Instrumentacion de colas/descartes (revision IEEE Access, R1.10) ──
+    # drop = frames_published(camera) - frames_received(yolo), calculado en
+    # aggregate_with_ci.py. queue_wait_ms = latencia total - inferencia pura.
+    "/camera/frames_published":    "std_msgs/Float32",
+    "/benchmark/frames_received":  "std_msgs/Float32",
+    "/benchmark/queue_wait_ms":    "std_msgs/Float32",
 }
 
 

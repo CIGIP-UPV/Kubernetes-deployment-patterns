@@ -59,6 +59,9 @@ spec:
               done
 
               {{- range .Values.bootstrap.modules }}
+              {{- /* Composición híbrida (R1.4/D2): llava corre como contenedor
+                     separado (llava-standalone), no como plugin: se omite aquí. */}}
+              {{- if not (and (eq . "llava") $.Values.hybrid.enabled) }}
               echo "[bootstrap] Loading module: {{ . }}"
               # Per-module parameter payload. Each block sets PAYLOAD with the
               # JSON body to POST. The plugin's __init__ receives these as
@@ -132,6 +135,7 @@ spec:
                 echo "[bootstrap] FAILED to load {{ . }} after 3 attempts"
                 exit 1
               fi
+              {{- end }}
               {{- end }}
 
               echo "[bootstrap] All modules loaded:"

@@ -2,6 +2,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from sensor_msgs.msg import Image
+from std_msgs.msg import Float32
 from cv_bridge import CvBridge
 import cv2
 import numpy as np
@@ -37,6 +38,14 @@ class CameraDriver(Node):
         topic = self.get_parameter('image_topic').get_parameter_value().string_value
         self.publisher = self.create_publisher(Image, topic, qos)
         self.bridge = CvBridge()
+        # ── Instrumentacion de descartes (revision IEEE Access, R1.10) ──
+        # Contador acumulado de frames publicados. Comparado con
+        # /benchmark/frames_received (YOLO), la diferencia son los frames
+        # descartados por la QoS BEST_EFFORT/KEEP_LAST(depth=1) cuando el
+        # suscriptor no consume a tiempo (firma del colapso del patron dinamico).
+        self.pub_frames_published = self.create_publisher(
+            Float32, '/camera/frames_published', 50)
+        self.frames_published = 0
 
         dev = self.get_parameter('device').get_parameter_value().string_value
         w = int(self.get_parameter('width').value)
@@ -104,6 +113,9 @@ class CameraDriver(Node):
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.header.frame_id = self.get_parameter('frame_id').get_parameter_value().string_value
         self.publisher.publish(msg)
+        # R1.10: contador acumulado de frames publicados.
+        self.frames_published += 1
+        self.pub_frames_published.publish(Float32(data=float(self.frames_published)))
 
 def main():
     rclpy.init()

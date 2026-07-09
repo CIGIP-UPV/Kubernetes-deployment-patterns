@@ -198,6 +198,68 @@ spec:
               readOnly: true
             {{- end }}
 
+        {{- if .Values.hybrid.enabled }}
+        # ── 3) LLaVA standalone (composición híbrida, revisión IEEE Access R1.4/D2) ──
+        # Proceso OS separado con su propio intérprete Python (GIL propio) y su
+        # propio contexto CUDA: el forward de LLaVA ya no puede retener el GIL
+        # del component_container. camera/yolo/voxtral siguen como plugins
+        # hot-swappables en component-host. Misma imagen, mismo nodo, mismo pod.
+        # No solicita nvidia.com/gpu para no duplicar la asignación del
+        # component-host: accede a la GPU vía runtimeClassName + NVIDIA_VISIBLE_DEVICES.
+        - name: llava-standalone
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: ROS_DOMAIN_ID
+              value: {{ .Values.ros.domainId | quote }}
+            - name: RMW_IMPLEMENTATION
+              value: {{ .Values.ros.rmwImplementation | quote }}
+            - name: ROS_LOCALHOST_ONLY
+              value: {{ .Values.ros.localhostOnly | quote }}
+            {{- if .Values.cyclonedds.enabled }}
+            - name: CYCLONEDDS_URI
+              value: "file:///etc/cyclonedds/cyclonedds.xml"
+            {{- end }}
+            - name: HF_HOME
+              value: "/opt/huggingface_cache"
+            - name: HF_HUB_CACHE
+              value: "/opt/huggingface_cache"
+            - name: TRANSFORMERS_CACHE
+              value: "/opt/huggingface_cache"
+            - name: HF_HUB_OFFLINE
+              value: "1"
+            - name: TRANSFORMERS_OFFLINE
+              value: "1"
+            {{- if .Values.gpu.enabled }}
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: {{ .Values.gpu.visibleDevices | default "all" | quote }}
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: {{ .Values.gpu.driverCapabilities | default "compute,utility" | quote }}
+            {{- end }}
+          command: ["/bin/bash", "-lc"]
+          args:
+            - |
+              set -e
+              source /opt/ros/humble/setup.bash
+              source /opt/base_ws/install/setup.bash
+              source /opt/component_ws/install/setup.bash
+              echo "[llava-standalone] LLaVA como proceso separado (híbrido R1.4)"
+              exec ros2 run llava_pkg llava_node --ros-args \
+                -p model_id:={{ .Values.llava.modelId | quote }} \
+                -p trigger_on_yolo:={{ .Values.llava.triggerOnYolo }} \
+                -p yolo_trigger_interval_s:={{ printf "%.1f" .Values.llava.yoloTriggerIntervalS }} \
+                -p max_new_tokens:={{ .Values.llava.maxNewTokens }} \
+                -p load_in_4bit:={{ .Values.llava.load4bit }}
+          resources:
+            {{- toYaml .Values.hybrid.resources | nindent 12 }}
+          volumeMounts:
+            {{- if .Values.cyclonedds.enabled }}
+            - name: cyclonedds
+              mountPath: /etc/cyclonedds
+              readOnly: true
+            {{- end }}
+        {{- end }}
+
       volumes:
         {{- if .Values.cyclonedds.enabled }}
         - name: cyclonedds
