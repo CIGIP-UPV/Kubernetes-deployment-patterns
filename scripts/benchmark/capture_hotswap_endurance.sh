@@ -102,8 +102,10 @@ do_op() {
   else
     payload="{\"module\":\"${module}\"}"
   fi
+  # timeout externo + --max-time: evita cuelgues indefinidos si el component
+  # host crashea a mitad de un swap (mismo endurecimiento que en C-7).
   t0=$(date +%s.%N)
-  resp=$(${EXEC_ORCH} curl -sX POST "${ORCH_URL}/${op}" \
+  resp=$(timeout 360 ${EXEC_ORCH} curl -s --max-time 300 -X POST "${ORCH_URL}/${op}" \
           -H "Content-Type: application/json" -d "${payload}" 2>&1) || true
   t1=$(date +%s.%N)
   lat=$(awk -v s="$t0" -v e="$t1" 'BEGIN{printf "%.2f", e-s}')
@@ -114,7 +116,7 @@ do_op() {
   if [ "${status}" = "FAIL" ]; then
     sleep 15
     t0=$(date +%s.%N)
-    resp=$(${EXEC_ORCH} curl -sX POST "${ORCH_URL}/${op}" \
+    resp=$(timeout 360 ${EXEC_ORCH} curl -s --max-time 300 -X POST "${ORCH_URL}/${op}" \
             -H "Content-Type: application/json" -d "${payload}" 2>&1) || true
     t1=$(date +%s.%N)
     lat=$(awk -v s="$t0" -v e="$t1" 'BEGIN{printf "%.2f", e-s}')

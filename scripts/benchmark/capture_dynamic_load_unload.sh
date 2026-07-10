@@ -63,8 +63,11 @@ for module in "${MODULES_ORDER[@]}"; do
   echo "─── Module: ${module} ───"
 
   # ── LOAD ──────────────────────────────────────────────────────────
+  # timeout externo + --max-time: sin ellos, si el component host crashea a
+  # mitad de un load, el kubectl exec queda colgado indefinidamente y bloquea
+  # toda la campaña (incidente 2026-07-09: 7 h de cuelgue en el ciclo image-cold 2).
   start_ts=$(date +%s.%N)
-  load_resp=$(${EXEC} curl -sX POST "${ORCH_URL}/load" \
+  load_resp=$(timeout 360 ${EXEC} curl -s --max-time 300 -X POST "${ORCH_URL}/load" \
     -H "Content-Type: application/json" \
     -d "${params}" 2>&1) || true
   end_ts=$(date +%s.%N)
@@ -83,7 +86,7 @@ for module in "${MODULES_ORDER[@]}"; do
 
   # ── UNLOAD ────────────────────────────────────────────────────────
   start_ts=$(date +%s.%N)
-  unload_resp=$(${EXEC} curl -sX POST "${ORCH_URL}/unload" \
+  unload_resp=$(timeout 120 ${EXEC} curl -s --max-time 90 -X POST "${ORCH_URL}/unload" \
     -H "Content-Type: application/json" \
     -d "{\"module\":\"${module}\"}" 2>&1) || true
   end_ts=$(date +%s.%N)
