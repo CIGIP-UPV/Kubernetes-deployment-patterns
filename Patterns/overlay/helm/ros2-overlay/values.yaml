@@ -33,11 +33,13 @@ nodes:
     name: edgenode01   # Donde corre el StatefulSet runtime con la GPU
 
 # ── PVC overlay-source (en kb2) ─────────────────────────────────────────────
-# Storage class K3s default (local-path). 30 GB cubre overlay-pack actual
-# (~17 GB) más espacio para una versión vieja (rollback inmediato).
+# Storage class K3s default (local-path). 45 GB: el carrier rev2 pesa ~34.3 GB
+# (HF cache 30.6G con LLaVA+Voxtral + python-deps 3.2G); con 30Gi el tarball
+# unico moria por ENOSPC. No cubre dos versiones simultaneas (rollback
+# inmediato requeriria ~75Gi; kb2 no tiene tanto disco libre).
 overlaySource:
   pvcName: overlay-source
-  size: 30Gi
+  size: 45Gi
   accessMode: ReadWriteOnce       # Solo un pod escribe a la vez (el Job, luego el server)
   storageClass: local-path        # K3s default; cambia si tienes otro provisioner
 

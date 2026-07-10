@@ -288,14 +288,21 @@ RUN echo "[build] Overlay artifact summary:" && \
     du -sh ${OVERLAY_ROOT}/system-libs/    2>/dev/null && \
     echo "[build] TOTAL:" && du -sh ${OVERLAY_ROOT}
 
-# ── STAGE 2: CARRIER (FROM busybox) ─────────────────────────────────────────
+# ── STAGE 2: CARRIER (FROM busybox, FORCED AMD64) ───────────────────────────
 # busybox:1.36 has /bin/sh + cp + ls + everything the Helm Job initContainer
-# needs to extract /opt/overlay to the PVC. ~2 MB image, ~17 GB total with
+# needs to extract /opt/overlay to the PVC. ~2 MB image, ~34 GB total with
 # the overlay artifacts.
+#
+# --platform=linux/amd64 is REQUIRED: the installer Job is the ONLY container
+# of the whole system that runs on the amd64 cloud node (kb2). The payload in
+# /opt/overlay is aarch64 (consumed on the Jetson after HTTP download), but
+# the carrier's sh/tar must execute on kb2. INCIDENTE 2026-07-09: rev1 built
+# natively on an Apple Silicon Mac produced an arm64 busybox → "exec format
+# error" on kb2 → BackoffLimitExceeded in every campaign cycle.
 #
 # This image is NEVER run as a service. Helm Job command is something like:
 #   ["sh", "-c", "cp -av /opt/overlay/. /pvc/overlay/$VERSION/"]
-FROM busybox:1.36
+FROM --platform=linux/amd64 busybox:1.36
 
 LABEL purpose="OCI carrier — overlay artifacts for ROS 2 Overlay pattern"
 LABEL not-runnable-as-service="true"
