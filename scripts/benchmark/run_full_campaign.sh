@@ -149,10 +149,17 @@ echo "pattern,t_zero,t_fin,t_install_e2e_s,t_ready_system_s,s_img_total_gb,t_inf
 #   kb2 (CP)    158.42.104.15  kb1.cigip.upv.es              administrador
 #   worker1-kb2 158.42.104.103 worker1-kb2.cigip.upv.es      administrador
 # Configurable por env var PURGE_HOSTS (lista separada por espacios de
-# user@fqdn). Requiere ademas: claves SSH (ssh-copy-id) y sudo NOPASSWD para
+# user@fqdn, o el valor especial "local" para el nodo donde corre la campana).
+# Requiere ademas: claves SSH (ssh-copy-id) y sudo NOPASSWD para
 # k3s en cada nodo (/etc/sudoers.d/k3s-nopasswd con
 # "<user> ALL=(ALL) NOPASSWD: /usr/local/bin/k3s").
-PURGE_HOSTS="${PURGE_HOSTS:-anakin@edgenode01.cigip.upv.es administrador@worker1-kb2.cigip.upv.es administrador@kb1.cigip.upv.es}"
+#
+# INCIDENTE 2026-07-10: kb1.cigip.upv.es ya NO resuelve a kb2 (el DNS se movio
+# a otra maquina, 158.42.104.179, el 2026-07-09). Los ciclos de la matriz hasta
+# esa fecha "purgaban" una maquina ajena y la cache de imagenes de kb2 quedaba
+# intacta (afecta solo a imagenes cloud: dashboard y el pull del overlay-pack
+# por el installer Job). Como la campana corre EN kb2, se purga en local.
+PURGE_HOSTS="${PURGE_HOSTS:-anakin@edgenode01.cigip.upv.es administrador@worker1-kb2.cigip.upv.es local}"
 
 purge_node_images() {
   if [ "${COLD_COLD}" != "true" ]; then
@@ -166,17 +173,29 @@ purge_node_images() {
       # Each pattern uses a different set of images. We purge ALL pattern-related
       # images to play it safe — pulls happen on next install only for the ones
       # that the chart actually uses.
+      local purge_cmd="sudo k3s ctr images list -q | grep -E 'patrones-kubernetes/(ros2-base|ros2-overlay-pack|ros2-component-host|ros2-monolithic|ros2-camera|ros2-yolo|ros2-llava|ros2-voxtral|ros2-dashboard)' | xargs -r sudo k3s ctr images rm; sudo k3s crictl rmi --prune"
       for host_user in ${PURGE_HOSTS}; do
         log "    purging on ${host_user}..."
         # Verificamos primero acceso SSH + sudo no interactivo; si falla, lo
         # registramos como ERROR (no WARNING silencioso) porque sin purga el
         # cold-cold NO es frio de verdad y el T_install no seria fiable.
+        if [ "${host_user}" = "local" ]; then
+          # La campana corre EN este nodo (kb2): purga sin SSH. Requiere sudo
+          # NOPASSWD para k3s tambien aqui (mismo sudoers.d que en los workers).
+          if ! sudo -n k3s ctr images list >/dev/null 2>&1; then
+            log "    ERROR: sudo -n k3s falla en local (falta NOPASSWD en kb2). El cold-cold NO sera fiable en este nodo."
+            continue
+          fi
+          bash -c "${purge_cmd}" >> "${CAMPAIGN_LOG}" 2>&1 && \
+            log "    purga OK en local (kb2)" || \
+            log "    WARNING: la purga local devolvio error"
+          continue
+        fi
         if ! ssh -o BatchMode=yes -o ConnectTimeout=8 "${host_user}" 'sudo -n k3s ctr images list >/dev/null 2>&1'; then
           log "    ERROR: no se pudo purgar en ${host_user} (SSH o sudo NOPASSWD fallan). El cold-cold NO sera fiable en este nodo."
           continue
         fi
-        ssh -o BatchMode=yes -o ConnectTimeout=8 "${host_user}" \
-          "sudo k3s ctr images list -q | grep -E 'patrones-kubernetes/(ros2-base|ros2-overlay-pack|ros2-component-host|ros2-monolithic|ros2-camera|ros2-yolo|ros2-llava|ros2-voxtral|ros2-dashboard)' | xargs -r sudo k3s ctr images rm; sudo k3s crictl rmi --prune" \
+        ssh -o BatchMode=yes -o ConnectTimeout=8 "${host_user}" "${purge_cmd}" \
           >> "${CAMPAIGN_LOG}" 2>&1 && \
           log "    purga OK en ${host_user}" || \
           log "    WARNING: la purga en ${host_user} devolvio error"
