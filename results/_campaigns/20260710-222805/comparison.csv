@@ -1,0 +1,2 @@
+pattern,t_zero,t_fin,t_install_e2e_s,t_ready_system_s,s_img_total_gb,t_inf_avg_ms,f_fps_pub,t_e2e_avg_ms,j_inf_ms,u_cpu_avg_pct,u_gpu_avg_pct,u_ram_avg_pct,run_dir,status,notes
+overlay,2026-07-10T22:28:18Z,2026-07-10T23:04:32Z,2174,1051,0.00,28.67,20.60,59.09,3.76,36.79,74.40,32.16,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260710-222805/overlay,ok,

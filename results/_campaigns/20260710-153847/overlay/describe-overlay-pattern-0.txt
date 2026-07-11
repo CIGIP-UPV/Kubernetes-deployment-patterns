@@ -1,0 +1,384 @@
+Name:                overlay-pattern-0
+Namespace:           ros2exp
+Priority:            0
+Runtime Class Name:  nvidia
+Service Account:     default
+Node:                edgenode01/158.42.104.206
+Start Time:          Fri, 10 Jul 2026 15:43:44 +0000
+Labels:              app=ros2-overlay-runtime
+                     app.kubernetes.io/instance=overlay-pattern
+                     app.kubernetes.io/managed-by=Helm
+                     app.kubernetes.io/name=ros2-overlay
+                     apps.kubernetes.io/pod-index=0
+                     component=runtime
+                     controller-revision-hash=overlay-pattern-5c6d98b69
+                     helm.sh/chart=ros2-overlay-1.0.0
+                     pattern=overlay
+                     statefulset.kubernetes.io/pod-name=overlay-pattern-0
+Annotations:         <none>
+Status:              Running
+IP:                  10.42.2.36
+IPs:
+  IP:           10.42.2.36
+Controlled By:  StatefulSet/overlay-pattern
+Init Containers:
+  wait-for-services:
+    Container ID:  containerd://b8453e77e3afefec81f8f0888c719ffb5262131d30aaed74bbbc50845e075b61
+    Image:         busybox:1.36
+    Image ID:      docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      sh
+      -c
+      FULLNAME="overlay-pattern"
+      NS="ros2exp"
+      OVERLAY_SVC="${FULLNAME}-overlay-server.${NS}.svc.cluster.local"
+      DASH_SVC="${FULLNAME}-dashboard-0.${FULLNAME}-dashboard-peers.${NS}.svc.cluster.local"
+      echo "[init] Waiting for overlay-server DNS: $OVERLAY_SVC"
+      until nslookup "$OVERLAY_SVC" >/dev/null 2>&1; do
+        echo "[init]   $OVERLAY_SVC not resolvable yet, retrying in 3s..."
+        sleep 3
+      done
+      echo "[init]   $OVERLAY_SVC resolved"
+      if [ -n "$DASH_SVC" ]; then
+        echo "[init] Waiting for dashboard DNS: $DASH_SVC"
+        until nslookup "$DASH_SVC" >/dev/null 2>&1; do
+          echo "[init]   $DASH_SVC not resolvable yet, retrying in 3s..."
+          sleep 3
+        done
+        echo "[init]   $DASH_SVC resolved"
+      fi
+      echo "[init] All DNS targets resolved — proceeding to overlay sync"
+      
+    State:          Terminated
+      Reason:       Completed
+      Exit Code:    0
+      Started:      Fri, 10 Jul 2026 15:43:45 +0000
+      Finished:     Fri, 10 Jul 2026 15:43:51 +0000
+    Ready:          True
+    Restart Count:  0
+    Environment:    <none>
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-h9vhs (ro)
+  overlay-sync:
+    Container ID:  containerd://16c220eeb77df4486d8ef6dffbde086187dfd307274384114ac56d62cfaef3dc
+    Image:         alpine:latest
+    Image ID:      docker.io/library/alpine@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      sh
+      -c
+      set -eo pipefail
+      # Install curl (alpine doesn't include it by default)
+      apk add --no-cache curl >/dev/null
+      
+      FULLNAME="overlay-pattern"
+      NS="ros2exp"
+      VERSION="1.0.0"
+      OVERLAY_SVC="${FULLNAME}-overlay-server.${NS}.svc.cluster.local"
+      PORT=80
+      TARGET=/opt/overlay
+      TIMEOUT=1800
+      
+      # Helper: HTTP HEAD probe — returns 0 if URL is reachable with 200.
+      probe_url() {
+        curl -fsI --max-time 5 "$1" -o /dev/null
+      }
+      
+      # Helper: poll a URL until it becomes reachable. Used in
+      # overlay.pipeline=true mode where the pre-install Job runs in
+      # parallel with this init container, so a layer tarball may not
+      # exist yet at this container's start time.
+      wait_for_url() {
+        local url=$1
+        local label=${2:-$url}
+        local max_wait=${TIMEOUT}
+        local waited=0
+        while ! probe_url "${url}"; do
+          if [ "${waited}" -ge "${max_wait}" ]; then
+            echo "[sync] FATAL: ${label} did not become available within ${max_wait} s"
+            exit 1
+          fi
+          sleep 5
+          waited=$((waited + 5))
+          if [ $((waited % 30)) -eq 0 ]; then
+            echo "[sync]   still waiting for ${label} (${waited}/${max_wait}s)"
+          fi
+        done
+      }
+      
+      mkdir -p "${TARGET}"
+      # ── Legacy single-tarball mode ─────────────────────────────────
+      URL="http://${OVERLAY_SVC}:${PORT}/overlay/${VERSION}.tar"
+      echo "[sync] Source: ${URL}"
+      echo "[sync] Target: ${TARGET}"
+      if [ -f "${TARGET}/install/setup.bash" ]; then
+        echo "[sync] Overlay already extracted, skipping download"
+        ls -la "${TARGET}/"
+        exit 0
+      fi
+      echo "[sync] Waiting for overlay-server + tarball availability..."
+      wait_for_url "${URL}" "overlay tarball"
+      echo "[sync] Server OK. Downloading + extracting tarball..."
+      curl -fSL --max-time ${TIMEOUT} "${URL}" \
+        | tar -xf - -C "${TARGET}"
+      
+      echo "[sync] Extraction complete. Contents:"
+      ls -la "${TARGET}/"
+      echo "[sync] Sizes:"
+      du -sh "${TARGET}"/install        2>/dev/null || true
+      du -sh "${TARGET}"/python-deps    2>/dev/null || true
+      du -sh "${TARGET}"/huggingface_cache 2>/dev/null || true
+      du -sh "${TARGET}"/models         2>/dev/null || true
+      du -sh "${TARGET}"/system-libs    2>/dev/null || true
+      echo "[sync] Done."
+      
+    State:          Terminated
+      Reason:       Completed
+      Exit Code:    0
+      Started:      Fri, 10 Jul 2026 15:43:52 +0000
+      Finished:     Fri, 10 Jul 2026 15:59:47 +0000
+    Ready:          True
+    Restart Count:  0
+    Environment:    <none>
+    Mounts:
+      /opt/overlay from overlay-mount (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-h9vhs (ro)
+Containers:
+  overlay-runtime:
+    Container ID:  containerd://8a6505feb2d73f9d24b6cfeb6d2699aaad7dcb8f7ce8f7beb12d096bc2d23b2a
+    Image:         gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-base:latest
+    Image ID:      gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-base@sha256:2293a86471b123342abd45d86000924f12daff2a2ca848aa44ebe2933588cd91
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      /bin/bash
+      -lc
+    Args:
+      set -e
+      echo "[runtime] Sourcing ROS 2 + base workspace..."
+      source /opt/ros/humble/setup.bash
+      source /opt/base_ws/install/setup.bash
+      
+      echo "[runtime] Sourcing overlay workspace..."
+      source /opt/overlay/install/setup.bash
+      
+      # ── Workaround for ros2-overlay-pack <= 1.0.x ──
+      # pip pulls nvidia-cuda-runtime-cu13 + nvidia-cudnn-cu13 etc.
+      # as transitive deps of ultralytics/transformers. Their .so
+      # files install under /opt/overlay/python-deps/nvidia/<lib>/
+      # as a SHARED namespace package, so deleting the .dist-info
+      # dirs alone is not enough — we must wipe the nvidia/ dir
+      # itself. The Jetson PyTorch wheel does NOT depend on these
+      # (it links libcuda from /usr/local/cuda/lib64 inherited
+      # from ros2-base).
+      echo "[runtime] Stripping nvidia-cu13 datacenter libs from overlay..."
+      rm -rf /opt/overlay/python-deps/nvidia      2>/dev/null || true
+      rm -rf /opt/overlay/python-deps/cuda_toolkit 2>/dev/null || true
+      # Also remove any *.dist-info / *.libs folders that referenced them
+      find /opt/overlay/python-deps -maxdepth 1 -type d \
+        \( -name "nvidia_*" -o -name "cuda_toolkit*" \) \
+        -exec rm -rf {} + 2>/dev/null || true
+      echo "[runtime] Remaining python-deps top-level (nvidia/cuda):"
+      ls /opt/overlay/python-deps 2>/dev/null | grep -i -E "nvidia|cuda" || \
+        echo "  (none — clean)"
+      
+      # PYTHONPATH for the overlay's pip --target site-packages
+      # (PyTorch, transformers, accelerate, ultralytics, etc.)
+      export PYTHONPATH="/opt/overlay/python-deps:${PYTHONPATH}"
+      
+      # LD_LIBRARY_PATH for the system libs we staged in the overlay
+      # (libasound, libportaudio, libsndfile — needed by librosa,
+      # sounddevice). Append to existing path (set in ros2-base ENV).
+      export LD_LIBRARY_PATH="/opt/overlay/system-libs:${LD_LIBRARY_PATH}"
+      
+      echo "[runtime] Environment summary:"
+      echo "  PYTHONPATH=${PYTHONPATH}"
+      echo "  LD_LIBRARY_PATH=${LD_LIBRARY_PATH}"
+      echo "  HF_HOME=${HF_HOME}"
+      echo ""
+      
+      echo "[runtime] Starting resource_monitor..."
+      python3 /opt/scripts/resource_monitor.py &
+      RESMON_PID=$!
+      
+      echo "[runtime] Starting camera_driver..."
+      ros2 run camera_driver_pkg camera_driver --ros-args \
+        -p device:=${CAMERA_DEVICE} \
+        -p width:=${CAMERA_WIDTH} \
+        -p height:=${CAMERA_HEIGHT} \
+        -p fps:=${CAMERA_FPS} \
+        -p frame_id:=${CAMERA_FRAME_ID} \
+        -p synthetic_mode:=${CAMERA_SYNTHETIC_MODE} \
+        -p image_topic:=${IMAGE_TOPIC} &
+      CAMERA_PID=$!
+      
+      sleep ${YOLO_START_DELAY}
+      echo "[runtime] Starting yolo_detector..."
+      ros2 run yolo_detector_pkg yolo_detector --ros-args \
+        -p model_path:=${YOLO_MODEL_PATH} \
+        -p conf:=${YOLO_CONF} \
+        -p image_topic:=${IMAGE_TOPIC} \
+        -p detections_topic:=${DETECTIONS_TOPIC} \
+        -p debug_image_topic:=${DEBUG_IMAGE_TOPIC} \
+        -p publish_debug_image:=${YOLO_PUBLISH_DEBUG} \
+        -p publish_metrics:=${YOLO_PUBLISH_METRICS} \
+        -p latency_topic:=${LATENCY_TOPIC} \
+        -p inference_topic:=${INFERENCE_TOPIC} \
+        -p filter_classes:="\"${YOLO_FILTER_CLASSES}\"" &
+      YOLO_PID=$!
+      
+      if [ "${LLAVA_ENABLED}" = "true" ]; then
+        sleep ${LLAVA_START_DELAY}
+        echo "[runtime] Starting llava_node..."
+        ros2 run llava_pkg llava_node --ros-args \
+          -p model_id:=${LLAVA_MODEL_ID} \
+          -p image_topic:=${IMAGE_TOPIC} \
+          -p detection_topic:=${DETECTIONS_TOPIC} \
+          -p trigger_topic:=${LLAVA_TRIGGER_TOPIC} \
+          -p response_topic:=${LLAVA_RESPONSE_TOPIC} \
+          -p latency_topic:=${LLAVA_LATENCY_TOPIC} \
+          -p inference_topic:=${LLAVA_INFERENCE_TOPIC} \
+          -p trigger_on_yolo:=${LLAVA_TRIGGER_ON_YOLO} \
+          -p yolo_trigger_interval_s:=$(printf "%.1f" "${LLAVA_YOLO_INTERVAL_S}") \
+          -p max_new_tokens:=${LLAVA_MAX_TOKENS} \
+          -p load_in_4bit:=${LLAVA_LOAD_4BIT} \
+          -p hf_cache_dir:=/opt/overlay/huggingface_cache &
+        LLAVA_PID=$!
+      fi
+      
+      if [ "${VOXTRAL_ENABLED}" = "true" ]; then
+        echo "[runtime] Starting voxtral_node..."
+        ros2 run voxtral_pkg voxtral_node --ros-args \
+          -p audio_mode:=${VOXTRAL_AUDIO_MODE} \
+          -p model_id:=${VOXTRAL_MODEL_ID} \
+          -p command_topic:=${VOICE_COMMAND_TOPIC} \
+          -p transcript_topic:=${VOICE_TRANSCRIPT_TOPIC} \
+          -p response_topic:=${VOICE_RESPONSE_TOPIC} \
+          -p llava_trigger_topic:=${LLAVA_TRIGGER_TOPIC} \
+          -p llava_response_topic:=${LLAVA_RESPONSE_TOPIC} \
+          -p latency_topic:=${VOICE_LATENCY_TOPIC} \
+          -p hf_cache_dir:=/opt/overlay/huggingface_cache &
+        VOXTRAL_PID=$!
+      fi
+      
+      echo "[runtime] All nodes launched. Waiting for any to exit..."
+      wait -n ${CAMERA_PID} ${YOLO_PID} ${RESMON_PID} ${LLAVA_PID:-} ${VOXTRAL_PID:-}
+      echo "[runtime] One process exited — pod will restart"
+      exit 1
+      
+    State:          Running
+      Started:      Fri, 10 Jul 2026 15:59:49 +0000
+    Ready:          True
+    Restart Count:  0
+    Limits:
+      nvidia.com/gpu:  1
+    Requests:
+      nvidia.com/gpu:  1
+    Liveness:          exec [/bin/bash -c pgrep -f camera_driver >/dev/null && pgrep -f yolo_detector >/dev/null
+] delay=0s timeout=5s period=30s #success=1 #failure=3
+    Startup:  exec [/bin/bash -c pgrep -f camera_driver >/dev/null && pgrep -f yolo_detector >/dev/null
+] delay=30s timeout=5s period=10s #success=1 #failure=36
+    Environment:
+      ROS_DOMAIN_ID:               42
+      RMW_IMPLEMENTATION:          rmw_cyclonedds_cpp
+      ROS_LOCALHOST_ONLY:          0
+      CYCLONEDDS_URI:              file:///etc/cyclonedds/cyclonedds.xml
+      CAMERA_DEVICE:               /dev/video1
+      CAMERA_WIDTH:                1280
+      CAMERA_HEIGHT:               720
+      CAMERA_FPS:                  0
+      CAMERA_FRAME_ID:             camera
+      CAMERA_SYNTHETIC_MODE:       false
+      IMAGE_TOPIC:                 /camera/image_raw
+      YOLO_MODEL_PATH:             /opt/overlay/models/yolov8n.pt
+      YOLO_CONF:                   0.25
+      YOLO_PUBLISH_DEBUG:          true
+      YOLO_PUBLISH_METRICS:        true
+      YOLO_FILTER_CLASSES:         0,56,60
+      YOLO_START_DELAY:            2
+      DETECTIONS_TOPIC:            /detections
+      DEBUG_IMAGE_TOPIC:           /detections/image
+      LATENCY_TOPIC:               /benchmark/latency_ms
+      INFERENCE_TOPIC:             /benchmark/inference_ms
+      LLAVA_ENABLED:               true
+      LLAVA_MODEL_ID:              llava-hf/llava-1.5-7b-hf
+      LLAVA_TRIGGER_ON_YOLO:       true
+      LLAVA_YOLO_INTERVAL_S:       30
+      LLAVA_MAX_TOKENS:            150
+      LLAVA_LOAD_4BIT:             true
+      LLAVA_START_DELAY:           15
+      LLAVA_TRIGGER_TOPIC:         /llava/trigger
+      LLAVA_RESPONSE_TOPIC:        /llava/response
+      LLAVA_LATENCY_TOPIC:         /llava/metrics_latency_ms
+      LLAVA_INFERENCE_TOPIC:       /llava/metrics_inference_ms
+      VOXTRAL_ENABLED:             true
+      VOXTRAL_AUDIO_MODE:          false
+      VOXTRAL_MODEL_ID:            mistralai/Voxtral-Mini-3B-2507
+      VOICE_COMMAND_TOPIC:         /voice/command
+      VOICE_TRANSCRIPT_TOPIC:      /voice/transcript
+      VOICE_RESPONSE_TOPIC:        /voice/response
+      VOICE_LATENCY_TOPIC:         /voice/metrics_latency_ms
+      HF_HOME:                     /opt/overlay/huggingface_cache
+      HF_HUB_CACHE:                /opt/overlay/huggingface_cache
+      TRANSFORMERS_CACHE:          /opt/overlay/huggingface_cache
+      HF_HUB_OFFLINE:              1
+      TRANSFORMERS_OFFLINE:        1
+      NVIDIA_VISIBLE_DEVICES:      all
+      NVIDIA_DRIVER_CAPABILITIES:  compute,utility
+    Mounts:
+      /dev/video1 from video-device (rw)
+      /etc/cyclonedds from cyclonedds (ro)
+      /opt/overlay from overlay-mount (rw)
+      /sys/devices/platform from sys-devices-platform (ro)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-h9vhs (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  overlay-mount:
+    Type:       EmptyDir (a temporary directory that shares a pod's lifetime)
+    Medium:     
+    SizeLimit:  <unset>
+  cyclonedds:
+    Type:      ConfigMap (a volume populated by a ConfigMap)
+    Name:      overlay-pattern-cyclonedds
+    Optional:  false
+  video-device:
+    Type:          HostPath (bare host directory volume)
+    Path:          /dev/video1
+    HostPathType:  CharDevice
+  sys-devices-platform:
+    Type:          HostPath (bare host directory volume)
+    Path:          /sys/devices/platform
+    HostPathType:  Directory
+  kube-api-access-h9vhs:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              kubernetes.io/hostname=edgenode01
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age   From               Message
+  ----    ------     ----  ----               -------
+  Normal  Scheduled  26m   default-scheduler  Successfully assigned ros2exp/overlay-pattern-0 to edgenode01
+  Normal  Pulled     26m   kubelet            Container image "busybox:1.36" already present on machine
+  Normal  Created    26m   kubelet            Created container: wait-for-services
+  Normal  Started    26m   kubelet            Started container wait-for-services
+  Normal  Pulled     26m   kubelet            Container image "alpine:latest" already present on machine
+  Normal  Created    26m   kubelet            Created container: overlay-sync
+  Normal  Started    26m   kubelet            Started container overlay-sync
+  Normal  Pulling    10m   kubelet            Pulling image "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-base:latest"
+  Normal  Pulled     10m   kubelet            Successfully pulled image "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-base:latest" in 547ms (547ms including waiting). Image size: 2408193177 bytes.
+  Normal  Created    10m   kubelet            Created container: overlay-runtime
+  Normal  Started    10m   kubelet            Started container overlay-runtime

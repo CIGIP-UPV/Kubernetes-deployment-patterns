@@ -1,0 +1,5 @@
+pattern,t_zero,t_fin,t_install_e2e_s,t_ready_system_s,s_img_total_gb,t_inf_avg_ms,f_fps_pub,t_e2e_avg_ms,j_inf_ms,u_cpu_avg_pct,u_gpu_avg_pct,u_ram_avg_pct,run_dir,status,notes
+monolithic,2026-07-09T22:16:53Z,2026-07-09T22:25:36Z,523,520,0.00,28.47,20.57,59.79,3.61,35.66,75.44,32.50,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260709-221644/monolithic,ok,
+microservices,2026-07-09T22:38:54Z,2026-07-09T22:50:18Z,684,681,0.00,29.47,20.07,82.36,3.61,36.72,80.81,53.04,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260709-221644/microservices,ok,
+overlay,2026-07-09T23:04:12Z,,,,,,,,,,,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260709-221644/overlay,install_failed,helm install returned non-zero
+dynamic-loader,2026-07-09T23:04:53Z,2026-07-09T23:15:36Z,643,548,0.00,211.34,3.97,262.20,27.72,23.00,26.85,31.18,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260709-221644/dynamic-loader,ok,;C-7 capture failed

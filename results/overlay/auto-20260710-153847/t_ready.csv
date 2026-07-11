@@ -1,0 +1,4 @@
+pod,podscheduled,ready,delta_s
+overlay-pattern-0,2026-07-10T15:43:44Z,2026-07-10T16:00:25Z,1001
+overlay-pattern-dashboard-0,2026-07-10T15:43:44Z,2026-07-10T15:44:53Z,69
+overlay-pattern-overlay-server-8585bdf96b-dlpgw,2026-07-10T15:43:44Z,2026-07-10T15:43:46Z,2

@@ -1,0 +1,120 @@
+Name:             microservices-pattern-dashboard-0
+Namespace:        ros2exp
+Priority:         0
+Service Account:  default
+Node:             worker1-kb2/158.42.104.103
+Start Time:       Thu, 09 Jul 2026 17:47:40 +0000
+Labels:           app=ros2-microservices-dashboard
+                  app.kubernetes.io/instance=microservices-pattern
+                  app.kubernetes.io/managed-by=Helm
+                  app.kubernetes.io/name=ros2-microservices
+                  apps.kubernetes.io/pod-index=0
+                  component=dashboard
+                  controller-revision-hash=microservices-pattern-dashboard-5dc647685
+                  helm.sh/chart=ros2-microservices-1.0.0
+                  pattern=microservices
+                  statefulset.kubernetes.io/pod-name=microservices-pattern-dashboard-0
+Annotations:      <none>
+Status:           Running
+IP:               10.42.1.237
+IPs:
+  IP:           10.42.1.237
+Controlled By:  StatefulSet/microservices-pattern-dashboard
+Init Containers:
+  wait-for-peers:
+    Container ID:  containerd://978a2d6894036981327df097482c37aa465dc8caf04e60ffe22b07eec1d5ba45
+    Image:         busybox:1.36
+    Image ID:      docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      sh
+      -c
+      FULLNAME="microservices-pattern"
+      NS="ros2exp"
+      PEERS=""
+      PEERS="$PEERS ${FULLNAME}-camera-0.${FULLNAME}-camera-peers.${NS}.svc.cluster.local"
+      PEERS="$PEERS ${FULLNAME}-yolo-0.${FULLNAME}-yolo-peers.${NS}.svc.cluster.local"
+      PEERS="$PEERS ${FULLNAME}-llava-0.${FULLNAME}-llava-peers.${NS}.svc.cluster.local"
+      PEERS="$PEERS ${FULLNAME}-voxtral-0.${FULLNAME}-voxtral-peers.${NS}.svc.cluster.local"
+      for PEER in $PEERS; do
+        echo "[init] Waiting for DDS peer DNS: $PEER"
+        until nslookup "$PEER" >/dev/null 2>&1; do
+          echo "[init]   $PEER not resolvable yet, retrying in 3s..."
+          sleep 3
+        done
+        echo "[init]   $PEER resolved"
+      done
+      GRACE=60
+      echo "[init] All peer DNS resolved — waiting ${GRACE}s for nodes to finish loading models and start publishing"
+      sleep "$GRACE"
+      echo "[init] Ready to start rosbridge"
+      
+    State:          Terminated
+      Reason:       Completed
+      Exit Code:    0
+      Started:      Thu, 09 Jul 2026 17:47:41 +0000
+      Finished:     Thu, 09 Jul 2026 17:48:47 +0000
+    Ready:          True
+    Restart Count:  0
+    Environment:    <none>
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-45gxs (ro)
+Containers:
+  dashboard:
+    Container ID:   containerd://8ae77709dff8eb584afd45347b4bbeed194ba23b0b51b91cbcc283e6e0255a37
+    Image:          gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard:latest
+    Image ID:       gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard@sha256:46f7e0651a22713ce0b1d911a07f9ce868fa0d2123a229f92301e640000d0df1
+    Ports:          8080/TCP, 9090/TCP
+    Host Ports:     0/TCP, 0/TCP
+    State:          Running
+      Started:      Thu, 09 Jul 2026 17:48:47 +0000
+    Ready:          True
+    Restart Count:  0
+    Liveness:       http-get http://:http/ delay=10s timeout=1s period=30s #success=1 #failure=3
+    Environment:
+      ROS_DOMAIN_ID:       42
+      RMW_IMPLEMENTATION:  rmw_cyclonedds_cpp
+      ROS_LOCALHOST_ONLY:  0
+      CYCLONEDDS_URI:      file:///etc/cyclonedds/cyclonedds.xml
+    Mounts:
+      /dashboard-cm from dashboard-html (ro)
+      /etc/cyclonedds from cyclonedds (ro)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-45gxs (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  dashboard-html:
+    Type:      ConfigMap (a volume populated by a ConfigMap)
+    Name:      microservices-pattern-dashboard-html
+    Optional:  false
+  cyclonedds:
+    Type:      ConfigMap (a volume populated by a ConfigMap)
+    Name:      microservices-pattern-cyclonedds
+    Optional:  false
+  kube-api-access-45gxs:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              kubernetes.io/arch=amd64
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age   From               Message
+  ----    ------     ----  ----               -------
+  Normal  Scheduled  11m   default-scheduler  Successfully assigned ros2exp/microservices-pattern-dashboard-0 to worker1-kb2
+  Normal  Pulled     11m   kubelet            Container image "busybox:1.36" already present on machine
+  Normal  Created    11m   kubelet            Created container: wait-for-peers
+  Normal  Started    11m   kubelet            Started container wait-for-peers
+  Normal  Pulling    10m   kubelet            Pulling image "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard:latest"
+  Normal  Pulled     10m   kubelet            Successfully pulled image "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard:latest" in 347ms (348ms including waiting). Image size: 270402470 bytes.
+  Normal  Created    10m   kubelet            Created container: dashboard
+  Normal  Started    10m   kubelet            Started container dashboard
