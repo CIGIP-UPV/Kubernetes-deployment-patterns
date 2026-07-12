@@ -34,3 +34,16 @@ overlay_inc_warm*.log
 overlay_meta.log
 results/_campaigns/.regcred_*.yaml
 .DS_Store
+
+# ── Documentos locales del articulo (nunca al repo publico) ──────────────────
+# Politica del proyecto: al git solo van desarrollos (codigo, charts, datos).
+REVISION_ACTION_PLAN.md
+REVIEWER_TRACEABILITY.csv
+SERVER_RUNBOOK.md
+HANDOFF_CONTINUIDAD.md
+ANALYSIS_F8_NOTES.md
+AUDITORIA_FASE1_diagnostico.md
+figuras_articulo.xlsx
+paper/
+paper_revision/
+*.LOCAL_may.csv

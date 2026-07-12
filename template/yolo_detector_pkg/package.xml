@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>yolo_detector_pkg</name>
+  <version>1.0.0</version>
+  <description>
+    Bring Your Own Model template node. Occupies the perception slot of the
+    four deployment patterns (the package name is inherited infrastructure
+    naming; the model does not need to be a detector).
+  </description>
+  <maintainer email="mmateo@cigip.upv.es">CIGIP-UPV</maintainer>
+  <license>Apache-2.0</license>
+
+  <depend>rclpy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

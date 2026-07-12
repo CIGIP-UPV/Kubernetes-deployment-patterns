@@ -5,146 +5,178 @@
 
 Reproducibility artifact for the article *"Analysis of Distributed AI
 Model Architectures for Cloud-Edge Robotic Systems Utilizing ROS 2"*
-submitted to **IEEE Access** (2026). This repository contains the
-complete source code, Helm charts, benchmark scripts and measurement
-data of the comparative evaluation of four ROS 2 deployment patterns —
-*monolithic containers*, *microservices*, *dynamic module loading* and
-*overlay workspaces* — running a multimodal AI workload (YOLOv8-nano +
-LLaVA-1.5-7B + Voxtral-Mini-3B) on a K3s cluster pairing an NVIDIA
-Jetson AGX Orin edge node with two amd64 cloud nodes.
+(IEEE Access, 2026, under revision). This repository contains the
+complete source code, Helm charts, benchmark scripts and raw
+measurement data of the comparative evaluation of four ROS 2 deployment
+patterns — *monolithic containers*, *microservices*, *dynamic module
+loading* and *overlay workspaces* — running a multimodal AI workload
+(YOLOv8-nano + LLaVA-1.5-7B + Voxtral-Mini-3B) on a K3s cluster pairing
+an NVIDIA Jetson AGX Orin edge node with two amd64 cloud nodes.
 
 > If you use this artifact please cite both the article and this
 > repository (see [CITATION.cff](CITATION.cff)).
+
+![The four deployment patterns](docs/figures/patterns_overview.png)
+
+## Artifact map: from the paper to the repository
+
+Naming note: the repository uses short pattern names; the paper uses
+the long ones. `Patterns/overlay` = *overlay workspaces*,
+`Patterns/dynamic-loader` = *dynamic module loading*.
+
+| In the paper | In this repository |
+|---|---|
+| Pattern descriptions and topology (Sections III and IV) | `Patterns/<pattern>/helm/` (charts), `Models/` (images and node source) |
+| Measurement procedures (Section IV) | `scripts/benchmark/run_full_campaign.sh` and the capture scripts it drives |
+| Deployment regimes: warm, image cache cold, fully clean (Section IV) | `COLD_MODE` in `run_full_campaign.sh`; matrix driver `run_coldstart_matrix.sh` |
+| Install time tables and figures (Section V) | raw cycles in `results/_campaigns/<TS>/comparison.csv`, regime in `REGIME.txt` |
+| Runtime metrics, queue wait and drop counters (Section V) | `scripts/benchmark/sample_dashboard_metrics.py`, per cycle samples under `results/_campaigns/<TS>/<pattern>/` |
+| Trigger sensitivity sweep (Section V) | `run_sensitivity_campaign.sh`, index `results/_campaigns/sensitivity_index_*.csv` |
+| Hybrid composition of the dynamic pattern (Section V) | `hybrid.enabled` in `Patterns/dynamic-loader/helm/dynamic-loader/values.yaml` |
+| Update cycle comparison (Section V) | `scripts/benchmark/measure_update_cycle.sh` |
+| Repeated hot swap endurance (Section V) | `scripts/benchmark/capture_hotswap_endurance.sh` |
+| Process and container topology evidence | `scripts/benchmark/capture_process_topology.sh`, captures under `results/topology/` |
+| Statistics: means and 95 percent confidence intervals | `scripts/benchmark/aggregate_with_ci.py` (stdlib only) |
+| Try your own model under the four patterns | [`template/`](template/README.md) |
 
 ## Repository layout
 
 ```
 .
-├── Models/                          # source code of the container images
-│   ├── ros2_base/                   #   minimal ROS 2 + CUDA L4T base image
-│   ├── ros2_cam_ws/                 #   camera driver
-│   ├── ros2_yolo_ws/                #   YOLOv8-nano detector (GPU)
-│   ├── ros2_llava_ws/               #   LLaVA-1.5-7B vision–language (GPU)
-│   ├── ros2_voxtral_ws/             #   Voxtral-Mini-3B voice interaction
-│   ├── ros2_monolithic_ws/          #   monolithic carrier (4 nodes in one image)
-│   ├── ros2_overlay_pack/           #   overlay-canonical carrier (deps + models)
-│   ├── ros2_component_host/         #   dynamic-loader host (component_container)
-│   ├── ros2_dashboard/              #   web control panel (rosbridge + nginx)
-│   ├── cusparselt_stub.c            #   stub for libcusparseLt.so.0 on Jetson
-│   └── patch_torchvision_jetson.py  #   torchvision NMS / Triton patches
+├── Models/                      # source code of the container images
+│   ├── ros2_base/               #   ROS 2 Humble + CUDA L4T base image
+│   ├── ros2_cam_ws/             #   camera driver
+│   ├── ros2_yolo_ws/            #   YOLOv8-nano detector (GPU)
+│   ├── ros2_llava_ws/           #   LLaVA-1.5-7B vision language (GPU)
+│   ├── ros2_voxtral_ws/         #   Voxtral-Mini-3B voice interaction
+│   ├── ros2_monolithic_ws/      #   monolithic image (4 nodes, one image)
+│   ├── ros2_overlay_pack/       #   overlay carrier (deps + models payload)
+│   ├── ros2_component_host/     #   dynamic pattern host + orchestrator
+│   └── ros2_dashboard/          #   web control panel (rosbridge + nginx)
 │
-├── Patterns/                        # the four Helm charts (chart version 1.0.0)
-│   ├── monolithic/
-│   ├── microservices/
-│   ├── dynamic-canonical/
-│   └── overlay-canonical/
+├── Patterns/                    # the four Helm charts
+│   ├── monolithic/helm/
+│   ├── microservices/helm/ros2-microservices/
+│   ├── dynamic-loader/helm/dynamic-loader/
+│   └── overlay/helm/ros2-overlay/
 │
-├── scripts/
-│   ├── benchmark/                   # automated measurement campaign
-│   │   ├── run_n_campaigns.sh             # wrapper: N warm + M cold-cold replicas
-│   │   ├── run_full_campaign.sh           #   core campaign (4 patterns in series)
-│   │   ├── capture_pattern_run.sh         #     per-pattern install + sample driver
-│   │   ├── sample_dashboard_metrics.py    #     rosbridge sampler (runtime metrics)
-│   │   ├── llava_trigger_driver.py        #     deterministic /llava/trigger publisher
-│   │   ├── trigger_test.py                #     quick-check of the trigger pipeline
-│   │   ├── ros_latency_probe.py           #     end-to-end latency probe
-│   │   ├── collect_metrics.sh             #     post-cycle metric collector
-│   │   ├── fix_comparison_csv.sh          #     post-hoc cleaner of comparison.csv
-│   │   ├── aggregate_meta_campaign.sh     #     mean ± std per pattern × regime
-│   │   ├── capture_dynamic_load_unload.sh #     per-module hot-swap timing
-│   │   ├── measure_overlay_once.sh        #     single overlay install (manual)
-│   │   └── measure_overlay_incremental_warm.sh
-│   ├── prepare_release.sh           # Zenodo / GitHub release cleanup (dry-run by default)
-│   └── publish_charts.sh            # push the four Helm charts to the OCI registry
+├── scripts/benchmark/           # automated measurement campaigns
+│   ├── run_full_campaign.sh           # core campaign (regimes via COLD_MODE)
+│   ├── run_coldstart_matrix.sh        # warm + image cold + fully clean matrix
+│   ├── run_sensitivity_campaign.sh    # LLaVA trigger period sweep
+│   ├── measure_update_cycle.sh        # equivalent update op per pattern
+│   ├── capture_hotswap_endurance.sh   # repeated swap cycles + memory watch
+│   ├── capture_process_topology.sh    # live process/container evidence
+│   ├── capture_dynamic_load_unload.sh # per module hot swap timing
+│   ├── sample_dashboard_metrics.py    # rosbridge sampler (runtime metrics)
+│   ├── llava_trigger_driver.py        # deterministic /llava/trigger publisher
+│   └── aggregate_with_ci.py           # mean, std, CI95, p50/p95, drops
 │
-├── results/                         # raw measurement data per cycle
-│   ├── _campaigns/                            #   raw rosbridge samples per cycle
-│   │   └── <TS>/<pattern>/                    #     one folder per cycle × pattern
-│   ├── overlay_incremental_warm/
-│   │   └── 20260527-122308/measurements.csv   # 5-cycle rollout-restart, 73.6 ± 0.5 s
-│   └── dynamic-canonical/load-unload/
-│       └── load_unload_per_module.csv         # per-module hot-swap latencies (Table 5)
+├── results/                     # raw measurement data (committed)
+│   ├── _campaigns/<TS>/         #   one dir per campaign; REGIME.txt inside
+│   ├── topology/                #   live process/container captures
+│   └── overlay_incremental_warm/
 │
-├── dashboard/                       # standalone HTML dashboard (rosbridge UI)
-│   └── index.html
-│
-├── README.md                        # this file
-├── LICENSE                          # Apache 2.0
-└── CITATION.cff                     # citation metadata for Zenodo / GitHub
+├── template/                    # bring your own model under the 4 patterns
+├── dashboard/                   # standalone HTML dashboard (rosbridge UI)
+├── LICENSE                      # Apache 2.0
+└── CITATION.cff                 # citation metadata for Zenodo / GitHub
 ```
 
 ## The four deployment patterns at a glance
 
-| Pattern                | What it is                                                                                  | Image footprint | OTA payload   |
-|------------------------|---------------------------------------------------------------------------------------------|-----------------|---------------|
-| **Monolithic**         | Single 30 GB image bundling ROS 2 runtime, all four AI nodes and Python deps.               | 30.01 GB        | 30 GB         |
-| **Microservices**      | Five separate images, one pod per service, communicate via CycloneDDS.                      | 47.25 GB        | 5–19 GB       |
-| **Dynamic loading**    | One `component_container_isolated` host that loads the four nodes as plugins on demand.     | 30.02 GB        | 30 GB         |
-| **Overlay workspaces** | Immutable 2.24 GB base + 25 GB mutable carrier extracted on edge from a cloud-side server.  | 27.54 GB        | 25 GB         |
+| Pattern | What it is | Lifecycle property exercised |
+|---|---|---|
+| **Monolithic** | One image bundling ROS 2 runtime and the four AI nodes as separate OS processes. | Simplest unit; any update re ships the full image. |
+| **Microservices** | One image and one pod per service, DDS across pods. | Per service isolation, update and patching. |
+| **Dynamic loading** | One component host process that loads and unloads the nodes as plugins at runtime. | Hot swap in seconds; shared interpreter and CUDA context. |
+| **Overlay workspaces** | Immutable base image plus a mutable carrier extracted cloud side and fetched by the edge. | Bounded OTA payload; base never re ships. |
 
-## How to reproduce the campaign
+Image sizes and all measured numbers are reported in the article with
+confidence intervals; the raw values per cycle live in
+`results/_campaigns/`.
 
-1. Provision a K3s cluster matching the topology in Table 1 (one Jetson
-   AGX Orin edge node, two amd64 cloud nodes).
-2. Set up SSH and passwordless `sudo k3s` between the control-plane
-   node and the three cluster nodes (needed for the cold-cold image
-   purge between cycles).
-3. Build and push the five container images
-   (`Models/ros2_*_ws/docker/Dockerfile`) to your own registry. The
-   build uses BuildKit and requires an `HF_TOKEN` secret with access to
-   the Voxtral-Mini-3B-2507 gated repository.
-4. Create the `ros2exp` namespace and the `regcred` image pull secret.
-5. Run the multi-replicate campaign:
+The runtime topology below is the key to understanding the results:
+where the process, container and pod boundaries fall in each pattern,
+and what runtime state is shared.
+
+![Runtime topology per pattern](docs/figures/runtime_topology.png)
+
+## How to reproduce the campaigns
+
+1. Provision a K3s cluster matching the topology in the article (one
+   Jetson AGX Orin edge node, two amd64 cloud nodes).
+2. Set up SSH and passwordless `sudo k3s` from the control plane to the
+   cluster nodes (required by the image purge of the cold regimes), and
+   passwordless `sudo rm` on the edge for the fully clean regime.
+3. Build and push the container images
+   (`Models/*/docker/Dockerfile`) to your registry. BuildKit is
+   required, plus an `HF_TOKEN` secret with access to the gated
+   Voxtral-Mini-3B repository. Note the architecture split: images that
+   run on the edge are arm64; the overlay carrier must be built with
+   `--platform linux/amd64` (see `Models/ros2_overlay_pack/docker/Dockerfile`).
+4. Create the `ros2exp` namespace and the `regcred` pull secret.
+5. Run the deployment regime matrix (three regimes, four patterns):
 
    ```bash
-   PATTERNS="monolithic microservices overlay-canonical dynamic-canonical" \
-     N_WARM=5 N_COLD=3 \
-     nohup bash scripts/benchmark/run_n_campaigns.sh > mega.log 2>&1 &
+   N_WARM=5 N_IMAGECOLD=3 N_PRISTINE=3 \
+     nohup bash scripts/benchmark/run_coldstart_matrix.sh > matrix.log 2>&1 &
    ```
 
-   Approximate wall-clock time: 14 hours.
-6. Aggregate the data:
+6. Run the trigger sensitivity sweep:
 
    ```bash
-   SUM=$(ls -1t results/_campaigns/_summary_*.csv | head -1)
-   for d in $(awk -F',' 'NR>1 {print $3}' "$SUM"); do
-     bash scripts/benchmark/fix_comparison_csv.sh "$d"
-   done
-   bash scripts/benchmark/aggregate_meta_campaign.sh "$SUM"
+   nohup bash scripts/benchmark/run_sensitivity_campaign.sh > sensitivity.log 2>&1 &
    ```
 
+7. Aggregate everything with confidence intervals:
+
+   ```bash
+   python3 scripts/benchmark/aggregate_with_ci.py
+   ```
+
+Campaigns write one directory per run under `results/_campaigns/`,
+including the exact regime (`REGIME.txt`), the raw rosbridge samples
+and the per pattern artifacts. Cycles excluded from the statistics of
+the article (cache priming, operator induced contention) are documented
+in the reproducibility notes of each campaign index.
+
+## Try your own model
+
+The [`template/`](template/README.md) directory lets you evaluate your
+own model under the four patterns without editing any chart: implement
+two methods in a template ROS 2 package, build with the provided
+Dockerfiles, and the full measurement methodology of the article
+(regimes, runtime metrics, confidence intervals) applies to your model
+unchanged.
 
 ## Pre-built images
 
-For reviewers who do not want to rebuild from scratch, the same five
-images used in the published measurements are mirrored in the
-institutional GitLab registry of CIGIP-UPV
-(`gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/`). They can
-be made available upon reasonable request to the corresponding author.
-The Dockerfiles in this repository are sufficient to rebuild
-byte-for-byte equivalent images on any host with NVIDIA Container
-Toolkit support.
+The images used in the published measurements are mirrored in the
+institutional GitLab registry of CIGIP-UPV and can be made available
+upon reasonable request to the corresponding author. The Dockerfiles in
+this repository are sufficient to rebuild equivalent images on any host
+with NVIDIA Container Toolkit support.
 
 ## Workload
 
-- **YOLOv8-nano** for real-time garment detection.
-- **LLaVA-1.5-7B** in FP16 for vision–language reasoning, triggered
-  every 30 s during the warm-up and sampling windows via a
-  deterministic external publisher (see
-  `scripts/benchmark/llava_trigger_driver.py`).
-- **Voxtral-Mini-3B** for voice interaction (Phase 1 in this paper:
-  loaded in memory, not actively driving an audio device).
+- **YOLOv8-nano** for real time detection.
+- **LLaVA-1.5-7B** for vision language reasoning, triggered
+  deterministically (period configurable; the article sweeps 30, 60,
+  120 and 300 s) via `scripts/benchmark/llava_trigger_driver.py`.
+- **Voxtral-Mini-3B** for voice interaction.
 
 The four deployment patterns receive identical workloads and identical
-ROS 2 application code; they differ only in how the four nodes are
-packaged and started.
+ROS 2 application code; they differ only in how the nodes are packaged,
+delivered and started.
 
 ## Citing
 
-Please cite both the article and this repository. The repository's
-`CITATION.cff` is set up so that GitHub and Zenodo render the citation
-metadata automatically; the Zenodo DOI generated upon archival is the
-preferred citation key for the dataset.
+Please cite both the article and this repository. `CITATION.cff` is set
+up so that GitHub and Zenodo render the citation metadata
+automatically. The revision submitted to IEEE Access is frozen as a git
+tag so the article can reference an immutable revision of this
+artifact.
 
 ## Authors
 
