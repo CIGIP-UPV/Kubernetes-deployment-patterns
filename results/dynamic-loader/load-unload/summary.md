@@ -1,6 +1,6 @@
 # dynamic-loader — C-7 load/unload latency
 
-_Captured: 2026-07-10T13:43:18Z_
+_Captured: 2026-07-12T13:06:51Z_
 
 Release: `dynamic-pattern`  ·  Namespace: `ros2exp`
 
@@ -8,9 +8,9 @@ Release: `dynamic-pattern`  ·  Namespace: `ros2exp`
 
 | Module | Load (s) | Unload (s) | Load status | Unload status |
 |--------|----------|------------|-------------|---------------|
-| yolo | 0.30 | 0.32 | FAIL | OK |
-| llava | 0.22 | 23.78 | FAIL | FAIL |
-| voxtral | 0.24 | 0.25 | FAIL | FAIL |
+| yolo | 0.27 | 90.27 | FAIL | FAIL |
+| llava | 0.57 | 0.62 | FAIL | FAIL |
+| voxtral | 0.51 | 0.52 | FAIL | FAIL |
 
 ## Comparison context
 

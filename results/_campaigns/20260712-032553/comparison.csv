@@ -1,0 +1,5 @@
+pattern,t_zero,t_fin,t_install_e2e_s,t_ready_system_s,s_img_total_gb,t_inf_avg_ms,f_fps_pub,t_e2e_avg_ms,j_inf_ms,u_cpu_avg_pct,u_gpu_avg_pct,u_ram_avg_pct,run_dir,status,notes
+monolithic,2026-07-12T03:25:53Z,2026-07-12T03:27:05Z,72,68,0.00,26.73,21.18,57.13,3.20,35.94,56.45,31.98,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260712-032553/monolithic,ok,
+microservices,2026-07-12T03:41:19Z,2026-07-12T03:43:03Z,104,101,0.00,26.42,22.64,77.74,3.13,34.93,57.32,51.87,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260712-032553/microservices,ok,
+overlay,2026-07-12T03:57:20Z,2026-07-12T04:18:56Z,1296,1000,0.00,25.95,21.47,58.48,3.34,35.41,54.62,31.93,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260712-032553/overlay,ok,
+dynamic-loader,2026-07-12T04:33:12Z,2026-07-12T04:36:06Z,174,68,0.00,209.75,4.00,260.96,39.68,22.91,29.31,31.09,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260712-032553/dynamic-loader,ok,

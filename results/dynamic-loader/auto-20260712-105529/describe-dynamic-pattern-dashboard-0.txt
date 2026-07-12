@@ -1,0 +1,112 @@
+Name:             dynamic-pattern-dashboard-0
+Namespace:        ros2exp
+Priority:         0
+Service Account:  default
+Node:             worker1-kb2/158.42.104.103
+Start Time:       Sun, 12 Jul 2026 12:36:05 +0000
+Labels:           app=dynamic-loader-dashboard
+                  app.kubernetes.io/instance=dynamic-pattern
+                  app.kubernetes.io/managed-by=Helm
+                  app.kubernetes.io/name=dynamic-loader
+                  apps.kubernetes.io/pod-index=0
+                  component=dashboard
+                  controller-revision-hash=dynamic-pattern-dashboard-7bfc995b4b
+                  helm.sh/chart=dynamic-loader-1.0.0
+                  pattern=dynamic-loader
+                  statefulset.kubernetes.io/pod-name=dynamic-pattern-dashboard-0
+Annotations:      <none>
+Status:           Running
+IP:               10.42.1.87
+IPs:
+  IP:           10.42.1.87
+Controlled By:  StatefulSet/dynamic-pattern-dashboard
+Init Containers:
+  wait-for-peers:
+    Container ID:  containerd://4e2c617263b9aacd9a85cf4a33440968161cdd58473bb667ff90b2cb4e2c7959
+    Image:         busybox:1.36
+    Image ID:      docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      sh
+      -c
+      FULLNAME="dynamic-pattern"
+      NS="ros2exp"
+      RUNTIME_PEER="${FULLNAME}-0.${FULLNAME}-peers.${NS}.svc.cluster.local"
+      echo "[init] Waiting for runtime DNS: $RUNTIME_PEER"
+      until nslookup "$RUNTIME_PEER" >/dev/null 2>&1; do
+        sleep 3
+      done
+      GRACE=60
+      echo "[init] Runtime resolved — waiting ${GRACE}s for components + bootstrap to complete"
+      sleep "$GRACE"
+      echo "[init] Ready"
+      
+    State:          Terminated
+      Reason:       Completed
+      Exit Code:    0
+      Started:      Sun, 12 Jul 2026 12:36:06 +0000
+      Finished:     Sun, 12 Jul 2026 12:37:12 +0000
+    Ready:          True
+    Restart Count:  0
+    Environment:    <none>
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-qwc6g (ro)
+Containers:
+  dashboard:
+    Container ID:   containerd://6a8e8d035a3dc3b7c2a6a63cc825dc223500ac53e46629f0cf23f6a80aee31ee
+    Image:          gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard:latest
+    Image ID:       gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard@sha256:46f7e0651a22713ce0b1d911a07f9ce868fa0d2123a229f92301e640000d0df1
+    Ports:          8080/TCP, 9090/TCP
+    Host Ports:     0/TCP, 0/TCP
+    State:          Running
+      Started:      Sun, 12 Jul 2026 12:37:13 +0000
+    Ready:          True
+    Restart Count:  0
+    Liveness:       http-get http://:http/ delay=10s timeout=1s period=30s #success=1 #failure=3
+    Environment:
+      ROS_DOMAIN_ID:       42
+      RMW_IMPLEMENTATION:  rmw_cyclonedds_cpp
+      ROS_LOCALHOST_ONLY:  0
+      CYCLONEDDS_URI:      file:///etc/cyclonedds/cyclonedds.xml
+    Mounts:
+      /dashboard-cm from dashboard-html (ro)
+      /etc/cyclonedds from cyclonedds (ro)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-qwc6g (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  dashboard-html:
+    Type:      ConfigMap (a volume populated by a ConfigMap)
+    Name:      dynamic-pattern-dashboard-html
+    Optional:  false
+  cyclonedds:
+    Type:      ConfigMap (a volume populated by a ConfigMap)
+    Name:      dynamic-pattern-cyclonedds
+    Optional:  false
+  kube-api-access-qwc6g:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age   From               Message
+  ----    ------     ----  ----               -------
+  Normal  Scheduled  18m   default-scheduler  Successfully assigned ros2exp/dynamic-pattern-dashboard-0 to worker1-kb2
+  Normal  Pulled     18m   kubelet            Container image "busybox:1.36" already present on machine
+  Normal  Created    18m   kubelet            Created container: wait-for-peers
+  Normal  Started    18m   kubelet            Started container wait-for-peers
+  Normal  Pulling    17m   kubelet            Pulling image "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard:latest"
+  Normal  Pulled     17m   kubelet            Successfully pulled image "gitlab-cigip.alc.upv.es:5050/cigip/patrones-kubernetes/ros2-dashboard:latest" in 339ms (339ms including waiting). Image size: 270402470 bytes.
+  Normal  Created    17m   kubelet            Created container: dashboard
+  Normal  Started    17m   kubelet            Started container dashboard

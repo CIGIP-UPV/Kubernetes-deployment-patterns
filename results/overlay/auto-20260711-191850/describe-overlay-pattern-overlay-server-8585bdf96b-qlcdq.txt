@@ -1,0 +1,72 @@
+Name:             overlay-pattern-overlay-server-8585bdf96b-qlcdq
+Namespace:        ros2exp
+Priority:         0
+Service Account:  default
+Node:             kb2/158.42.104.15
+Start Time:       Sat, 11 Jul 2026 19:53:18 +0000
+Labels:           app=ros2-overlay-overlay-server
+                  app.kubernetes.io/instance=overlay-pattern
+                  app.kubernetes.io/managed-by=Helm
+                  app.kubernetes.io/name=ros2-overlay
+                  component=overlay-server
+                  helm.sh/chart=ros2-overlay-1.0.0
+                  pod-template-hash=8585bdf96b
+Annotations:      <none>
+Status:           Running
+IP:               10.42.0.12
+IPs:
+  IP:           10.42.0.12
+Controlled By:  ReplicaSet/overlay-pattern-overlay-server-8585bdf96b
+Containers:
+  nginx:
+    Container ID:   containerd://420b267e821e690317c420497d5e91c726a62fa37a78debcbc5af070265fae6f
+    Image:          nginx:alpine
+    Image ID:       docker.io/library/nginx@sha256:54f2a904c251d5a34adf545a72d32515a15e08418dae0266e23be2e18c66fefa
+    Port:           80/TCP
+    Host Port:      0/TCP
+    State:          Running
+      Started:      Sat, 11 Jul 2026 19:53:20 +0000
+    Ready:          True
+    Restart Count:  0
+    Limits:
+      cpu:     500m
+      memory:  256Mi
+    Requests:
+      cpu:        50m
+      memory:     64Mi
+    Liveness:     http-get http://:http/ delay=5s timeout=5s period=30s #success=1 #failure=3
+    Readiness:    http-get http://:http/ delay=1s timeout=3s period=5s #success=1 #failure=3
+    Environment:  <none>
+    Mounts:
+      /usr/share/nginx/html/overlay from overlay-source (ro)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-fq8jp (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  overlay-source:
+    Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:  overlay-pattern-overlay-source
+    ReadOnly:   false
+  kube-api-access-fq8jp:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              kubernetes.io/hostname=kb2
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason                           Age   From               Message
+  ----     ------                           ----  ----               -------
+  Normal   Scheduled                        27m   default-scheduler  Successfully assigned ros2exp/overlay-pattern-overlay-server-8585bdf96b-qlcdq to kb2
+  Warning  FailedToRetrieveImagePullSecret  27m   kubelet            Unable to retrieve some image pull secrets (regcred); attempting to pull the image may not succeed.
+  Normal   Pulled                           27m   kubelet            Container image "nginx:alpine" already present on machine
+  Normal   Created                          27m   kubelet            Created container: nginx
+  Normal   Started                          27m   kubelet            Started container nginx

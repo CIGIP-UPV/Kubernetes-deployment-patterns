@@ -1,4 +1,4 @@
 module,load_s,unload_s,load_status,unload_status
-yolo,0.30,0.32,FAIL,OK
-llava,0.22,23.78,FAIL,FAIL
-voxtral,0.24,0.25,FAIL,FAIL
+yolo,0.27,90.27,FAIL,FAIL
+llava,0.57,0.62,FAIL,FAIL
+voxtral,0.51,0.52,FAIL,FAIL
