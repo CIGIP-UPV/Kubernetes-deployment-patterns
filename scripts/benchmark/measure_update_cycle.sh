@@ -128,8 +128,12 @@ PYEOF
 }
 
 wait_pods_ready() {
-  kubectl wait pod -n "${NAMESPACE}" -l "app.kubernetes.io/instance=${RELEASE}" \
-    --for=condition=Ready --timeout=60m >/dev/null 2>&1
+  local r rc=0
+  for r in $(kubectl get statefulset,deployment -n "${NAMESPACE}" -l "app.kubernetes.io/instance=${RELEASE}" -o name 2>/dev/null); do
+    kubectl rollout status "$r" -n "${NAMESPACE}" --timeout=60m >/dev/null 2>&1 || rc=1
+  done
+  kubectl wait pod -n "${NAMESPACE}" -l "app.kubernetes.io/instance=${RELEASE}" --for=condition=Ready --timeout=60m >/dev/null 2>&1 || rc=1
+  return $rc
 }
 
 for rep in $(seq 1 "${N_REPS}"); do
