@@ -59,20 +59,31 @@ declare -A MODULE_PARAMS=(
 
 # ── Memoria del proceso component_container (RSS/VmSize, kB) ────────────────
 host_process_memory() {
-  # Devuelve "rss_kb vmsize_kb" del proceso python que ejecuta el
+  # Devuelve "rss_kb vmsize_kb" del proceso worker que ejecuta el
   # component_container_isolated, o "NA NA" si no se encuentra.
+  # Varios procesos casan el patron (bash -lc, ros2 run CLI y el worker de
+  # Python que carga los modelos). El wrapper pesa ~2.8 MB; el worker, GB.
+  # Elegimos el de mayor VmRSS para medir el proceso que realmente aloja los
+  # modelos, que es el relevante para R1.12 (fuga tras swaps repetidos).
   ${EXEC_HOST} sh -c '
+    best_rss=-1; best_vsz=NA
     for d in /proc/[0-9]*; do
       cmd=$(tr "\0" " " < "$d/cmdline" 2>/dev/null)
       case "$cmd" in
         *component_container_isolated*)
           rss=$(awk "/^VmRSS:/{print \$2}"  "$d/status" 2>/dev/null)
           vsz=$(awk "/^VmSize:/{print \$2}" "$d/status" 2>/dev/null)
-          echo "${rss:-NA} ${vsz:-NA}"
-          exit 0 ;;
+          [ -z "$rss" ] && continue
+          if [ "$rss" -gt "$best_rss" ] 2>/dev/null; then
+            best_rss=$rss; best_vsz=${vsz:-NA}
+          fi ;;
       esac
     done
-    echo "NA NA"' 2>/dev/null || echo "NA NA"
+    if [ "$best_rss" -ge 0 ] 2>/dev/null; then
+      echo "$best_rss $best_vsz"
+    else
+      echo "NA NA"
+    fi' 2>/dev/null || echo "NA NA"
 }
 
 # MemAvailable del edge (todo el nodo; la GPU del Jetson usa memoria unificada,

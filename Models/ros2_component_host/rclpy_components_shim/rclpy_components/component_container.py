@@ -23,8 +23,10 @@ applied to the loaded node before its first spin.
 import argparse
 import importlib
 import logging
+import os
 import sys
 import threading
+import time
 import traceback
 from typing import Any, Dict, Optional
 
@@ -97,6 +99,19 @@ class ComponentContainer(Node):
         self._next_id = 1
         self._lock = threading.Lock()
         self._executor: Optional[MultiThreadedExecutor] = None
+
+        # Deferred, executor-context teardown (R1.12 hardening). Destroying a
+        # plugin node directly from the UnloadNode service thread races the
+        # MultiThreadedExecutor: the node's entities may still sit in the
+        # current wait set, producing a use-after-free that aborts the whole
+        # process (observed as component-host restarts under repeated hot-swap
+        # with live traffic). Instead we remove the node from the executor, let
+        # the wait set rebuild, and finalize it from the container's own
+        # executor context after a short grace period.
+        self._destroy_lock = threading.Lock()
+        self._pending_destroy: list = []
+        self._unload_grace_s = float(os.environ.get('UNLOAD_GRACE_S', '1.5'))
+        self._reaper = self.create_timer(0.2, self._reap_pending)
 
         self._srv_load   = self.create_service(LoadNode,   f'{prefix}/load_node',   self._cb_load)
         self._srv_unload = self.create_service(UnloadNode, f'{prefix}/unload_node', self._cb_unload)
@@ -213,18 +228,71 @@ class ComponentContainer(Node):
             response.error_message = f'unique_id={request.unique_id} not loaded'
             return response
         plugin_name, full_node_name, instance = entry
+        # Stop new callback dispatch for this node immediately, then defer the
+        # physical destroy_node() to _reap_pending so it runs from the executor's
+        # own context after the wait set has been rebuilt and any in-flight
+        # callback for this node has drained. The node is already out of the
+        # registry, so ListNodes is consistent from the caller's point of view.
         try:
             if self._executor:
                 self._executor.remove_node(instance)
-            instance.destroy_node()
-            response.success = True
-            response.error_message = ''
-            self.get_logger().info(f'[unload] OK uid={request.unique_id} ({full_node_name})')
         except Exception as e:                       # pragma: no cover
-            response.success = False
-            response.error_message = f'{e}'
-            self.get_logger().error(f'[unload] FAILED: {e}')
+            self.get_logger().warn(f'[unload] remove_node warning ({full_node_name}): {e}')
+        # Best-effort quiesce of active timers so no new timer callbacks fire
+        # during the grace window. Subscriptions stop being dispatched once the
+        # node is out of the executor.
+        try:
+            for t in list(getattr(instance, 'timers', []) or []):
+                try:
+                    t.cancel()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        deadline = time.monotonic() + self._unload_grace_s
+        with self._destroy_lock:
+            self._pending_destroy.append((deadline, plugin_name, full_node_name, instance))
+        # Wake the executor so it rebuilds its wait set without this node.
+        try:
+            wake = getattr(self._executor, 'wake', None)
+            if callable(wake):
+                wake()
+        except Exception:
+            pass
+        response.success = True
+        response.error_message = ''
+        self.get_logger().info(
+            f'[unload] OK uid={request.unique_id} ({full_node_name}); '
+            f'finalize deferred ~{self._unload_grace_s:.1f}s'
+        )
         return response
+
+    def _reap_pending(self):
+        """Finalize nodes whose grace period elapsed, from executor context."""
+        now = time.monotonic()
+        due = []
+        with self._destroy_lock:
+            keep = []
+            for item in self._pending_destroy:
+                if item[0] <= now:
+                    due.append(item)
+                else:
+                    keep.append(item)
+            self._pending_destroy = keep
+        for _deadline, _plugin_name, full_node_name, instance in due:
+            self._safe_destroy(full_node_name, instance)
+
+    def _safe_destroy(self, full_node_name, instance):
+        """Destroy a node, swallowing any teardown error.
+
+        Never let a finalize error propagate into the executor thread and take
+        down the container; drop the reference and let GC reclaim the node.
+        """
+        try:
+            instance.destroy_node()
+            self.get_logger().info(f'[reap] destroyed {full_node_name}')
+        except Exception as e:                       # pragma: no cover
+            self.get_logger().error(f'[reap] destroy error for {full_node_name}: {e}')
 
     def _cb_list(self, request, response):
         with self._lock:
