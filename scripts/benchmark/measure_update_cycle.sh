@@ -112,8 +112,8 @@ PYEOF
 }
 
 stop_gap_probe() {
-  kill -INT "${GAP_PID}" 2>/dev/null || true
-  wait "${GAP_PID}" 2>/dev/null || true
+  kill -9 "${GAP_PID}" 2>/dev/null || true
+  for _i in 1 2 3; do kill -0 "${GAP_PID}" 2>/dev/null || break; sleep 1; done
   # gap máximo a posteriori
   GAP_MAX=$(python3 - "$GAP_CSV" <<'PYEOF'
 import sys, csv
