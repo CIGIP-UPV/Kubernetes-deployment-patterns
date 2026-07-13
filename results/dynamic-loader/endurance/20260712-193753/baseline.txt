@@ -1,0 +1,3 @@
+baseline components: {"loaded":[{"unique_id":1,"full_node_name":"ComponentManager"},{"unique_id":2,"full_node_name":"ComponentManager"},{"unique_id":3,"full_node_name":"ComponentManager"},{"unique_id":4,"full_node_name":"ComponentManager"}],"tracked":{"camera":1,"yolo":2,"llava":3,"voxtral":4},"available":["camera","yolo","llava","voxtral"]}
+baseline host memory (rss vms kB): 2848 4560
+baseline MemAvailable (kB): 45687244

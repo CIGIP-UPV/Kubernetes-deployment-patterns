@@ -1,0 +1,7 @@
+final components: {"loaded":[{"unique_id":22,"full_node_name":"ComponentManager"}],"tracked":{"camera":1,"yolo":3,"llava":4,"voxtral":22},"available":["camera","yolo","llava","voxtral"]}
+final host memory (rss vms kB): 2868 4560
+final MemAvailable (kB): 46166372
+
+Comparar con baseline.txt: una pendiente positiva sostenida de RSS o
+una caida sostenida de MemAvailable a componentes iguales indica fuga
+(R1.12). Analizar tendencia con scripts/benchmark/aggregate_with_ci.py.

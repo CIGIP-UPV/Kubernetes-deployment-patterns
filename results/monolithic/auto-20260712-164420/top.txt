@@ -1,0 +1,4 @@
+# Captured 2026-07-12T17:03:58Z
+NAME                             CPU(cores)   MEMORY(bytes)   
+monolithic-pattern-0             2618m        15940Mi         
+monolithic-pattern-dashboard-0   103m         102Mi           
