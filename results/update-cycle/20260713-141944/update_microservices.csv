@@ -1,0 +1,5 @@
+pattern,rep,stage,seconds,status,notes
+microservices,1,t_publish,NA,SKIP,"artefacto pre-publicado (tag update-test)"
+microservices,1,t_publish,NA,SKIP,"artefacto pre-publicado (tag update-test)"
+microservices,1,t_rollout,1.49,FAIL,"helm upgrade --set images.yolo.tag=update-test"
+microservices,1,t_rollout,1.96,OK,"helm upgrade --set images.yolo.tag=update-test"

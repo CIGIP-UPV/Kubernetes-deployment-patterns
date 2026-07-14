@@ -1,0 +1,9 @@
+pattern,rep,stage,seconds,status,notes
+monolithic,1,t_publish,NA,SKIP,"artefacto pre-publicado (tag update-test)"
+monolithic,1,t_rollout,1.41,OK,"helm upgrade --set image.tag=update-test"
+monolithic,1,t_ready,92.73,OK,"incluye pull de la imagen nueva"
+monolithic,1,t_gap_max,NA,OK,"hueco max en /benchmark/latency_ms (interrupcion percibida)"
+monolithic,1,t_rollback,74.11,OK,"helm rollback"
+monolithic,2,t_publish,NA,SKIP,"artefacto pre-publicado (tag update-test)"
+monolithic,2,t_rollout,1.41,OK,"helm upgrade --set image.tag=update-test"
+monolithic,2,t_ready,72.91,OK,"incluye pull de la imagen nueva"

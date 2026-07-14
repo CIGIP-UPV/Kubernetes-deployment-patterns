@@ -1,0 +1,4 @@
+pattern,rep,stage,seconds,status,notes
+monolithic,1,t_publish,NA,SKIP,"artefacto pre-publicado (tag update-test)"
+monolithic,1,t_rollout,1.29,OK,"helm upgrade --set image.tag=update-test"
+monolithic,1,t_ready,0.36,OK,"incluye pull de la imagen nueva"
