@@ -267,14 +267,16 @@ install_pattern() {
         -n "${NAMESPACE}" --create-namespace \
         --timeout "${HELM_TIMEOUT}" --wait \
         --set image.tag="${IMAGE_TAG}" \
-        --set camera.device="${CAMERA_DEVICE}"
+        --set camera.device="${CAMERA_DEVICE}" \
+        --set camera.fps="${CAMERA_FPS:-0}"
       ;;
     microservices)
       helm install "${release}" "${PROJECT_ROOT}/Patterns/microservices/helm/ros2-microservices" \
         -n "${NAMESPACE}" --create-namespace \
         --timeout "${HELM_TIMEOUT}" --wait \
         --set image.tag="${IMAGE_TAG}" \
-        --set camera.device="${CAMERA_DEVICE}"
+        --set camera.device="${CAMERA_DEVICE}" \
+        --set camera.fps="${CAMERA_FPS:-0}"
       ;;
     overlay)
       # IMPORTANTE: overlay se instala SIN --wait, a propósito.
@@ -292,7 +294,8 @@ install_pattern() {
         --set images.base.tag="${IMAGE_TAG}" \
         --set images.overlayPack.tag="${IMAGE_TAG}" \
         --set nodes.cloud.name="${CLOUD_NODE}" \
-        --set camera.device="${CAMERA_DEVICE}"
+        --set camera.device="${CAMERA_DEVICE}" \
+        --set camera.fps="${CAMERA_FPS:-0}"
       ;;
     dynamic-loader)
       # DYNAMIC_HYBRID=true instala la variante hibrida (R1.4/D2: LLaVA como
@@ -303,7 +306,8 @@ install_pattern() {
         --timeout "${HELM_TIMEOUT}" --wait \
         --set image.tag="${IMAGE_TAG}" \
         --set hybrid.enabled="${DYNAMIC_HYBRID:-false}" \
-        --set camera.device="${CAMERA_DEVICE}"
+        --set camera.device="${CAMERA_DEVICE}" \
+        --set camera.fps="${CAMERA_FPS:-0}"
       ;;
     *)
       log "  ERROR: unknown pattern '${pattern}'"; return 1
