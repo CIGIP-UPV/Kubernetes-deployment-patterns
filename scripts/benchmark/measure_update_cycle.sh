@@ -167,7 +167,7 @@ for rep in $(seq 1 "${N_REPS}"); do
       # el Init Container detecta el marker ausente y re-descarga SOLO esa capa.
       t0=$(now_s)
       ssh -o BatchMode=yes -o ConnectTimeout=8 "${EDGE_PURGE_HOST}" \
-        "sudo -n /bin/rm -rf ${OVERLAY_HOSTPATH:?}/.markers/deps* ${OVERLAY_HOSTPATH:?}/deps* 2>/dev/null; true" \
+        "sudo -n /bin/rm -rf ${OVERLAY_HOSTPATH:?}/install/setup.bash 2>/dev/null; true" \
         >/dev/null 2>&1 && st=OK || st=FAIL
       t1=$(now_s); record "${rep}" t_rollout "$(elapsed "$t0" "$t1")" "${st}" "invalidacion marker capa deps (edge)"
       t0=$(now_s)
