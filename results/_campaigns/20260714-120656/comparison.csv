@@ -1,0 +1,2 @@
+pattern,t_zero,t_fin,t_install_e2e_s,t_ready_system_s,s_img_total_gb,t_inf_avg_ms,f_fps_pub,t_e2e_avg_ms,j_inf_ms,u_cpu_avg_pct,u_gpu_avg_pct,u_ram_avg_pct,run_dir,status,notes
+dynamic-loader,2026-07-14T12:06:57Z,2026-07-14T12:09:36Z,159,68,0.00,210.26,3.99,261.97,35.35,22.86,27.80,31.23,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260714-120656/dynamic-loader,ok,
