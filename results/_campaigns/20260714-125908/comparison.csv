@@ -1,0 +1,3 @@
+pattern,t_zero,t_fin,t_install_e2e_s,t_ready_system_s,s_img_total_gb,t_inf_avg_ms,f_fps_pub,t_e2e_avg_ms,j_inf_ms,u_cpu_avg_pct,u_gpu_avg_pct,u_ram_avg_pct,run_dir,status,notes
+dynamic-loader,2026-07-14T12:59:09Z,2026-07-14T13:01:14Z,125,68,0.00,86.68,4.85,118.45,108.10,16.17,70.63,32.02,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260714-125908/dynamic-loader,ok,
+monolithic,2026-07-14T13:15:07Z,2026-07-14T13:16:17Z,70,68,0.00,41.94,4.89,79.14,5.36,14.98,89.83,32.79,/home/administrador/Kubernetes-deployment-patterns/results/_campaigns/20260714-125908/monolithic,ok,
