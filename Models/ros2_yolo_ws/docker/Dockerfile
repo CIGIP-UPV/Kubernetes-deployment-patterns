@@ -21,7 +21,7 @@ RUN mkdir -p /cuda-export && \
           -Wl,-soname,libcusparseLt.so.0 ; \
     fi
 
-FROM nvcr.io/nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04 AS cuda-libs-amd64
+FROM busybox AS cuda-libs-amd64
 RUN apt-get update && \
     apt-get install -y --no-install-recommends libcusparselt0 2>/dev/null || true && \
     rm -rf /var/lib/apt/lists/*
@@ -86,8 +86,8 @@ RUN ARCH=$(dpkg --print-architecture) && \
       pip uninstall -y $(pip list 2>/dev/null | grep -i 'nvidia-cu' | awk '{print $1}' | tr '\n' ' ') 2>/dev/null || true ; \
     else \
       python3 -m pip install --no-cache-dir \
-        torch==2.4.1+cu121 torchvision==0.19.1+cu121 \
-        --index-url https://download.pytorch.org/whl/cu121 ; \
+        torch==2.4.1 torchvision==0.19.1 \
+        --index-url https://download.pytorch.org/whl/cpu ; \
     fi
 
 ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/lib/aarch64-linux-gnu:/usr/lib/aarch64-linux-gnu/nvidia
